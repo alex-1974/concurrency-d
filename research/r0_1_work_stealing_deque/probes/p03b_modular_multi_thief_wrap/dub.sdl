@@ -1,0 +1,7 @@
+name "r0-1-p03b-modular-multi-thief-wrap"
+description "R0.1 P03b modular multi-thief accounting across ulong wrap"
+targetType "executable"
+
+sourcePaths "source" "../../candidate/source"
+
+versions "ConcurrencyResearchProbe"
