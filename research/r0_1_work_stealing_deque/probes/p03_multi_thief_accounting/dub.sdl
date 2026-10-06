@@ -1,0 +1,5 @@
+name "r0-1-p03-multi-thief-accounting"
+description "R0.1 P03 multi-thief accounting and uniqueness probe"
+targetType "executable"
+
+sourcePaths "source" "../../candidate/source"
