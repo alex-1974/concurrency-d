@@ -1,0 +1,7 @@
+name "r0-1-p06-single-thread-hot-paths"
+description "R0.1 P06 signed versus modular single-thread WSQ hot paths"
+targetType "executable"
+
+sourcePaths "source" "../../candidate/source"
+
+versions "ConcurrencyResearchProbe"
