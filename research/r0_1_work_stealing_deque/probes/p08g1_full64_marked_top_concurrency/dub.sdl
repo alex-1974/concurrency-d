@@ -1,0 +1,7 @@
+name "r0-1-p08g1-full64-marked-top-concurrency"
+description "R0.1 P08g1 full-64 distance-marked batch concurrency"
+targetType "executable"
+
+sourcePaths "source" "../../candidate/source"
+
+versions "ConcurrencyResearchProbe"

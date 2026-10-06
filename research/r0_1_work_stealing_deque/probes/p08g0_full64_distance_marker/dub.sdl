@@ -1,0 +1,5 @@
+name "r0-1-p08g0-full64-distance-marker"
+description "R0.1 P08g0 full-64-bit distance marker algebra"
+targetType "executable"
+
+sourcePaths "source"

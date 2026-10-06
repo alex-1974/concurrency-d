@@ -1,0 +1,5 @@
+name "r0-1-p08g2-marked-top-owner-thief-drain"
+description "R0.1 P08g2 marked-top concurrent owner/thief drain"
+targetType "executable"
+
+sourcePaths "source" "../../candidate/source"

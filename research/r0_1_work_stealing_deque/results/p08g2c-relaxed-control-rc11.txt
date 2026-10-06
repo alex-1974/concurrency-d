@@ -1,0 +1,61 @@
+GenMC v0.19.0 (LLVM 21.1.8)
+Copyright (C) 2024 MPI-SWS. All rights reserved.
+
+*** Compilation complete.
+*** Transformation complete.
+Error: Safety violation!
+Event (0, 11) in graph:
+<-1, 0>:
+	(0, 1): Wna (topState, 0) stale_bottom_relaxed_control.c:148
+	(0, 2): Wna (bottom, 10) stale_bottom_relaxed_control.c:160
+	(0, 3): Wna (clearedBusy, 0) stale_bottom_relaxed_control.c:164
+	(0, 4): THREAD_CREATE [thread 1] pthread.h:146
+	(0, 5): THREAD_CREATE [thread 2] pthread.h:146
+	(0, 6): THREAD_CREATE [thread 3] pthread.h:146
+	(0, 7): THREAD_JOIN [thread 1] pthread.h:163
+	(0, 8): THREAD_JOIN [thread 2] pthread.h:163
+	(0, 9): THREAD_JOIN [thread 3] pthread.h:163
+	(0, 10): Rrlx (clearedBusy, 1) [(3, 5)] stale_bottom_relaxed_control.c:209
+	(0, 11): ERROR stale_bottom_relaxed_control.c:213
+<0, 1> owner_history:
+	(1, 1): Wrlx (bottom, 2) stale_bottom_relaxed_control.c:30
+	(1, 2): THREAD_END
+<0, 2> batch_a:
+	(2, 1): Racq (bottom, 2) [(1, 1)] stale_bottom_relaxed_control.c:49
+	(2, 2): Racq (topState, 0) [(0, 1)] stale_bottom_relaxed_control.c:57
+	(2, 3): CRsc (topState, 0) [(0, 1)] stale_bottom_relaxed_control.c:75
+	(2, 4): CWsc (topState, 8) stale_bottom_relaxed_control.c:75
+	(2, 5): THREAD_END
+<0, 3> batch_b:
+	(3, 1): Rrlx (topState, 8) [(2, 4)] stale_bottom_relaxed_control.c:98
+	(3, 2): Racq (bottom, 10) [(0, 2)] stale_bottom_relaxed_control.c:106
+	(3, 3): CRsc (topState, 8) [(2, 4)] stale_bottom_relaxed_control.c:126
+	(3, 4): CWsc (topState, 0) stale_bottom_relaxed_control.c:126
+	(3, 5): Wrlx (clearedBusy, 1) stale_bottom_relaxed_control.c:136
+	(3, 6): THREAD_END
+Coherence:
+clearedBusy: [ (0, 3): Wna (G#(0, 8), 0) (3, 5): Wrlx (G#(0, 8), 1) ]
+bottom: [ (0, 2): Wna (G#(0, 4), 10) (1, 1): Wrlx (G#(0, 4), 2) ]
+topState: [ (0, 1): Wna (G#(0, 0), 0) (2, 4): CWsc (G#(0, 0), 8) (3, 4): CWsc (G#(0, 0), 0) ]
+
+Trace to (0, 11):
+[main] stale_bottom_relaxed_control.c: 148: atomic_init(
+[main] stale_bottom_relaxed_control.c: 160: atomic_init(
+[main] stale_bottom_relaxed_control.c: 164: atomic_init(
+[main] pthread.h: 146: (*__newthread) = __VERIFIER_thread_create(__attr, __start_routine, __arg);
+[owner_history] stale_bottom_relaxed_control.c: 30: atomic_store_explicit(
+[batch_a] stale_bottom_relaxed_control.c: 49: atomic_load_explicit(
+[batch_a] stale_bottom_relaxed_control.c: 57: atomic_load_explicit(
+[batch_a] stale_bottom_relaxed_control.c: 75: atomic_compare_exchange_strong_explicit(
+[main] pthread.h: 163: void *__retval = __VERIFIER_thread_join(__th);
+[batch_b] stale_bottom_relaxed_control.c: 98: atomic_load_explicit(
+[batch_b] stale_bottom_relaxed_control.c: 106: atomic_load_explicit(
+[batch_b] stale_bottom_relaxed_control.c: 126: atomic_compare_exchange_strong_explicit(
+[batch_b] stale_bottom_relaxed_control.c: 136: atomic_store_explicit(
+[main] pthread.h: 163: void *__retval = __VERIFIER_thread_join(__th);
+[main] stale_bottom_relaxed_control.c: 209: atomic_load_explicit(
+[main] stale_bottom_relaxed_control.c: 213: assert(cleared == 0);
+
+*** Verification unsuccesful.
+Number of complete executions explored: 0
+Total wall-clock time: 0.12s

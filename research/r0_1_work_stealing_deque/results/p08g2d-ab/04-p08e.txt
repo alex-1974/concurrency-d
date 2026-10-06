@@ -1,0 +1,19 @@
+    Starting Performing "release" build using ldc2 for x86_64.
+    Building r0-1-p08e3-marked-top-owner-thief-drain ~master: building configuration [application]
+     Linking r0-1-p08e3-marked-top-owner-thief-drain
+     Running r0-1-p08e3-marked-top-owner-thief-drain 
+R0.1 P08e3 marked-top concurrent owner/thief drain
+items=1048576 capacity=1048576 thieves=4 batch=8 warmups=4 samples=15
+steal-one     median=  74.482 ns/item p10/p90=  72.039/  75.408
+              owner=8038780 stolen=7689860 claims=7689860 stolen/claim=1.000
+              retries owner=15 thief=10725003 checksum=8246345072640
+repeat-steal  median=  74.564 ns/item p10/p90=  69.763/  75.947
+              owner=7702489 stolen=8026151 claims=3439996 stolen/claim=2.333
+              retries owner=15 thief=7914863 checksum=8246345072640
+gated         median= 217.161 ns/item p10/p90=  74.187/ 324.711
+              owner=3738584 stolen=11990056 claims=1498762 stolen/claim=8.000
+              retries owner=15 thief=60 checksum=8246345072640
+marked-top    median=  19.707 ns/item p10/p90=  16.853/  21.437
+              owner=494737 stolen=15233903 claims=1904247 stolen/claim=8.000
+              retries owner=20 thief=17570580 checksum=8246345072640
+R0.1 P08e3 PASS

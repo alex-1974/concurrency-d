@@ -428,3 +428,16 @@ Before choosing marked-top as the preferred R0.1 design:
 3. resolve the 63-bit versus full-64-bit counter contract;
 4. then repeat external C++ parity controls for the qualified mechanism.
 
+
+## Subsequent qualification
+
+P08f subsequently qualified the marked-top ordering through x86_64 and
+AArch64 code-generation inspection plus GenMC RC11 model checking.
+
+P08g subsequently developed a full-64-bit distance-marked representation.
+
+After removal of a redundant pre-CAS SC barrier, the Full64 candidate reached
+performance parity with P08e in paired normalized benchmarks while preserving
+the complete 64-bit modular counter domain.
+
+P08g is therefore the preferred follow-on R0.1 research candidate.

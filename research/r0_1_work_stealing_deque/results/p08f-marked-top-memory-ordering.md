@@ -447,3 +447,20 @@ Still open:
 
 The next research step is P08f3: encode the minimum owner/batch interaction as
 a memory-model litmus and ask whether the forbidden outcome can occur.
+
+## Subsequent qualification
+
+P08f3 completed the formal owner/batch overlap check using GenMC v0.19.0 under
+RC11.
+
+The SC-fence model was SAFE and a relaxed negative control reproduced the
+forbidden owner/batch overlap.
+
+P08g then reused the qualified post-busy-claim ordering while replacing the
+63-bit encoded marker with a full-64-bit distance-marked state.
+
+A separate GenMC positive/negative-control pair qualified the acquire
+observation required to distinguish the Full64 busy representation safely.
+
+See `p08g-full64-distance-marked-top.md` for the resulting architecture and
+performance comparison.
