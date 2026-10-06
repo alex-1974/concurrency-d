@@ -1,0 +1,5 @@
+name "r0-1-p02-last-item-race"
+description "R0.1 P02 owner-pop versus thief-steal last-item race"
+targetType "executable"
+
+sourcePaths "source" "../../candidate/source"
