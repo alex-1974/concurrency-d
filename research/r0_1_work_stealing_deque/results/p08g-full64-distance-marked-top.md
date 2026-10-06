@@ -2,7 +2,15 @@
 
 ## Status
 
-Preferred R0.1 research candidate after P08g2d.
+Qualified Full64 research candidate, but no longer the preferred R0.1
+scheduler candidate after P08g3-P08g6.
+
+P08g2d demonstrated pure-drain performance parity with P08e. Subsequent
+scheduler-like and owner-contention qualification exposed a material
+coherence cost caused by the additional bottom observation required for
+Full64 busy-state classification.
+
+P08e marked-top therefore regains preferred R0.1 scheduler status.
 
 This is not yet a production/public API decision.
 
@@ -248,23 +256,35 @@ This is performance parity for the purpose of architecture selection.
     marker:         impossible bounded-distance state
     atomic width:   64 bit
     owner path:     near baseline
-    batch path:     performance parity with P08e
+    batch path:     pure-drain parity; slower under light scheduler work
     wrap:           full ulong modular
     stale-state:    RC11 positive + negative-control qualification
 
-## Current conclusion
+## Revised conclusion after P08g3-P08g6
 
-P08g Full64 is the preferred R0.1 research candidate.
+P08g Full64 remains a correctness-qualified research candidate, but it is no
+longer the preferred R0.1 scheduler candidate.
 
-It improves on P08e by preserving the complete 64-bit counter domain without:
+Scheduler-like paired measurements showed Full64 normalized regressions of:
 
-- widening the atomic top state;
-- adding a second coordination atomic;
-- introducing an owner-side gate;
-- materially reducing measured performance.
+    work=0   +9.04 %
+    work=16 +19.91 %
+    work=64  -0.15 %
 
-This remains a research conclusion rather than a production contract.
+P08g4 localized the structural difference to the additional pre-CAS bottom
+observation required by Full64 state classification.
 
-Further qualification should retain the same standards already applied to
-P08e/P08f, especially code-generation inspection, weak-memory reasoning and
-scheduler-level workload validation.
+P08g5 showed that the isolated busy-rejection path is already more expensive.
+
+P08g6 then showed the decisive effect under active owner contention: the
+Full64 busy-rejection path was approximately 3.9x as expensive because it
+reads the owner-mutated bottom cache line, while P08e can reject busy using
+topState alone.
+
+Therefore P08e marked-top regains preferred R0.1 scheduler status.
+
+See `p08g-scheduler-performance-reassessment.md` for the complete evidence.
+
+P08g should be retained as research rather than removed. Any future Full64
+representation should avoid dependence on the owner-written bottom cache line
+before it can compete for scheduler-hot-path use.

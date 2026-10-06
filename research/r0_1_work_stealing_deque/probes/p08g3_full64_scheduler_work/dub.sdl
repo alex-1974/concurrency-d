@@ -1,0 +1,7 @@
+name "r0-1-p08g3-local-work"
+description "R0.1 P08g3 scheduler-like steal then local work"
+targetType "executable"
+
+sourcePaths "source" "../../candidate/source"
+
+versions "ConcurrencyResearchProbe"

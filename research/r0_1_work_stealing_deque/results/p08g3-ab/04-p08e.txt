@@ -1,0 +1,37 @@
+    Starting Performing "release" build using ldc2 for x86_64.
+    Building r0-1-p08e5-local-work ~master: building configuration [application]
+     Linking r0-1-p08e5-local-work
+     Running r0-1-p08e5-local-work 
+R0.1 P08e5 scheduler-like local work
+items=1048576 thieves=4 batch=8 warmups=4 samples=15
+steal-one   work=  0 median=  77.506 ns/item p10/p90=  75.086/  79.038
+            owner=7688828 stolen=8039812 ownerShare=48.884%
+            claims=8039812 stolen/claim=1.000
+            ownerBusyRetries=0 thiefRetries=10884245
+            valueChecksum=8246345072640 workChecksum=2154793563490615296
+marked-top  work=  0 median=  19.770 ns/item p10/p90=  17.947/  21.395
+            owner=172135 stolen=15556505 ownerShare=1.094%
+            claims=1944574 stolen/claim=8.000
+            ownerBusyRetries=1771666 thiefRetries=23186431
+            valueChecksum=8246345072640 workChecksum=2154793563490615296
+steal-one   work= 16 median=  83.465 ns/item p10/p90=  80.948/  86.570
+            owner=7204029 stolen=8524611 ownerShare=45.802%
+            claims=8524611 stolen/claim=1.000
+            ownerBusyRetries=0 thiefRetries=12108436
+            valueChecksum=8246345072640 workChecksum=18305770528397891105
+marked-top  work= 16 median=  21.970 ns/item p10/p90=  20.950/  22.369
+            owner=1158901 stolen=14569739 ownerShare=7.368%
+            claims=1821225 stolen/claim=8.000
+            ownerBusyRetries=1401487 thiefRetries=15964933
+            valueChecksum=8246345072640 workChecksum=18305770528397891105
+steal-one   work= 64 median=  86.435 ns/item p10/p90=  83.175/  90.429
+            owner=4478029 stolen=11250611 ownerShare=28.471%
+            claims=11250611 stolen/claim=1.000
+            ownerBusyRetries=0 thiefRetries=10810966
+            valueChecksum=8246345072640 workChecksum=8867736069045744307
+marked-top  work= 64 median=  38.921 ns/item p10/p90=  37.854/  40.405
+            owner=2928989 stolen=12799651 ownerShare=18.622%
+            claims=1599965 stolen/claim=8.000
+            ownerBusyRetries=214777 thiefRetries=91375
+            valueChecksum=8246345072640 workChecksum=8867736069045744307
+R0.1 P08e5 PASS

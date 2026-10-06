@@ -1,0 +1,6 @@
+name "r0-1-p08g6-busy-rejection-owner-contention"
+description "R0.1 P08g6 busy rejection cost while owner contends on bottom"
+targetType "executable"
+
+versions "ConcurrencyResearchProbe"
+sourcePaths "source" "../../candidate/source"

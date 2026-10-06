@@ -1,0 +1,6 @@
+name "r0-1-p08g5-busy-rejection-cost"
+description "R0.1 P08g5 P08e versus Full64 busy batch rejection cost"
+targetType "executable"
+
+versions "ConcurrencyResearchProbe"
+sourcePaths "source" "../../candidate/source"

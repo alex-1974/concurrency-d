@@ -1,0 +1,5 @@
+name "r0-1-p08g4-full64-vs-p08e-codegen"
+description "R0.1 P08g4 direct P08e versus Full64 LDC x86_64 codegen comparison"
+targetType "executable"
+
+sourcePaths "source" "../../candidate/source"
