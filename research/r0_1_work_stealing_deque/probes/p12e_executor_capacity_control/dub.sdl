@@ -1,0 +1,4 @@
+name "r0-1-p12e-executor-capacity-control"
+description "R0.1 P12e pure compute control for overflow executor layouts"
+targetType "executable"
+sourcePaths "source"
