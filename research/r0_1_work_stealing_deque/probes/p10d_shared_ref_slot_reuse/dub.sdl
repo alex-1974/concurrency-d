@@ -1,0 +1,5 @@
+name "r0-1-p10d-shared-ref-slot-reuse"
+description "R0.1 P10d shared task reference lifetime and slot reuse qualification"
+targetType "executable"
+
+sourcePaths "source" "../../candidate/source"

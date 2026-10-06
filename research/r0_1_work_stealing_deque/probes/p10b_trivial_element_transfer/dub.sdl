@@ -1,0 +1,7 @@
+name "r0-1-p10b-trivial-element-transfer"
+description "R0.1 P10b trivial 8-byte and 16-byte element transfer qualification"
+targetType "executable"
+
+sourcePaths "source" "../../candidate/source"
+
+versions "ConcurrencyResearchProbe"

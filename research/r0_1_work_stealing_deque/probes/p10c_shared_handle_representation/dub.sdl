@@ -1,0 +1,5 @@
+name "r0-1-p10c-shared-handle-representation"
+description "R0.1 P10c shared pointer and opaque handle representation qualification"
+targetType "executable"
+
+sourcePaths "source" "../../candidate/source"
