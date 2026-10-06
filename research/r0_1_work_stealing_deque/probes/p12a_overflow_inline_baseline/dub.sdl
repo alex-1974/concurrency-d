@@ -1,0 +1,5 @@
+name "r0-1-p12a-overflow-inline-baseline"
+description "R0.1 P12a retry versus execute-inline overflow baseline"
+targetType "executable"
+
+sourcePaths "source" "../../candidate/source"

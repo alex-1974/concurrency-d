@@ -1,0 +1,5 @@
+name "r0-1-p12b-overflow-work-granularity"
+description "R0.1 P12b overflow policy work-granularity qualification"
+targetType "executable"
+
+sourcePaths "source" "../../candidate/source"
