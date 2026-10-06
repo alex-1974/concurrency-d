@@ -1,0 +1,7 @@
+name "r0-1-p13a-minimal-scheduler"
+description "R0.1 P13a minimal multi-worker scheduler harness"
+targetType "executable"
+
+sourcePaths "source" "../../candidate/source"
+
+versions "ConcurrencyResearchProbe"
