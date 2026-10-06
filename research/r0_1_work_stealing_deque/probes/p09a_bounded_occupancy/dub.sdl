@@ -1,0 +1,5 @@
+name "r0-1-p09a-bounded-occupancy"
+description "R0.1 P09a bounded occupancy and near-capacity owner qualification"
+targetType "executable"
+
+sourcePaths "source" "../../candidate/source"

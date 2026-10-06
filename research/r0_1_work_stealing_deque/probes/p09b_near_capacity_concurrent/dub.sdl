@@ -1,0 +1,7 @@
+name "r0-1-p09b-near-capacity-concurrent"
+description "R0.1 P09b concurrent near-capacity refill qualification"
+targetType "executable"
+
+sourcePaths "source" "../../candidate/source"
+
+versions "ConcurrencyResearchProbe"
