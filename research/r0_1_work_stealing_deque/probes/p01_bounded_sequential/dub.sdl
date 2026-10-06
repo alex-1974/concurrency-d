@@ -1,0 +1,5 @@
+name "r0-1-p01-bounded-sequential"
+description "R0.1 P01 bounded work-stealing deque sequential invariant probe"
+targetType "executable"
+
+sourcePaths "source" "../../candidate/source"
