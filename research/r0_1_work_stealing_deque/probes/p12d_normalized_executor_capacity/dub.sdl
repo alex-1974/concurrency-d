@@ -1,0 +1,5 @@
+name "r0-1-p12d-normalized-executor-capacity"
+description "R0.1 P12d normalized executor-capacity overflow comparison"
+targetType "executable"
+
+sourcePaths "source" "../../candidate/source"
