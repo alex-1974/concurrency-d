@@ -1,0 +1,5 @@
+name "r0-1-p11a-safety-boundary-audit"
+description "R0.1 P11a safety and copyability audit"
+targetType "executable"
+
+sourcePaths "source" "../../candidate/source"

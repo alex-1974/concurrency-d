@@ -29,7 +29,7 @@ version (ConcurrencyResearchProbe)
  */
 private void researchSeqCstBarrier(
     shared int* fenceWord)
-    @nogc nothrow
+    @trusted @nogc nothrow
 {
     version (LDC)
     {
@@ -51,6 +51,14 @@ struct MarkedTopBatchBoundedWorkStealingDeque(
     T,
     size_t LogSize)
 {
+    /*
+     * Concurrent queue state has identity.
+     *
+     * Copying top/bottom/buffer state would create a second unrelated
+     * synchronization object and has no valid queue semantics.
+     */
+    @disable this(this);
+
     static assert(LogSize > 0);
     static assert(LogSize < 62);
 
@@ -143,7 +151,7 @@ private:
 
 public:
     bool tryPush(T item)
-        @nogc nothrow
+        @safe @nogc nothrow
     {
         const b =
             atomicLoad!(
@@ -189,7 +197,7 @@ public:
     }
 
     TakeResult!T pop()
-        @nogc nothrow
+        @safe @nogc nothrow
     {
         for (;;)
         {
@@ -301,7 +309,7 @@ public:
     }
 
     TakeResult!T steal()
-        @nogc nothrow
+        @safe @nogc nothrow
     {
         const state =
             atomicLoad!(
@@ -360,7 +368,7 @@ public:
 
     size_t stealBatch(
         scope T[] output)
-        @nogc nothrow
+        @safe @nogc nothrow
     {
         if (output.length == 0)
             return 0;
@@ -485,7 +493,7 @@ public:
     }
 
     size_t sizeSnapshot() const
-        @nogc nothrow
+        @safe @nogc nothrow
     {
         const state =
             atomicLoad!(
@@ -510,7 +518,7 @@ public:
     }
 
     bool emptySnapshot() const
-        @nogc nothrow
+        @safe @nogc nothrow
     {
         return
             sizeSnapshot() == 0;

@@ -1,0 +1,5 @@
+name "r0-1-p11b-hardened-safety-contract"
+description "R0.1 P11b hardened safety and non-copyable contract"
+targetType "executable"
+
+sourcePaths "source" "../../candidate/source"
