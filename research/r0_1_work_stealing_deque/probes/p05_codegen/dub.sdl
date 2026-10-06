@@ -1,0 +1,5 @@
+name "r0-1-p05-codegen"
+description "R0.1 P05 signed versus modular WSQ codegen probe"
+targetType "executable"
+
+sourcePaths "source" "../../candidate/source"
