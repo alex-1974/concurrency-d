@@ -1,0 +1,5 @@
+name "r0-1-p08e2-marked-top-owner-cost"
+description "R0.1 P08e2 marked-top uncontended owner hot-path cost"
+targetType "executable"
+
+sourcePaths "source" "../../candidate/source"

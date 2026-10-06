@@ -1,0 +1,7 @@
+name "r0-1-p08e0-marked-top-batch"
+description "R0.1 P08e0 marked-top two-phase batch correctness"
+targetType "executable"
+
+sourcePaths "source" "../../candidate/source"
+
+versions "ConcurrencyResearchProbe"

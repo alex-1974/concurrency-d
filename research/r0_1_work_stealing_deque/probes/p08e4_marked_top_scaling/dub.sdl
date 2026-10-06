@@ -1,0 +1,7 @@
+name "r0-1-p08e4-marked-top-scaling"
+description "R0.1 P08e4 marked-top scaling and owner progress"
+targetType "executable"
+
+sourcePaths "source" "../../candidate/source"
+
+versions "ConcurrencyResearchProbe"

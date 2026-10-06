@@ -1,0 +1,7 @@
+name "r0-1-p08e1-marked-top-concurrency"
+description "R0.1 P08e1 marked-top owner/batch concurrency qualification"
+targetType "executable"
+
+sourcePaths "source" "../../candidate/source"
+
+versions "ConcurrencyResearchProbe"
