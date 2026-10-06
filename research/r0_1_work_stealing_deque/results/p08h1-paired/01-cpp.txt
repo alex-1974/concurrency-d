@@ -1,0 +1,15 @@
+R0.1 P08h0 Taskflow scheduler-like drain
+items=1048576 thieves=4 warmups=4 samples=15
+taskflow    work=  0 median=  69.566 ns/item p10/p90=  68.665/  70.517
+            owner=7569190 stolen=8159450 ownerShare=48.124%
+            stealRetries=11762547
+            valueChecksum=8246345072640 workChecksum=2154793563490615296
+taskflow    work= 16 median=  73.108 ns/item p10/p90=  72.726/  73.594
+            owner=6908097 stolen=8820543 ownerShare=43.920%
+            stealRetries=13309767
+            valueChecksum=8246345072640 workChecksum=18305770528397891105
+taskflow    work= 64 median=  70.247 ns/item p10/p90=  69.947/  71.075
+            owner=4415604 stolen=11313036 ownerShare=28.074%
+            stealRetries=10819109
+            valueChecksum=8246345072640 workChecksum=8867736069045744307
+R0.1 P08h0 PASS
