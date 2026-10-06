@@ -1,0 +1,5 @@
+name "r0-1-p12c-global-spill-baseline"
+description "R0.1 P12c retry versus inline versus global locked spill"
+targetType "executable"
+
+sourcePaths "source" "../../candidate/source"
