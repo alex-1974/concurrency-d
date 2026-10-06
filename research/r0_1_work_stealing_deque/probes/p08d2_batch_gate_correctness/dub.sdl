@@ -1,0 +1,7 @@
+name "r0-1-p08d2-batch-gate-correctness"
+description "R0.1 P08d2 gated single-CAS batch correctness"
+targetType "executable"
+
+sourcePaths "source" "../../candidate/source"
+
+versions "ConcurrencyResearchProbe"

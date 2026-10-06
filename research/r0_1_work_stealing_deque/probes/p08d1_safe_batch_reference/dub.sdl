@@ -1,0 +1,7 @@
+name "r0-1-p08d1-safe-batch-reference"
+description "R0.1 P08d1 safe repeated-steal batch semantic reference"
+targetType "executable"
+
+sourcePaths "source" "../../candidate/source"
+
+versions "ConcurrencyResearchProbe"

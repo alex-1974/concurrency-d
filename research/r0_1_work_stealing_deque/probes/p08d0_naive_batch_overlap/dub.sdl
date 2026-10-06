@@ -1,0 +1,7 @@
+name "r0-1-p08d0-naive-batch-overlap"
+description "R0.1 P08d0 deterministic rejection of naive multi-item top CAS"
+targetType "executable"
+
+sourcePaths "source" "../../candidate/source"
+
+versions "ConcurrencyResearchProbe"
