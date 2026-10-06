@@ -1,0 +1,292 @@
+R0.1 P08f1 marked-top LDC x86_64 codegen
+
+=== LDC ===
+LDC - the LLVM D compiler (1.41.0):
+  based on DMD v2.111.0 and LLVM 19.1.7
+  built with LDC - the LLVM D compiler (1.41.0)
+  Default target: x86_64-pc-linux-gnu
+  Host CPU: skylake
+  http://dlang.org - http://wiki.dlang.org/LDC
+
+
+  Registered Targets:
+    aarch64     - AArch64 (little endian)
+    aarch64_32  - AArch64 (little endian ILP32)
+    aarch64_be  - AArch64 (big endian)
+    amdgcn      - AMD GCN GPUs
+    arm         - ARM
+    arm64       - ARM64 (little endian)
+    arm64_32    - ARM64 (little endian ILP32)
+    armeb       - ARM (big endian)
+    avr         - Atmel AVR Microcontroller
+    bpf         - BPF (host endian)
+    bpfeb       - BPF (big endian)
+    bpfel       - BPF (little endian)
+    hexagon     - Hexagon
+    lanai       - Lanai
+    loongarch32 - 32-bit LoongArch
+    loongarch64 - 64-bit LoongArch
+    m68k        - Motorola 68000 family
+    mips        - MIPS (32-bit big endian)
+    mips64      - MIPS (64-bit big endian)
+    mips64el    - MIPS (64-bit little endian)
+    mipsel      - MIPS (32-bit little endian)
+    msp430      - MSP430 [experimental]
+    nvptx       - NVIDIA PTX 32-bit
+    nvptx64     - NVIDIA PTX 64-bit
+    ppc32       - PowerPC 32
+    ppc32le     - PowerPC 32 LE
+    ppc64       - PowerPC 64
+    ppc64le     - PowerPC 64 LE
+    r600        - AMD GPUs HD2XXX-HD6XXX
+    riscv32     - 32-bit RISC-V
+    riscv64     - 64-bit RISC-V
+    sparc       - Sparc
+    sparcel     - Sparc LE
+    sparcv9     - Sparc V9
+    systemz     - SystemZ
+    thumb       - Thumb
+    thumbeb     - Thumb (big endian)
+    ve          - VE
+    wasm32      - WebAssembly 32-bit
+    wasm64      - WebAssembly 64-bit
+    x86         - 32-bit X86: Pentium-Pro and above
+    x86-64      - 64-bit X86: EM64T and AMD64
+    xcore       - XCore
+    xtensa      - Xtensa 32
+
+=== MACHINE ===
+Linux xps-15 6.17.0-22-generic #22-Ubuntu SMP PREEMPT_DYNAMIC Fri Mar 13 12:04:44 UTC 2026 x86_64 GNU/Linux
+
+CPU(s):                                  12
+Liste der Online-CPU(s):                 0-11
+Skalierung der CPU(s):                   79%
+NUMA-Knoten0 CPU(s):                     0-11
+
+=== BINARY SHA256 ===
+28756e8934fcfbe43b2fe5b3138d8c5e13bfb57da5c278c1a5632688c6218cc7  research/r0_1_work_stealing_deque/probes/p08f1_marked_top_codegen/r0-1-p08f1-marked-top-codegen
+
+=== p08f1_pop ===
+
+research/r0_1_work_stealing_deque/probes/p08f1_marked_top_codegen/r0-1-p08f1-marked-top-codegen:     Dateiformat elf64-x86-64
+
+
+Disassembly of section .init:
+
+Disassembly of section .plt:
+
+Disassembly of section .plt.got:
+
+Disassembly of section .text:
+
+0000000000025aa0 <p08f1_pop>:
+   25aa0:	48 ba ff ff ff ff ff 	movabs rdx,0x7fffffffffffffff
+   25aa7:	ff ff 7f 
+   25aaa:	48 8b 4f 40          	mov    rcx,QWORD PTR [rdi+0x40]
+   25aae:	4c 8d 04 11          	lea    r8,[rcx+rdx*1]
+   25ab2:	b0 3f                	mov    al,0x3f
+   25ab4:	c4 c2 f8 f5 c0       	bzhi   rax,r8,rax
+   25ab9:	0f 1f 80 00 00 00 00 	nop    DWORD PTR [rax+0x0]
+   25ac0:	48 89 47 40          	mov    QWORD PTR [rdi+0x40],rax
+   25ac4:	f0 83 4c 24 c0 00    	lock or DWORD PTR [rsp-0x40],0x0
+   25aca:	48 8b 07             	mov    rax,QWORD PTR [rdi]
+   25acd:	a8 01                	test   al,0x1
+   25acf:	74 14                	je     25ae5 <p08f1_pop+0x45>
+   25ad1:	48 89 4f 40          	mov    QWORD PTR [rdi+0x40],rcx
+   25ad5:	48 8b 4f 40          	mov    rcx,QWORD PTR [rdi+0x40]
+   25ad9:	4c 8d 04 11          	lea    r8,[rcx+rdx*1]
+   25add:	4c 89 c0             	mov    rax,r8
+   25ae0:	48 21 d0             	and    rax,rdx
+   25ae3:	eb db                	jmp    25ac0 <p08f1_pop+0x20>
+   25ae5:	49 89 c2             	mov    r10,rax
+   25ae8:	49 d1 ea             	shr    r10,1
+   25aeb:	4d 89 c1             	mov    r9,r8
+   25aee:	4d 29 d1             	sub    r9,r10
+   25af1:	49 21 d1             	and    r9,rdx
+   25af4:	49 81 f9 00 01 00 00 	cmp    r9,0x100
+   25afb:	73 29                	jae    25b26 <p08f1_pop+0x86>
+   25afd:	41 0f b6 d0          	movzx  edx,r8b
+   25b01:	48 8b 94 d7 80 00 00 	mov    rdx,QWORD PTR [rdi+rdx*8+0x80]
+   25b08:	00 
+   25b09:	4d 85 c9             	test   r9,r9
+   25b0c:	75 0f                	jne    25b1d <p08f1_pop+0x7d>
+   25b0e:	4c 8d 40 02          	lea    r8,[rax+0x2]
+   25b12:	f0 4c 0f b1 07       	lock cmpxchg QWORD PTR [rdi],r8
+   25b17:	48 89 4f 40          	mov    QWORD PTR [rdi+0x40],rcx
+   25b1b:	75 0d                	jne    25b2a <p08f1_pop+0x8a>
+   25b1d:	48 89 16             	mov    QWORD PTR [rsi],rdx
+   25b20:	b8 01 00 00 00       	mov    eax,0x1
+   25b25:	c3                   	ret
+   25b26:	48 89 4f 40          	mov    QWORD PTR [rdi+0x40],rcx
+   25b2a:	31 c0                	xor    eax,eax
+   25b2c:	c3                   	ret
+
+Disassembly of section .fini:
+
+=== p08f1_batch ===
+
+research/r0_1_work_stealing_deque/probes/p08f1_marked_top_codegen/r0-1-p08f1-marked-top-codegen:     Dateiformat elf64-x86-64
+
+
+Disassembly of section .init:
+
+Disassembly of section .plt:
+
+Disassembly of section .plt.got:
+
+Disassembly of section .text:
+
+0000000000025b30 <p08f1_batch>:
+   25b30:	48 85 d2             	test   rdx,rdx
+   25b33:	74 4a                	je     25b7f <p08f1_batch+0x4f>
+   25b35:	48 8b 0f             	mov    rcx,QWORD PTR [rdi]
+   25b38:	f6 c1 01             	test   cl,0x1
+   25b3b:	75 42                	jne    25b7f <p08f1_batch+0x4f>
+   25b3d:	49 89 c8             	mov    r8,rcx
+   25b40:	49 83 c8 01          	or     r8,0x1
+   25b44:	48 89 c8             	mov    rax,rcx
+   25b47:	f0 4c 0f b1 07       	lock cmpxchg QWORD PTR [rdi],r8
+   25b4c:	75 31                	jne    25b7f <p08f1_batch+0x4f>
+   25b4e:	49 89 c8             	mov    r8,rcx
+   25b51:	49 d1 e8             	shr    r8,1
+   25b54:	f0 83 4c 24 c0 00    	lock or DWORD PTR [rsp-0x40],0x0
+   25b5a:	48 8b 47 40          	mov    rax,QWORD PTR [rdi+0x40]
+   25b5e:	4c 29 c0             	sub    rax,r8
+   25b61:	41 b1 3f             	mov    r9b,0x3f
+   25b64:	c4 e2 b0 f5 c0       	bzhi   rax,rax,r9
+   25b69:	4c 8d 88 ff fe ff ff 	lea    r9,[rax-0x101]
+   25b70:	49 81 f9 00 ff ff ff 	cmp    r9,0xffffffffffffff00
+   25b77:	73 09                	jae    25b82 <p08f1_batch+0x52>
+   25b79:	31 c0                	xor    eax,eax
+   25b7b:	48 89 0f             	mov    QWORD PTR [rdi],rcx
+   25b7e:	c3                   	ret
+   25b7f:	31 c0                	xor    eax,eax
+   25b81:	c3                   	ret
+   25b82:	48 39 c2             	cmp    rdx,rax
+   25b85:	48 0f 42 c2          	cmovb  rax,rdx
+   25b89:	48 8d 50 ff          	lea    rdx,[rax-0x1]
+   25b8d:	89 c1                	mov    ecx,eax
+   25b8f:	83 e1 07             	and    ecx,0x7
+   25b92:	48 83 fa 07          	cmp    rdx,0x7
+   25b96:	73 07                	jae    25b9f <p08f1_batch+0x6f>
+   25b98:	31 d2                	xor    edx,edx
+   25b9a:	e9 ce 00 00 00       	jmp    25c6d <p08f1_batch+0x13d>
+   25b9f:	41 89 c1             	mov    r9d,eax
+   25ba2:	41 81 e1 f8 01 00 00 	and    r9d,0x1f8
+   25ba9:	31 d2                	xor    edx,edx
+   25bab:	0f 1f 44 00 00       	nop    DWORD PTR [rax+rax*1+0x0]
+   25bb0:	45 8d 14 10          	lea    r10d,[r8+rdx*1]
+   25bb4:	45 0f b6 d2          	movzx  r10d,r10b
+   25bb8:	4e 8b 94 d7 80 00 00 	mov    r10,QWORD PTR [rdi+r10*8+0x80]
+   25bbf:	00 
+   25bc0:	4c 89 14 d6          	mov    QWORD PTR [rsi+rdx*8],r10
+   25bc4:	45 8d 14 10          	lea    r10d,[r8+rdx*1]
+   25bc8:	41 ff c2             	inc    r10d
+   25bcb:	45 0f b6 d2          	movzx  r10d,r10b
+   25bcf:	4e 8b 94 d7 80 00 00 	mov    r10,QWORD PTR [rdi+r10*8+0x80]
+   25bd6:	00 
+   25bd7:	4c 89 54 d6 08       	mov    QWORD PTR [rsi+rdx*8+0x8],r10
+   25bdc:	45 8d 54 10 02       	lea    r10d,[r8+rdx*1+0x2]
+   25be1:	45 0f b6 d2          	movzx  r10d,r10b
+   25be5:	4e 8b 94 d7 80 00 00 	mov    r10,QWORD PTR [rdi+r10*8+0x80]
+   25bec:	00 
+   25bed:	4c 89 54 d6 10       	mov    QWORD PTR [rsi+rdx*8+0x10],r10
+   25bf2:	45 8d 54 10 03       	lea    r10d,[r8+rdx*1+0x3]
+   25bf7:	45 0f b6 d2          	movzx  r10d,r10b
+   25bfb:	4e 8b 94 d7 80 00 00 	mov    r10,QWORD PTR [rdi+r10*8+0x80]
+   25c02:	00 
+   25c03:	4c 89 54 d6 18       	mov    QWORD PTR [rsi+rdx*8+0x18],r10
+   25c08:	45 8d 54 10 04       	lea    r10d,[r8+rdx*1+0x4]
+   25c0d:	45 0f b6 d2          	movzx  r10d,r10b
+   25c11:	4e 8b 94 d7 80 00 00 	mov    r10,QWORD PTR [rdi+r10*8+0x80]
+   25c18:	00 
+   25c19:	4c 89 54 d6 20       	mov    QWORD PTR [rsi+rdx*8+0x20],r10
+   25c1e:	45 8d 54 10 05       	lea    r10d,[r8+rdx*1+0x5]
+   25c23:	45 0f b6 d2          	movzx  r10d,r10b
+   25c27:	4e 8b 94 d7 80 00 00 	mov    r10,QWORD PTR [rdi+r10*8+0x80]
+   25c2e:	00 
+   25c2f:	4c 89 54 d6 28       	mov    QWORD PTR [rsi+rdx*8+0x28],r10
+   25c34:	45 8d 54 10 06       	lea    r10d,[r8+rdx*1+0x6]
+   25c39:	45 0f b6 d2          	movzx  r10d,r10b
+   25c3d:	4e 8b 94 d7 80 00 00 	mov    r10,QWORD PTR [rdi+r10*8+0x80]
+   25c44:	00 
+   25c45:	4c 89 54 d6 30       	mov    QWORD PTR [rsi+rdx*8+0x30],r10
+   25c4a:	45 8d 54 10 07       	lea    r10d,[r8+rdx*1+0x7]
+   25c4f:	45 0f b6 d2          	movzx  r10d,r10b
+   25c53:	4e 8b 94 d7 80 00 00 	mov    r10,QWORD PTR [rdi+r10*8+0x80]
+   25c5a:	00 
+   25c5b:	4c 89 54 d6 38       	mov    QWORD PTR [rsi+rdx*8+0x38],r10
+   25c60:	48 83 c2 08          	add    rdx,0x8
+   25c64:	49 39 d1             	cmp    r9,rdx
+   25c67:	0f 85 43 ff ff ff    	jne    25bb0 <p08f1_batch+0x80>
+   25c6d:	48 85 c9             	test   rcx,rcx
+   25c70:	74 2a                	je     25c9c <p08f1_batch+0x16c>
+   25c72:	48 8d 34 d6          	lea    rsi,[rsi+rdx*8]
+   25c76:	4c 01 c2             	add    rdx,r8
+   25c79:	45 31 c9             	xor    r9d,r9d
+   25c7c:	0f 1f 40 00          	nop    DWORD PTR [rax+0x0]
+   25c80:	46 8d 14 0a          	lea    r10d,[rdx+r9*1]
+   25c84:	45 0f b6 d2          	movzx  r10d,r10b
+   25c88:	4e 8b 94 d7 80 00 00 	mov    r10,QWORD PTR [rdi+r10*8+0x80]
+   25c8f:	00 
+   25c90:	4e 89 14 ce          	mov    QWORD PTR [rsi+r9*8],r10
+   25c94:	49 ff c1             	inc    r9
+   25c97:	4c 39 c9             	cmp    rcx,r9
+   25c9a:	75 e4                	jne    25c80 <p08f1_batch+0x150>
+   25c9c:	49 01 c0             	add    r8,rax
+   25c9f:	4d 01 c0             	add    r8,r8
+   25ca2:	4c 89 07             	mov    QWORD PTR [rdi],r8
+   25ca5:	c3                   	ret
+
+Disassembly of section .fini:
+
+=== p08f1_steal ===
+
+research/r0_1_work_stealing_deque/probes/p08f1_marked_top_codegen/r0-1-p08f1-marked-top-codegen:     Dateiformat elf64-x86-64
+
+
+Disassembly of section .init:
+
+Disassembly of section .plt:
+
+Disassembly of section .plt.got:
+
+Disassembly of section .text:
+
+0000000000025cb0 <p08f1_steal>:
+   25cb0:	48 8b 07             	mov    rax,QWORD PTR [rdi]
+   25cb3:	31 d2                	xor    edx,edx
+   25cb5:	b9 00 00 00 00       	mov    ecx,0x0
+   25cba:	a8 01                	test   al,0x1
+   25cbc:	75 40                	jne    25cfe <p08f1_steal+0x4e>
+   25cbe:	48 89 c1             	mov    rcx,rax
+   25cc1:	48 d1 e9             	shr    rcx,1
+   25cc4:	f0 83 4c 24 c0 00    	lock or DWORD PTR [rsp-0x40],0x0
+   25cca:	48 8b 57 40          	mov    rdx,QWORD PTR [rdi+0x40]
+   25cce:	48 29 ca             	sub    rdx,rcx
+   25cd1:	41 b0 3f             	mov    r8b,0x3f
+   25cd4:	c4 e2 b8 f5 d2       	bzhi   rdx,rdx,r8
+   25cd9:	48 ff ca             	dec    rdx
+   25cdc:	48 81 fa ff 00 00 00 	cmp    rdx,0xff
+   25ce3:	77 27                	ja     25d0c <p08f1_steal+0x5c>
+   25ce5:	0f b6 c9             	movzx  ecx,cl
+   25ce8:	48 8b 8c cf 80 00 00 	mov    rcx,QWORD PTR [rdi+rcx*8+0x80]
+   25cef:	00 
+   25cf0:	4c 8d 40 02          	lea    r8,[rax+0x2]
+   25cf4:	31 d2                	xor    edx,edx
+   25cf6:	f0 4c 0f b1 07       	lock cmpxchg QWORD PTR [rdi],r8
+   25cfb:	0f 94 c2             	sete   dl
+   25cfe:	f6 c2 01             	test   dl,0x1
+   25d01:	74 12                	je     25d15 <p08f1_steal+0x65>
+   25d03:	48 89 0e             	mov    QWORD PTR [rsi],rcx
+   25d06:	b8 01 00 00 00       	mov    eax,0x1
+   25d0b:	c3                   	ret
+   25d0c:	31 c9                	xor    ecx,ecx
+   25d0e:	31 d2                	xor    edx,edx
+   25d10:	f6 c2 01             	test   dl,0x1
+   25d13:	75 ee                	jne    25d03 <p08f1_steal+0x53>
+   25d15:	31 c0                	xor    eax,eax
+   25d17:	c3                   	ret
+
+Disassembly of section .fini:
+

@@ -1,0 +1,468 @@
+R0.1 P08f2b AArch64 barrier qualification
+
+=== LDC ===
+LDC - the LLVM D compiler (1.41.0):
+  based on DMD v2.111.0 and LLVM 19.1.7
+  built with LDC - the LLVM D compiler (1.41.0)
+  Default target: x86_64-pc-linux-gnu
+  Host CPU: skylake
+  http://dlang.org - http://wiki.dlang.org/LDC
+
+
+  Registered Targets:
+    aarch64     - AArch64 (little endian)
+    aarch64_32  - AArch64 (little endian ILP32)
+    aarch64_be  - AArch64 (big endian)
+    amdgcn      - AMD GCN GPUs
+    arm         - ARM
+    arm64       - ARM64 (little endian)
+    arm64_32    - ARM64 (little endian ILP32)
+    armeb       - ARM (big endian)
+    avr         - Atmel AVR Microcontroller
+    bpf         - BPF (host endian)
+    bpfeb       - BPF (big endian)
+    bpfel       - BPF (little endian)
+    hexagon     - Hexagon
+    lanai       - Lanai
+    loongarch32 - 32-bit LoongArch
+    loongarch64 - 64-bit LoongArch
+    m68k        - Motorola 68000 family
+    mips        - MIPS (32-bit big endian)
+    mips64      - MIPS (64-bit big endian)
+    mips64el    - MIPS (64-bit little endian)
+    mipsel      - MIPS (32-bit little endian)
+    msp430      - MSP430 [experimental]
+    nvptx       - NVIDIA PTX 32-bit
+    nvptx64     - NVIDIA PTX 64-bit
+    ppc32       - PowerPC 32
+    ppc32le     - PowerPC 32 LE
+    ppc64       - PowerPC 64
+    ppc64le     - PowerPC 64 LE
+    r600        - AMD GPUs HD2XXX-HD6XXX
+    riscv32     - 32-bit RISC-V
+    riscv64     - 64-bit RISC-V
+    sparc       - Sparc
+    sparcel     - Sparc LE
+    sparcv9     - Sparc V9
+    systemz     - SystemZ
+    thumb       - Thumb
+    thumbeb     - Thumb (big endian)
+    ve          - VE
+    wasm32      - WebAssembly 32-bit
+    wasm64      - WebAssembly 64-bit
+    x86         - 32-bit X86: Pentium-Pro and above
+    x86-64      - 64-bit X86: EM64T and AMD64
+    xcore       - XCore
+    xtensa      - Xtensa 32
+
+=== TARGET ===
+aarch64-linux-gnu
+
+=== SOURCE HASHES ===
+67c783c7fd7d699b60f457dff8539dd1d5825c57a79525b0d973f07172e5617d  research/r0_1_work_stealing_deque/candidate/source/concurrency/research/modular_bounded_wsq_batch_marked_top.d
+08a423dbe05dc0be9c324154c8660dfc1fe9f1510bfa754d43b42fe3e1e8e80b  research/r0_1_work_stealing_deque/probes/p08f2_aarch64_codegen/source/app.d
+
+=== BARRIER HELPER ASM ===
+
+=== LLVM IR ATOMICS ===
+89:  %3 = load atomic i64, ptr %1 monotonic, align 8 ; [#uses = 3]
+92:  store atomic i64 %5, ptr %1 monotonic, align 8
+94:  %6 = load atomic i64, ptr %queue_arg monotonic, align 8 ; [#uses = 2]
+101:  store atomic i64 %8, ptr %1 monotonic, align 8
+102:  %9 = load atomic i64, ptr %1 monotonic, align 8 ; [#uses = 3]
+105:  store atomic i64 %11, ptr %1 monotonic, align 8
+107:  %12 = load atomic i64, ptr %queue_arg monotonic, align 8 ; [#uses = 2]
+123:  store atomic i64 %.lcssa18.i, ptr %1 monotonic, align 8
+130:  %21 = load atomic i64, ptr %20 monotonic, align 8 ; [#uses = 1]
+136:  %24 = cmpxchg ptr %queue_arg, i64 %.lcssa.i, i64 %23 seq_cst monotonic, align 8 ; [#uses = 1]
+138:  store atomic i64 %.lcssa18.i, ptr %1 monotonic, align 8
+155:  %3 = load atomic i64, ptr %1 monotonic, align 8 ; [#uses = 3]
+158:  store atomic i64 %5, ptr %1 monotonic, align 8
+160:  %6 = load atomic i64, ptr %.this_arg monotonic, align 8 ; [#uses = 2]
+167:  store atomic i64 %8, ptr %1 monotonic, align 8
+168:  %9 = load atomic i64, ptr %1 monotonic, align 8 ; [#uses = 3]
+171:  store atomic i64 %11, ptr %1 monotonic, align 8
+173:  %12 = load atomic i64, ptr %.this_arg monotonic, align 8 ; [#uses = 2]
+192:  %21 = load atomic i64, ptr %20 monotonic, align 8 ; [#uses = 2]
+198:  %24 = cmpxchg ptr %.this_arg, i64 %.lcssa, i64 %23 seq_cst monotonic, align 8 ; [#uses = 1]
+207:  store atomic i64 %.lcssa18, ptr %1 monotonic, align 8
+228:  store atomic i64 %.sink.i, ptr %queue_arg release, align 8
+232:  %1 = load atomic i64, ptr %queue_arg acquire, align 8 ; [#uses = 5]
+240:  %5 = cmpxchg ptr %queue_arg, i64 %1, i64 %4 seq_cst monotonic, align 8 ; [#uses = 1]
+248:  %9 = load atomic i64, ptr %8 acquire, align 8   ; [#uses = 1]
+266:  %18 = load atomic i64, ptr %17 monotonic, align 8 ; [#uses = 1]
+293:  store atomic i64 %.sink, ptr %.this_arg release, align 8
+301:  %2 = load atomic i64, ptr %.this_arg acquire, align 8 ; [#uses = 5]
+309:  %6 = cmpxchg ptr %.this_arg, i64 %2, i64 %5 seq_cst monotonic, align 8 ; [#uses = 1]
+317:  %10 = load atomic i64, ptr %9 acquire, align 8  ; [#uses = 1]
+335:  %19 = load atomic i64, ptr %18 monotonic, align 8 ; [#uses = 1]
+350:  %1 = load atomic i64, ptr %queue_arg acquire, align 8 ; [#uses = 4]
+360:  %6 = load atomic i64, ptr %5 acquire, align 8   ; [#uses = 1]
+371:  %13 = load atomic i64, ptr %12 monotonic, align 8 ; [#uses = 1]
+373:  %15 = cmpxchg ptr %queue_arg, i64 %1, i64 %14 seq_cst monotonic, align 8 ; [#uses = 1]
+404:  %1 = load atomic i64, ptr %.this_arg acquire, align 8 ; [#uses = 4]
+418:  %6 = load atomic i64, ptr %5 acquire, align 8   ; [#uses = 1]
+429:  %13 = load atomic i64, ptr %12 monotonic, align 8 ; [#uses = 1]
+431:  %15 = cmpxchg ptr %.this_arg, i64 %1, i64 %14 seq_cst monotonic, align 8 ; [#uses = 1]
+497:  %2 = load atomic i64, ptr %1 monotonic, align 8 ; [#uses = 3]
+498:  %3 = load atomic i64, ptr %.this_arg acquire, align 8 ; [#uses = 1]
+512:  store atomic i64 %item_arg, ptr %10 monotonic, align 8
+513:  fence release
+516:  store atomic i64 %12, ptr %1 release, align 8
+523:  %1 = load atomic i64, ptr %val monotonic, align 8 ; [#uses = 1]
+530:  %1 = load atomic i64, ptr %val monotonic, align 8 ; [#uses = 1]
+537:  %1 = load atomic i64, ptr %src_arg monotonic, align 8 ; [#uses = 1]
+544:  %1 = load atomic i64, ptr %val acquire, align 8 ; [#uses = 1]
+551:  %1 = load atomic i64, ptr %val acquire, align 8 ; [#uses = 1]
+558:  %1 = load atomic i64, ptr %src_arg acquire, align 8 ; [#uses = 1]
+565:  store atomic i64 %newval_arg, ptr %val monotonic, align 8
+572:  store atomic i64 %newval_arg, ptr %val monotonic, align 8
+579:  store atomic i64 %value_arg, ptr %dest_arg monotonic, align 8
+586:  fence release
+593:  fence release
+600:  store atomic i64 %newval_arg, ptr %val release, align 8
+607:  store atomic i64 %newval_arg, ptr %val release, align 8
+614:  store atomic i64 %value_arg, ptr %dest_arg release, align 8
+621:  store atomic i64 %newval_arg, ptr %val monotonic, align 8
+628:  store atomic i64 %newval_arg, ptr %val monotonic, align 8
+638:  %1 = cmpxchg ptr %here_arg, i64 %ifThis_arg, i64 %writeThis_arg seq_cst monotonic, align 8 ; [#uses = 1]
+646:  %1 = cmpxchg ptr %here_arg, i64 %ifThis_arg, i64 %writeThis_arg seq_cst monotonic, align 8 ; [#uses = 1]
+654:  %1 = cmpxchg ptr %dest_arg, i64 %compare_arg, i64 %value_arg seq_cst monotonic, align 8 ; [#uses = 1]
+662:  %1 = cmpxchg ptr %dest_arg, i64 %compare_arg, i64 %value_arg seq_cst monotonic, align 8 ; [#uses = 1]
+670:  %1 = cmpxchg ptr %here_arg, i64 %ifThis_arg, i64 %writeThis_arg seq_cst monotonic, align 8 ; [#uses = 1]
+678:  %1 = cmpxchg ptr %here_arg, i64 %ifThis_arg, i64 %writeThis_arg seq_cst monotonic, align 8 ; [#uses = 1]
+687:  %0 = load atomic i64, ptr %.this_arg monotonic, align 8 ; [#uses = 1]
+690:  %3 = load atomic i64, ptr %2 monotonic, align 8 ; [#uses = 1]
+701:  %1 = load atomic i64, ptr %.this_arg monotonic, align 8 ; [#uses = 1]
+704:  %4 = load atomic i64, ptr %3 monotonic, align 8 ; [#uses = 1]
+
+=== POP ASM ===
+p08f2_pop:
+	.cfi_startproc
+	stp	x29, x30, [sp, #-64]!
+	.cfi_def_cfa_offset 64
+	str	x23, [sp, #16]
+	stp	x22, x21, [sp, #32]
+	stp	x20, x19, [sp, #48]
+	mov	x29, sp
+	.cfi_def_cfa w29, 64
+	.cfi_offset w19, -8
+	.cfi_offset w20, -16
+	.cfi_offset w21, -24
+	.cfi_offset w22, -32
+	.cfi_offset w23, -48
+	.cfi_offset w30, -56
+	.cfi_offset w29, -64
+	.cfi_remember_state
+	ldr	x21, [x0, #64]
+	mov	x23, #9223372036854775807
+	mov	x20, x1
+	mov	x19, x0
+	add	x22, x21, x23
+	and	x8, x22, #0x7fffffffffffffff
+	str	x8, [x0, #64]
+	add	x0, x0, #72
+	bl	_D11concurrency8research36modular_bounded_wsq_batch_marked_top21researchSeqCstBarrierFNbNiOPiZv
+	ldr	x8, [x19]
+	tbz	w8, #0, .LBB0_2
+.LBB0_1:
+	str	x21, [x19, #64]
+	add	x0, x19, #72
+	ldr	x21, [x19, #64]
+	add	x22, x21, x23
+	and	x8, x22, #0x7fffffffffffffff
+	str	x8, [x19, #64]
+	bl	_D11concurrency8research36modular_bounded_wsq_batch_marked_top21researchSeqCstBarrierFNbNiOPiZv
+	ldr	x8, [x19]
+	tbnz	w8, #0, .LBB0_1
+.LBB0_2:
+	sub	x9, x22, x8, lsr #1
+	and	x10, x9, #0x7fffffffffffffff
+	cmp	x10, #256
+	b.hs	.LBB0_9
+	add	x9, x19, w22, uxtb #3
+	ldr	x9, [x9, #128]
+	cbnz	x10, .LBB0_8
+	add	x10, x8, #2
+.LBB0_5:
+	ldaxr	x11, [x19]
+	cmp	x11, x8
+	b.ne	.LBB0_10
+	stlxr	w11, x10, [x19]
+	cbnz	w11, .LBB0_5
+	str	x21, [x19, #64]
+.LBB0_8:
+	str	x9, [x20]
+	mov	w0, #1
+	.cfi_def_cfa wsp, 64
+	ldp	x20, x19, [sp, #48]
+	ldr	x23, [sp, #16]
+	ldp	x22, x21, [sp, #32]
+	ldp	x29, x30, [sp], #64
+	.cfi_def_cfa_offset 0
+	.cfi_restore w19
+	.cfi_restore w20
+	.cfi_restore w21
+	.cfi_restore w22
+	.cfi_restore w23
+	.cfi_restore w30
+	.cfi_restore w29
+	ret
+.LBB0_9:
+	.cfi_restore_state
+	.cfi_remember_state
+	mov	x0, xzr
+	str	x21, [x19, #64]
+	.cfi_def_cfa wsp, 64
+	ldp	x20, x19, [sp, #48]
+	ldr	x23, [sp, #16]
+	ldp	x22, x21, [sp, #32]
+	ldp	x29, x30, [sp], #64
+	.cfi_def_cfa_offset 0
+	.cfi_restore w19
+	.cfi_restore w20
+	.cfi_restore w21
+	.cfi_restore w22
+	.cfi_restore w23
+	.cfi_restore w30
+	.cfi_restore w29
+	ret
+.LBB0_10:
+	.cfi_restore_state
+	mov	x0, xzr
+	clrex
+	str	x21, [x19, #64]
+	.cfi_def_cfa wsp, 64
+	ldp	x20, x19, [sp, #48]
+	ldr	x23, [sp, #16]
+	ldp	x22, x21, [sp, #32]
+	ldp	x29, x30, [sp], #64
+	.cfi_def_cfa_offset 0
+	.cfi_restore w19
+	.cfi_restore w20
+	.cfi_restore w21
+	.cfi_restore w22
+	.cfi_restore w23
+	.cfi_restore w30
+	.cfi_restore w29
+	ret
+.Lfunc_end0:
+	.size	p08f2_pop, .Lfunc_end0-p08f2_pop
+
+=== BATCH ASM ===
+p08f2_batch:
+	.cfi_startproc
+	cbz	x2, .LBB2_7
+	stp	x29, x30, [sp, #-64]!
+	.cfi_def_cfa_offset 64
+	str	x23, [sp, #16]
+	stp	x22, x21, [sp, #32]
+	stp	x20, x19, [sp, #48]
+	mov	x29, sp
+	.cfi_def_cfa w29, 64
+	.cfi_offset w19, -8
+	.cfi_offset w20, -16
+	.cfi_offset w21, -24
+	.cfi_offset w22, -32
+	.cfi_offset w23, -48
+	.cfi_offset w30, -56
+	.cfi_offset w29, -64
+	.cfi_remember_state
+	ldar	x20, [x0]
+	tbnz	w20, #0, .LBB2_8
+	lsr	x19, x20, #1
+	orr	x8, x20, #0x1
+.LBB2_3:
+	ldaxr	x9, [x0]
+	cmp	x9, x20
+	b.ne	.LBB2_9
+	stlxr	w9, x8, [x0]
+	cbnz	w9, .LBB2_3
+	mov	x23, x0
+	add	x0, x0, #72
+	mov	x22, x2
+	mov	x21, x1
+	bl	_D11concurrency8research36modular_bounded_wsq_batch_marked_top21researchSeqCstBarrierFNbNiOPiZv
+	add	x9, x23, #64
+	mov	x8, x23
+	ldar	x9, [x9]
+	sub	x9, x9, x19
+	and	x9, x9, #0x7fffffffffffffff
+	sub	x10, x9, #257
+	cmn	x10, #256
+	b.hs	.LBB2_10
+	mov	x0, xzr
+	stlr	x20, [x8]
+	.cfi_def_cfa wsp, 64
+	ldp	x20, x19, [sp, #48]
+	ldr	x23, [sp, #16]
+	ldp	x22, x21, [sp, #32]
+	ldp	x29, x30, [sp], #64
+	.cfi_def_cfa_offset 0
+	.cfi_restore w19
+	.cfi_restore w20
+	.cfi_restore w21
+	.cfi_restore w22
+	.cfi_restore w23
+	.cfi_restore w30
+	.cfi_restore w29
+	ret
+.LBB2_7:
+	mov	x0, xzr
+	ret
+.LBB2_8:
+	.cfi_restore_state
+	.cfi_remember_state
+	mov	x0, xzr
+	.cfi_def_cfa wsp, 64
+	ldp	x20, x19, [sp, #48]
+	ldr	x23, [sp, #16]
+	ldp	x22, x21, [sp, #32]
+	ldp	x29, x30, [sp], #64
+	.cfi_def_cfa_offset 0
+	.cfi_restore w19
+	.cfi_restore w20
+	.cfi_restore w21
+	.cfi_restore w22
+	.cfi_restore w23
+	.cfi_restore w30
+	.cfi_restore w29
+	ret
+.LBB2_9:
+	.cfi_restore_state
+	.cfi_remember_state
+	mov	x0, xzr
+	clrex
+	.cfi_def_cfa wsp, 64
+	ldp	x20, x19, [sp, #48]
+	ldr	x23, [sp, #16]
+	ldp	x22, x21, [sp, #32]
+	ldp	x29, x30, [sp], #64
+	.cfi_def_cfa_offset 0
+	.cfi_restore w19
+	.cfi_restore w20
+	.cfi_restore w21
+	.cfi_restore w22
+	.cfi_restore w23
+	.cfi_restore w30
+	.cfi_restore w29
+	ret
+.LBB2_10:
+	.cfi_restore_state
+	cmp	x22, x9
+	mov	x11, x19
+	csel	x0, x22, x9, lo
+	add	x9, x8, #128
+	neg	x10, x0
+.LBB2_11:
+	and	x12, x11, #0xff
+	adds	x10, x10, #1
+	add	x11, x11, #1
+	ldr	x12, [x9, x12, lsl #3]
+	str	x12, [x21], #8
+	b.lo	.LBB2_11
+	add	x9, x0, x19
+	lsl	x20, x9, #1
+	stlr	x20, [x8]
+	.cfi_def_cfa wsp, 64
+	ldp	x20, x19, [sp, #48]
+	ldr	x23, [sp, #16]
+	ldp	x22, x21, [sp, #32]
+	ldp	x29, x30, [sp], #64
+	.cfi_def_cfa_offset 0
+	.cfi_restore w19
+	.cfi_restore w20
+	.cfi_restore w21
+	.cfi_restore w22
+	.cfi_restore w23
+	.cfi_restore w30
+	.cfi_restore w29
+	ret
+.Lfunc_end2:
+	.size	p08f2_batch, .Lfunc_end2-p08f2_batch
+
+=== STEAL ASM ===
+p08f2_steal:
+	.cfi_startproc
+	stp	x29, x30, [sp, #-48]!
+	.cfi_def_cfa_offset 48
+	str	x21, [sp, #16]
+	stp	x20, x19, [sp, #32]
+	mov	x29, sp
+	.cfi_def_cfa w29, 48
+	.cfi_offset w19, -8
+	.cfi_offset w20, -16
+	.cfi_offset w21, -32
+	.cfi_offset w30, -40
+	.cfi_offset w29, -48
+	.cfi_remember_state
+	ldar	x21, [x0]
+	mov	x19, x1
+	tbnz	w21, #0, .LBB4_6
+	mov	x20, x0
+	add	x0, x0, #72
+	bl	_D11concurrency8research36modular_bounded_wsq_batch_marked_top21researchSeqCstBarrierFNbNiOPiZv
+	add	x8, x20, #64
+	ldar	x8, [x8]
+	sub	x8, x8, x21, lsr #1
+	and	x8, x8, #0x7fffffffffffffff
+	sub	x8, x8, #1
+	cmp	x8, #255
+	b.hi	.LBB4_7
+	lsr	x8, x21, #1
+	add	x9, x21, #2
+	add	x8, x20, w8, uxtb #3
+	ldr	x8, [x8, #128]
+.LBB4_3:
+	ldaxr	x10, [x20]
+	cmp	x10, x21
+	b.ne	.LBB4_9
+	stlxr	w10, x9, [x20]
+	cbnz	w10, .LBB4_3
+	mov	w9, #1
+	b	.LBB4_10
+.LBB4_6:
+	mov	x9, xzr
+	mov	x8, xzr
+	tbz	w9, #0, .LBB4_8
+	b	.LBB4_11
+.LBB4_7:
+	mov	x8, xzr
+	mov	x9, xzr
+	tbnz	w9, #0, .LBB4_11
+.LBB4_8:
+	mov	x0, xzr
+	.cfi_def_cfa wsp, 48
+	ldp	x20, x19, [sp, #32]
+	ldr	x21, [sp, #16]
+	ldp	x29, x30, [sp], #48
+	.cfi_def_cfa_offset 0
+	.cfi_restore w19
+	.cfi_restore w20
+	.cfi_restore w21
+	.cfi_restore w30
+	.cfi_restore w29
+	ret
+.LBB4_9:
+	.cfi_restore_state
+	mov	w9, wzr
+	clrex
+.LBB4_10:
+	mov	w9, w9
+	tbz	w9, #0, .LBB4_8
+.LBB4_11:
+	str	x8, [x19]
+	mov	w0, #1
+	.cfi_def_cfa wsp, 48
+	ldp	x20, x19, [sp, #32]
+	ldr	x21, [sp, #16]
+	ldp	x29, x30, [sp], #48
+	.cfi_def_cfa_offset 0
+	.cfi_restore w19
+	.cfi_restore w20
+	.cfi_restore w21
+	.cfi_restore w30
+	.cfi_restore w29
+	ret
+.Lfunc_end4:
+	.size	p08f2_steal, .Lfunc_end4-p08f2_steal

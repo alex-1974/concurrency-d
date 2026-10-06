@@ -1,0 +1,1676 @@
+R0.1 P08f2 AArch64 codegen
+
+=== LDC ===
+LDC - the LLVM D compiler (1.41.0):
+  based on DMD v2.111.0 and LLVM 19.1.7
+  built with LDC - the LLVM D compiler (1.41.0)
+  Default target: x86_64-pc-linux-gnu
+  Host CPU: skylake
+  http://dlang.org - http://wiki.dlang.org/LDC
+
+
+  Registered Targets:
+    aarch64     - AArch64 (little endian)
+    aarch64_32  - AArch64 (little endian ILP32)
+    aarch64_be  - AArch64 (big endian)
+    amdgcn      - AMD GCN GPUs
+    arm         - ARM
+    arm64       - ARM64 (little endian)
+    arm64_32    - ARM64 (little endian ILP32)
+    armeb       - ARM (big endian)
+    avr         - Atmel AVR Microcontroller
+    bpf         - BPF (host endian)
+    bpfeb       - BPF (big endian)
+    bpfel       - BPF (little endian)
+    hexagon     - Hexagon
+    lanai       - Lanai
+    loongarch32 - 32-bit LoongArch
+    loongarch64 - 64-bit LoongArch
+    m68k        - Motorola 68000 family
+    mips        - MIPS (32-bit big endian)
+    mips64      - MIPS (64-bit big endian)
+    mips64el    - MIPS (64-bit little endian)
+    mipsel      - MIPS (32-bit little endian)
+    msp430      - MSP430 [experimental]
+    nvptx       - NVIDIA PTX 32-bit
+    nvptx64     - NVIDIA PTX 64-bit
+    ppc32       - PowerPC 32
+    ppc32le     - PowerPC 32 LE
+    ppc64       - PowerPC 64
+    ppc64le     - PowerPC 64 LE
+    r600        - AMD GPUs HD2XXX-HD6XXX
+    riscv32     - 32-bit RISC-V
+    riscv64     - 64-bit RISC-V
+    sparc       - Sparc
+    sparcel     - Sparc LE
+    sparcv9     - Sparc V9
+    systemz     - SystemZ
+    thumb       - Thumb
+    thumbeb     - Thumb (big endian)
+    ve          - VE
+    wasm32      - WebAssembly 32-bit
+    wasm64      - WebAssembly 64-bit
+    x86         - 32-bit X86: Pentium-Pro and above
+    x86-64      - 64-bit X86: EM64T and AMD64
+    xcore       - XCore
+    xtensa      - Xtensa 32
+
+=== TARGET ===
+aarch64-linux-gnu
+
+=== SOURCE SHA256 ===
+67c783c7fd7d699b60f457dff8539dd1d5825c57a79525b0d973f07172e5617d  research/r0_1_work_stealing_deque/candidate/source/concurrency/research/modular_bounded_wsq_batch_marked_top.d
+08a423dbe05dc0be9c324154c8660dfc1fe9f1510bfa754d43b42fe3e1e8e80b  research/r0_1_work_stealing_deque/probes/p08f2_aarch64_codegen/source/app.d
+
+=== ASSEMBLY ===
+	.text
+	.file	"app.d"
+	.section	.text.p08f2_pop,"ax",@progbits
+	.globl	p08f2_pop
+	.p2align	2
+	.type	p08f2_pop,@function
+p08f2_pop:
+	.cfi_startproc
+	stp	x29, x30, [sp, #-64]!
+	.cfi_def_cfa_offset 64
+	str	x23, [sp, #16]
+	stp	x22, x21, [sp, #32]
+	stp	x20, x19, [sp, #48]
+	mov	x29, sp
+	.cfi_def_cfa w29, 64
+	.cfi_offset w19, -8
+	.cfi_offset w20, -16
+	.cfi_offset w21, -24
+	.cfi_offset w22, -32
+	.cfi_offset w23, -48
+	.cfi_offset w30, -56
+	.cfi_offset w29, -64
+	.cfi_remember_state
+	ldr	x21, [x0, #64]
+	mov	x23, #9223372036854775807
+	mov	x20, x1
+	mov	x19, x0
+	add	x22, x21, x23
+	and	x8, x22, #0x7fffffffffffffff
+	str	x8, [x0, #64]
+	add	x0, x0, #72
+	bl	_D11concurrency8research36modular_bounded_wsq_batch_marked_top21researchSeqCstBarrierFNbNiOPiZv
+	ldr	x8, [x19]
+	tbz	w8, #0, .LBB0_2
+.LBB0_1:
+	str	x21, [x19, #64]
+	add	x0, x19, #72
+	ldr	x21, [x19, #64]
+	add	x22, x21, x23
+	and	x8, x22, #0x7fffffffffffffff
+	str	x8, [x19, #64]
+	bl	_D11concurrency8research36modular_bounded_wsq_batch_marked_top21researchSeqCstBarrierFNbNiOPiZv
+	ldr	x8, [x19]
+	tbnz	w8, #0, .LBB0_1
+.LBB0_2:
+	sub	x9, x22, x8, lsr #1
+	and	x10, x9, #0x7fffffffffffffff
+	cmp	x10, #256
+	b.hs	.LBB0_9
+	add	x9, x19, w22, uxtb #3
+	ldr	x9, [x9, #128]
+	cbnz	x10, .LBB0_8
+	add	x10, x8, #2
+.LBB0_5:
+	ldaxr	x11, [x19]
+	cmp	x11, x8
+	b.ne	.LBB0_10
+	stlxr	w11, x10, [x19]
+	cbnz	w11, .LBB0_5
+	str	x21, [x19, #64]
+.LBB0_8:
+	str	x9, [x20]
+	mov	w0, #1
+	.cfi_def_cfa wsp, 64
+	ldp	x20, x19, [sp, #48]
+	ldr	x23, [sp, #16]
+	ldp	x22, x21, [sp, #32]
+	ldp	x29, x30, [sp], #64
+	.cfi_def_cfa_offset 0
+	.cfi_restore w19
+	.cfi_restore w20
+	.cfi_restore w21
+	.cfi_restore w22
+	.cfi_restore w23
+	.cfi_restore w30
+	.cfi_restore w29
+	ret
+.LBB0_9:
+	.cfi_restore_state
+	.cfi_remember_state
+	mov	x0, xzr
+	str	x21, [x19, #64]
+	.cfi_def_cfa wsp, 64
+	ldp	x20, x19, [sp, #48]
+	ldr	x23, [sp, #16]
+	ldp	x22, x21, [sp, #32]
+	ldp	x29, x30, [sp], #64
+	.cfi_def_cfa_offset 0
+	.cfi_restore w19
+	.cfi_restore w20
+	.cfi_restore w21
+	.cfi_restore w22
+	.cfi_restore w23
+	.cfi_restore w30
+	.cfi_restore w29
+	ret
+.LBB0_10:
+	.cfi_restore_state
+	mov	x0, xzr
+	clrex
+	str	x21, [x19, #64]
+	.cfi_def_cfa wsp, 64
+	ldp	x20, x19, [sp, #48]
+	ldr	x23, [sp, #16]
+	ldp	x22, x21, [sp, #32]
+	ldp	x29, x30, [sp], #64
+	.cfi_def_cfa_offset 0
+	.cfi_restore w19
+	.cfi_restore w20
+	.cfi_restore w21
+	.cfi_restore w22
+	.cfi_restore w23
+	.cfi_restore w30
+	.cfi_restore w29
+	ret
+.Lfunc_end0:
+	.size	p08f2_pop, .Lfunc_end0-p08f2_pop
+	.cfi_endproc
+
+	.section	.text._D11concurrency8research36modular_bounded_wsq_batch_marked_top__T38MarkedTopBatchBoundedWorkStealingDequeTmVmi8ZQBv3popMFNbNiZSQEvQEl11bounded_wsq__T10TakeResultTmZQp,"axG",@progbits,_D11concurrency8research36modular_bounded_wsq_batch_marked_top__T38MarkedTopBatchBoundedWorkStealingDequeTmVmi8ZQBv3popMFNbNiZSQEvQEl11bounded_wsq__T10TakeResultTmZQp,comdat
+	.weak	_D11concurrency8research36modular_bounded_wsq_batch_marked_top__T38MarkedTopBatchBoundedWorkStealingDequeTmVmi8ZQBv3popMFNbNiZSQEvQEl11bounded_wsq__T10TakeResultTmZQp
+	.p2align	2
+	.type	_D11concurrency8research36modular_bounded_wsq_batch_marked_top__T38MarkedTopBatchBoundedWorkStealingDequeTmVmi8ZQBv3popMFNbNiZSQEvQEl11bounded_wsq__T10TakeResultTmZQp,@function
+_D11concurrency8research36modular_bounded_wsq_batch_marked_top__T38MarkedTopBatchBoundedWorkStealingDequeTmVmi8ZQBv3popMFNbNiZSQEvQEl11bounded_wsq__T10TakeResultTmZQp:
+	.cfi_startproc
+	stp	x29, x30, [sp, #-48]!
+	.cfi_def_cfa_offset 48
+	stp	x22, x21, [sp, #16]
+	stp	x20, x19, [sp, #32]
+	mov	x29, sp
+	.cfi_def_cfa w29, 48
+	.cfi_offset w19, -8
+	.cfi_offset w20, -16
+	.cfi_offset w21, -24
+	.cfi_offset w22, -32
+	.cfi_offset w30, -40
+	.cfi_offset w29, -48
+	.cfi_remember_state
+	ldr	x20, [x0, #64]
+	mov	x22, #9223372036854775807
+	mov	x19, x0
+	add	x21, x20, x22
+	and	x8, x21, #0x7fffffffffffffff
+	str	x8, [x0, #64]
+	add	x0, x0, #72
+	bl	_D11concurrency8research36modular_bounded_wsq_batch_marked_top21researchSeqCstBarrierFNbNiOPiZv
+	ldr	x8, [x19]
+	tbz	w8, #0, .LBB1_2
+.LBB1_1:
+	str	x20, [x19, #64]
+	add	x0, x19, #72
+	ldr	x20, [x19, #64]
+	add	x21, x20, x22
+	and	x8, x21, #0x7fffffffffffffff
+	str	x8, [x19, #64]
+	bl	_D11concurrency8research36modular_bounded_wsq_batch_marked_top21researchSeqCstBarrierFNbNiOPiZv
+	ldr	x8, [x19]
+	tbnz	w8, #0, .LBB1_1
+.LBB1_2:
+	sub	x9, x21, x8, lsr #1
+	and	x9, x9, #0x7fffffffffffffff
+	cmp	x9, #255
+	b.hi	.LBB1_5
+	add	x10, x19, w21, uxtb #3
+	ldr	x1, [x10, #128]
+	cbz	x9, .LBB1_6
+	mov	w0, #1
+	.cfi_def_cfa wsp, 48
+	ldp	x20, x19, [sp, #32]
+	ldp	x22, x21, [sp, #16]
+	ldp	x29, x30, [sp], #48
+	.cfi_def_cfa_offset 0
+	.cfi_restore w19
+	.cfi_restore w20
+	.cfi_restore w21
+	.cfi_restore w22
+	.cfi_restore w30
+	.cfi_restore w29
+	ret
+.LBB1_5:
+	.cfi_restore_state
+	.cfi_remember_state
+	mov	x1, xzr
+	mov	x0, xzr
+	str	x20, [x19, #64]
+	.cfi_def_cfa wsp, 48
+	ldp	x20, x19, [sp, #32]
+	ldp	x22, x21, [sp, #16]
+	ldp	x29, x30, [sp], #48
+	.cfi_def_cfa_offset 0
+	.cfi_restore w19
+	.cfi_restore w20
+	.cfi_restore w21
+	.cfi_restore w22
+	.cfi_restore w30
+	.cfi_restore w29
+	ret
+.LBB1_6:
+	.cfi_restore_state
+	add	x9, x8, #2
+.LBB1_7:
+	ldaxr	x10, [x19]
+	cmp	x10, x8
+	b.ne	.LBB1_10
+	stlxr	w10, x9, [x19]
+	cbnz	w10, .LBB1_7
+	mov	w8, #1
+	b	.LBB1_11
+.LBB1_10:
+	mov	w8, wzr
+	clrex
+.LBB1_11:
+	cmp	w8, #0
+	mov	w0, w8
+	csel	x1, x1, xzr, ne
+	str	x20, [x19, #64]
+	.cfi_def_cfa wsp, 48
+	ldp	x20, x19, [sp, #32]
+	ldp	x22, x21, [sp, #16]
+	ldp	x29, x30, [sp], #48
+	.cfi_def_cfa_offset 0
+	.cfi_restore w19
+	.cfi_restore w20
+	.cfi_restore w21
+	.cfi_restore w22
+	.cfi_restore w30
+	.cfi_restore w29
+	ret
+.Lfunc_end1:
+	.size	_D11concurrency8research36modular_bounded_wsq_batch_marked_top__T38MarkedTopBatchBoundedWorkStealingDequeTmVmi8ZQBv3popMFNbNiZSQEvQEl11bounded_wsq__T10TakeResultTmZQp, .Lfunc_end1-_D11concurrency8research36modular_bounded_wsq_batch_marked_top__T38MarkedTopBatchBoundedWorkStealingDequeTmVmi8ZQBv3popMFNbNiZSQEvQEl11bounded_wsq__T10TakeResultTmZQp
+	.cfi_endproc
+
+	.section	.text.p08f2_batch,"ax",@progbits
+	.globl	p08f2_batch
+	.p2align	2
+	.type	p08f2_batch,@function
+p08f2_batch:
+	.cfi_startproc
+	cbz	x2, .LBB2_7
+	stp	x29, x30, [sp, #-64]!
+	.cfi_def_cfa_offset 64
+	str	x23, [sp, #16]
+	stp	x22, x21, [sp, #32]
+	stp	x20, x19, [sp, #48]
+	mov	x29, sp
+	.cfi_def_cfa w29, 64
+	.cfi_offset w19, -8
+	.cfi_offset w20, -16
+	.cfi_offset w21, -24
+	.cfi_offset w22, -32
+	.cfi_offset w23, -48
+	.cfi_offset w30, -56
+	.cfi_offset w29, -64
+	.cfi_remember_state
+	ldar	x20, [x0]
+	tbnz	w20, #0, .LBB2_8
+	lsr	x19, x20, #1
+	orr	x8, x20, #0x1
+.LBB2_3:
+	ldaxr	x9, [x0]
+	cmp	x9, x20
+	b.ne	.LBB2_9
+	stlxr	w9, x8, [x0]
+	cbnz	w9, .LBB2_3
+	mov	x23, x0
+	add	x0, x0, #72
+	mov	x22, x2
+	mov	x21, x1
+	bl	_D11concurrency8research36modular_bounded_wsq_batch_marked_top21researchSeqCstBarrierFNbNiOPiZv
+	add	x9, x23, #64
+	mov	x8, x23
+	ldar	x9, [x9]
+	sub	x9, x9, x19
+	and	x9, x9, #0x7fffffffffffffff
+	sub	x10, x9, #257
+	cmn	x10, #256
+	b.hs	.LBB2_10
+	mov	x0, xzr
+	stlr	x20, [x8]
+	.cfi_def_cfa wsp, 64
+	ldp	x20, x19, [sp, #48]
+	ldr	x23, [sp, #16]
+	ldp	x22, x21, [sp, #32]
+	ldp	x29, x30, [sp], #64
+	.cfi_def_cfa_offset 0
+	.cfi_restore w19
+	.cfi_restore w20
+	.cfi_restore w21
+	.cfi_restore w22
+	.cfi_restore w23
+	.cfi_restore w30
+	.cfi_restore w29
+	ret
+.LBB2_7:
+	mov	x0, xzr
+	ret
+.LBB2_8:
+	.cfi_restore_state
+	.cfi_remember_state
+	mov	x0, xzr
+	.cfi_def_cfa wsp, 64
+	ldp	x20, x19, [sp, #48]
+	ldr	x23, [sp, #16]
+	ldp	x22, x21, [sp, #32]
+	ldp	x29, x30, [sp], #64
+	.cfi_def_cfa_offset 0
+	.cfi_restore w19
+	.cfi_restore w20
+	.cfi_restore w21
+	.cfi_restore w22
+	.cfi_restore w23
+	.cfi_restore w30
+	.cfi_restore w29
+	ret
+.LBB2_9:
+	.cfi_restore_state
+	.cfi_remember_state
+	mov	x0, xzr
+	clrex
+	.cfi_def_cfa wsp, 64
+	ldp	x20, x19, [sp, #48]
+	ldr	x23, [sp, #16]
+	ldp	x22, x21, [sp, #32]
+	ldp	x29, x30, [sp], #64
+	.cfi_def_cfa_offset 0
+	.cfi_restore w19
+	.cfi_restore w20
+	.cfi_restore w21
+	.cfi_restore w22
+	.cfi_restore w23
+	.cfi_restore w30
+	.cfi_restore w29
+	ret
+.LBB2_10:
+	.cfi_restore_state
+	cmp	x22, x9
+	mov	x11, x19
+	csel	x0, x22, x9, lo
+	add	x9, x8, #128
+	neg	x10, x0
+.LBB2_11:
+	and	x12, x11, #0xff
+	adds	x10, x10, #1
+	add	x11, x11, #1
+	ldr	x12, [x9, x12, lsl #3]
+	str	x12, [x21], #8
+	b.lo	.LBB2_11
+	add	x9, x0, x19
+	lsl	x20, x9, #1
+	stlr	x20, [x8]
+	.cfi_def_cfa wsp, 64
+	ldp	x20, x19, [sp, #48]
+	ldr	x23, [sp, #16]
+	ldp	x22, x21, [sp, #32]
+	ldp	x29, x30, [sp], #64
+	.cfi_def_cfa_offset 0
+	.cfi_restore w19
+	.cfi_restore w20
+	.cfi_restore w21
+	.cfi_restore w22
+	.cfi_restore w23
+	.cfi_restore w30
+	.cfi_restore w29
+	ret
+.Lfunc_end2:
+	.size	p08f2_batch, .Lfunc_end2-p08f2_batch
+	.cfi_endproc
+
+	.section	.text._D11concurrency8research36modular_bounded_wsq_batch_marked_top__T38MarkedTopBatchBoundedWorkStealingDequeTmVmi8ZQBv10stealBatchMFNbNiMAmZm,"axG",@progbits,_D11concurrency8research36modular_bounded_wsq_batch_marked_top__T38MarkedTopBatchBoundedWorkStealingDequeTmVmi8ZQBv10stealBatchMFNbNiMAmZm,comdat
+	.weak	_D11concurrency8research36modular_bounded_wsq_batch_marked_top__T38MarkedTopBatchBoundedWorkStealingDequeTmVmi8ZQBv10stealBatchMFNbNiMAmZm
+	.p2align	2
+	.type	_D11concurrency8research36modular_bounded_wsq_batch_marked_top__T38MarkedTopBatchBoundedWorkStealingDequeTmVmi8ZQBv10stealBatchMFNbNiMAmZm,@function
+_D11concurrency8research36modular_bounded_wsq_batch_marked_top__T38MarkedTopBatchBoundedWorkStealingDequeTmVmi8ZQBv10stealBatchMFNbNiMAmZm:
+	.cfi_startproc
+	cbz	x1, .LBB3_7
+	stp	x29, x30, [sp, #-64]!
+	.cfi_def_cfa_offset 64
+	str	x23, [sp, #16]
+	stp	x22, x21, [sp, #32]
+	stp	x20, x19, [sp, #48]
+	mov	x29, sp
+	.cfi_def_cfa w29, 64
+	.cfi_offset w19, -8
+	.cfi_offset w20, -16
+	.cfi_offset w21, -24
+	.cfi_offset w22, -32
+	.cfi_offset w23, -48
+	.cfi_offset w30, -56
+	.cfi_offset w29, -64
+	.cfi_remember_state
+	ldar	x20, [x0]
+	tbnz	w20, #0, .LBB3_8
+	lsr	x19, x20, #1
+	orr	x8, x20, #0x1
+.LBB3_3:
+	ldaxr	x9, [x0]
+	cmp	x9, x20
+	b.ne	.LBB3_9
+	stlxr	w9, x8, [x0]
+	cbnz	w9, .LBB3_3
+	mov	x23, x0
+	add	x0, x0, #72
+	mov	x22, x1
+	mov	x21, x2
+	bl	_D11concurrency8research36modular_bounded_wsq_batch_marked_top21researchSeqCstBarrierFNbNiOPiZv
+	add	x9, x23, #64
+	mov	x8, x23
+	ldar	x9, [x9]
+	sub	x9, x9, x19
+	and	x9, x9, #0x7fffffffffffffff
+	sub	x10, x9, #257
+	cmn	x10, #256
+	b.hs	.LBB3_10
+	mov	x0, xzr
+	stlr	x20, [x8]
+	.cfi_def_cfa wsp, 64
+	ldp	x20, x19, [sp, #48]
+	ldr	x23, [sp, #16]
+	ldp	x22, x21, [sp, #32]
+	ldp	x29, x30, [sp], #64
+	.cfi_def_cfa_offset 0
+	.cfi_restore w19
+	.cfi_restore w20
+	.cfi_restore w21
+	.cfi_restore w22
+	.cfi_restore w23
+	.cfi_restore w30
+	.cfi_restore w29
+	ret
+.LBB3_7:
+	mov	x0, xzr
+	ret
+.LBB3_8:
+	.cfi_restore_state
+	.cfi_remember_state
+	mov	x0, xzr
+	.cfi_def_cfa wsp, 64
+	ldp	x20, x19, [sp, #48]
+	ldr	x23, [sp, #16]
+	ldp	x22, x21, [sp, #32]
+	ldp	x29, x30, [sp], #64
+	.cfi_def_cfa_offset 0
+	.cfi_restore w19
+	.cfi_restore w20
+	.cfi_restore w21
+	.cfi_restore w22
+	.cfi_restore w23
+	.cfi_restore w30
+	.cfi_restore w29
+	ret
+.LBB3_9:
+	.cfi_restore_state
+	.cfi_remember_state
+	mov	x0, xzr
+	clrex
+	.cfi_def_cfa wsp, 64
+	ldp	x20, x19, [sp, #48]
+	ldr	x23, [sp, #16]
+	ldp	x22, x21, [sp, #32]
+	ldp	x29, x30, [sp], #64
+	.cfi_def_cfa_offset 0
+	.cfi_restore w19
+	.cfi_restore w20
+	.cfi_restore w21
+	.cfi_restore w22
+	.cfi_restore w23
+	.cfi_restore w30
+	.cfi_restore w29
+	ret
+.LBB3_10:
+	.cfi_restore_state
+	cmp	x9, x22
+	mov	x11, x19
+	csel	x0, x9, x22, lo
+	add	x9, x8, #128
+	neg	x10, x0
+.LBB3_11:
+	and	x12, x11, #0xff
+	adds	x10, x10, #1
+	add	x11, x11, #1
+	ldr	x12, [x9, x12, lsl #3]
+	str	x12, [x21], #8
+	b.lo	.LBB3_11
+	add	x9, x0, x19
+	lsl	x20, x9, #1
+	stlr	x20, [x8]
+	.cfi_def_cfa wsp, 64
+	ldp	x20, x19, [sp, #48]
+	ldr	x23, [sp, #16]
+	ldp	x22, x21, [sp, #32]
+	ldp	x29, x30, [sp], #64
+	.cfi_def_cfa_offset 0
+	.cfi_restore w19
+	.cfi_restore w20
+	.cfi_restore w21
+	.cfi_restore w22
+	.cfi_restore w23
+	.cfi_restore w30
+	.cfi_restore w29
+	ret
+.Lfunc_end3:
+	.size	_D11concurrency8research36modular_bounded_wsq_batch_marked_top__T38MarkedTopBatchBoundedWorkStealingDequeTmVmi8ZQBv10stealBatchMFNbNiMAmZm, .Lfunc_end3-_D11concurrency8research36modular_bounded_wsq_batch_marked_top__T38MarkedTopBatchBoundedWorkStealingDequeTmVmi8ZQBv10stealBatchMFNbNiMAmZm
+	.cfi_endproc
+
+	.section	.text.p08f2_steal,"ax",@progbits
+	.globl	p08f2_steal
+	.p2align	2
+	.type	p08f2_steal,@function
+p08f2_steal:
+	.cfi_startproc
+	stp	x29, x30, [sp, #-48]!
+	.cfi_def_cfa_offset 48
+	str	x21, [sp, #16]
+	stp	x20, x19, [sp, #32]
+	mov	x29, sp
+	.cfi_def_cfa w29, 48
+	.cfi_offset w19, -8
+	.cfi_offset w20, -16
+	.cfi_offset w21, -32
+	.cfi_offset w30, -40
+	.cfi_offset w29, -48
+	.cfi_remember_state
+	ldar	x21, [x0]
+	mov	x19, x1
+	tbnz	w21, #0, .LBB4_6
+	mov	x20, x0
+	add	x0, x0, #72
+	bl	_D11concurrency8research36modular_bounded_wsq_batch_marked_top21researchSeqCstBarrierFNbNiOPiZv
+	add	x8, x20, #64
+	ldar	x8, [x8]
+	sub	x8, x8, x21, lsr #1
+	and	x8, x8, #0x7fffffffffffffff
+	sub	x8, x8, #1
+	cmp	x8, #255
+	b.hi	.LBB4_7
+	lsr	x8, x21, #1
+	add	x9, x21, #2
+	add	x8, x20, w8, uxtb #3
+	ldr	x8, [x8, #128]
+.LBB4_3:
+	ldaxr	x10, [x20]
+	cmp	x10, x21
+	b.ne	.LBB4_9
+	stlxr	w10, x9, [x20]
+	cbnz	w10, .LBB4_3
+	mov	w9, #1
+	b	.LBB4_10
+.LBB4_6:
+	mov	x9, xzr
+	mov	x8, xzr
+	tbz	w9, #0, .LBB4_8
+	b	.LBB4_11
+.LBB4_7:
+	mov	x8, xzr
+	mov	x9, xzr
+	tbnz	w9, #0, .LBB4_11
+.LBB4_8:
+	mov	x0, xzr
+	.cfi_def_cfa wsp, 48
+	ldp	x20, x19, [sp, #32]
+	ldr	x21, [sp, #16]
+	ldp	x29, x30, [sp], #48
+	.cfi_def_cfa_offset 0
+	.cfi_restore w19
+	.cfi_restore w20
+	.cfi_restore w21
+	.cfi_restore w30
+	.cfi_restore w29
+	ret
+.LBB4_9:
+	.cfi_restore_state
+	mov	w9, wzr
+	clrex
+.LBB4_10:
+	mov	w9, w9
+	tbz	w9, #0, .LBB4_8
+.LBB4_11:
+	str	x8, [x19]
+	mov	w0, #1
+	.cfi_def_cfa wsp, 48
+	ldp	x20, x19, [sp, #32]
+	ldr	x21, [sp, #16]
+	ldp	x29, x30, [sp], #48
+	.cfi_def_cfa_offset 0
+	.cfi_restore w19
+	.cfi_restore w20
+	.cfi_restore w21
+	.cfi_restore w30
+	.cfi_restore w29
+	ret
+.Lfunc_end4:
+	.size	p08f2_steal, .Lfunc_end4-p08f2_steal
+	.cfi_endproc
+
+	.section	.text._D11concurrency8research36modular_bounded_wsq_batch_marked_top__T38MarkedTopBatchBoundedWorkStealingDequeTmVmi8ZQBv5stealMFNbNiZSQExQEn11bounded_wsq__T10TakeResultTmZQp,"axG",@progbits,_D11concurrency8research36modular_bounded_wsq_batch_marked_top__T38MarkedTopBatchBoundedWorkStealingDequeTmVmi8ZQBv5stealMFNbNiZSQExQEn11bounded_wsq__T10TakeResultTmZQp,comdat
+	.weak	_D11concurrency8research36modular_bounded_wsq_batch_marked_top__T38MarkedTopBatchBoundedWorkStealingDequeTmVmi8ZQBv5stealMFNbNiZSQExQEn11bounded_wsq__T10TakeResultTmZQp
+	.p2align	2
+	.type	_D11concurrency8research36modular_bounded_wsq_batch_marked_top__T38MarkedTopBatchBoundedWorkStealingDequeTmVmi8ZQBv5stealMFNbNiZSQExQEn11bounded_wsq__T10TakeResultTmZQp,@function
+_D11concurrency8research36modular_bounded_wsq_batch_marked_top__T38MarkedTopBatchBoundedWorkStealingDequeTmVmi8ZQBv5stealMFNbNiZSQExQEn11bounded_wsq__T10TakeResultTmZQp:
+	.cfi_startproc
+	stp	x29, x30, [sp, #-32]!
+	.cfi_def_cfa_offset 32
+	stp	x20, x19, [sp, #16]
+	mov	x29, sp
+	.cfi_def_cfa w29, 32
+	.cfi_offset w19, -8
+	.cfi_offset w20, -16
+	.cfi_offset w30, -24
+	.cfi_offset w29, -32
+	.cfi_remember_state
+	ldar	x20, [x0]
+	tbnz	w20, #0, .LBB5_6
+	mov	x19, x0
+	add	x0, x0, #72
+	bl	_D11concurrency8research36modular_bounded_wsq_batch_marked_top21researchSeqCstBarrierFNbNiOPiZv
+	add	x8, x19, #64
+	ldar	x8, [x8]
+	sub	x8, x8, x20, lsr #1
+	and	x8, x8, #0x7fffffffffffffff
+	sub	x8, x8, #1
+	cmp	x8, #255
+	b.hi	.LBB5_7
+	lsr	x8, x20, #1
+	add	x8, x19, w8, uxtb #3
+	ldr	x1, [x8, #128]
+	add	x8, x20, #2
+.LBB5_3:
+	ldaxr	x9, [x19]
+	cmp	x9, x20
+	b.ne	.LBB5_8
+	stlxr	w9, x8, [x19]
+	cbnz	w9, .LBB5_3
+	mov	w8, #1
+	mov	w0, w8
+	.cfi_def_cfa wsp, 32
+	ldp	x20, x19, [sp, #16]
+	ldp	x29, x30, [sp], #32
+	.cfi_def_cfa_offset 0
+	.cfi_restore w19
+	.cfi_restore w20
+	.cfi_restore w30
+	.cfi_restore w29
+	ret
+.LBB5_6:
+	.cfi_restore_state
+	.cfi_remember_state
+	mov	x0, xzr
+	mov	x1, xzr
+	.cfi_def_cfa wsp, 32
+	ldp	x20, x19, [sp, #16]
+	ldp	x29, x30, [sp], #32
+	.cfi_def_cfa_offset 0
+	.cfi_restore w19
+	.cfi_restore w20
+	.cfi_restore w30
+	.cfi_restore w29
+	ret
+.LBB5_7:
+	.cfi_restore_state
+	.cfi_remember_state
+	mov	x1, xzr
+	mov	x0, xzr
+	.cfi_def_cfa wsp, 32
+	ldp	x20, x19, [sp, #16]
+	ldp	x29, x30, [sp], #32
+	.cfi_def_cfa_offset 0
+	.cfi_restore w19
+	.cfi_restore w20
+	.cfi_restore w30
+	.cfi_restore w29
+	ret
+.LBB5_8:
+	.cfi_restore_state
+	clrex
+	mov	w0, wzr
+	.cfi_def_cfa wsp, 32
+	ldp	x20, x19, [sp, #16]
+	ldp	x29, x30, [sp], #32
+	.cfi_def_cfa_offset 0
+	.cfi_restore w19
+	.cfi_restore w20
+	.cfi_restore w30
+	.cfi_restore w29
+	ret
+.Lfunc_end5:
+	.size	_D11concurrency8research36modular_bounded_wsq_batch_marked_top__T38MarkedTopBatchBoundedWorkStealingDequeTmVmi8ZQBv5stealMFNbNiZSQExQEn11bounded_wsq__T10TakeResultTmZQp, .Lfunc_end5-_D11concurrency8research36modular_bounded_wsq_batch_marked_top__T38MarkedTopBatchBoundedWorkStealingDequeTmVmi8ZQBv5stealMFNbNiZSQExQEn11bounded_wsq__T10TakeResultTmZQp
+	.cfi_endproc
+
+	.section	.text._D11concurrency8research36modular_bounded_wsq_batch_marked_top__T38MarkedTopBatchBoundedWorkStealingDequeTmVmi8ZQBv9encodeTopFNaNbNiNfmbZm,"axG",@progbits,_D11concurrency8research36modular_bounded_wsq_batch_marked_top__T38MarkedTopBatchBoundedWorkStealingDequeTmVmi8ZQBv9encodeTopFNaNbNiNfmbZm,comdat
+	.weak	_D11concurrency8research36modular_bounded_wsq_batch_marked_top__T38MarkedTopBatchBoundedWorkStealingDequeTmVmi8ZQBv9encodeTopFNaNbNiNfmbZm
+	.p2align	2
+	.type	_D11concurrency8research36modular_bounded_wsq_batch_marked_top__T38MarkedTopBatchBoundedWorkStealingDequeTmVmi8ZQBv9encodeTopFNaNbNiNfmbZm,@function
+_D11concurrency8research36modular_bounded_wsq_batch_marked_top__T38MarkedTopBatchBoundedWorkStealingDequeTmVmi8ZQBv9encodeTopFNaNbNiNfmbZm:
+	.cfi_startproc
+	stp	x29, x30, [sp, #-16]!
+	.cfi_def_cfa_offset 16
+	mov	x29, sp
+	.cfi_def_cfa w29, 16
+	.cfi_offset w30, -8
+	.cfi_offset w29, -16
+	mov	w8, w1
+	orr	x0, x8, x0, lsl #1
+	.cfi_def_cfa wsp, 16
+	ldp	x29, x30, [sp], #16
+	.cfi_def_cfa_offset 0
+	.cfi_restore w30
+	.cfi_restore w29
+	ret
+.Lfunc_end6:
+	.size	_D11concurrency8research36modular_bounded_wsq_batch_marked_top__T38MarkedTopBatchBoundedWorkStealingDequeTmVmi8ZQBv9encodeTopFNaNbNiNfmbZm, .Lfunc_end6-_D11concurrency8research36modular_bounded_wsq_batch_marked_top__T38MarkedTopBatchBoundedWorkStealingDequeTmVmi8ZQBv9encodeTopFNaNbNiNfmbZm
+	.cfi_endproc
+
+	.section	.text._D11concurrency8research36modular_bounded_wsq_batch_marked_top__T38MarkedTopBatchBoundedWorkStealingDequeTmVmi8ZQBv9decodeTopFNaNbNiNfmZm,"axG",@progbits,_D11concurrency8research36modular_bounded_wsq_batch_marked_top__T38MarkedTopBatchBoundedWorkStealingDequeTmVmi8ZQBv9decodeTopFNaNbNiNfmZm,comdat
+	.weak	_D11concurrency8research36modular_bounded_wsq_batch_marked_top__T38MarkedTopBatchBoundedWorkStealingDequeTmVmi8ZQBv9decodeTopFNaNbNiNfmZm
+	.p2align	2
+	.type	_D11concurrency8research36modular_bounded_wsq_batch_marked_top__T38MarkedTopBatchBoundedWorkStealingDequeTmVmi8ZQBv9decodeTopFNaNbNiNfmZm,@function
+_D11concurrency8research36modular_bounded_wsq_batch_marked_top__T38MarkedTopBatchBoundedWorkStealingDequeTmVmi8ZQBv9decodeTopFNaNbNiNfmZm:
+	.cfi_startproc
+	stp	x29, x30, [sp, #-16]!
+	.cfi_def_cfa_offset 16
+	mov	x29, sp
+	.cfi_def_cfa w29, 16
+	.cfi_offset w30, -8
+	.cfi_offset w29, -16
+	lsr	x0, x0, #1
+	.cfi_def_cfa wsp, 16
+	ldp	x29, x30, [sp], #16
+	.cfi_def_cfa_offset 0
+	.cfi_restore w30
+	.cfi_restore w29
+	ret
+.Lfunc_end7:
+	.size	_D11concurrency8research36modular_bounded_wsq_batch_marked_top__T38MarkedTopBatchBoundedWorkStealingDequeTmVmi8ZQBv9decodeTopFNaNbNiNfmZm, .Lfunc_end7-_D11concurrency8research36modular_bounded_wsq_batch_marked_top__T38MarkedTopBatchBoundedWorkStealingDequeTmVmi8ZQBv9decodeTopFNaNbNiNfmZm
+	.cfi_endproc
+
+	.section	.text._D11concurrency8research36modular_bounded_wsq_batch_marked_top__T38MarkedTopBatchBoundedWorkStealingDequeTmVmi8ZQBv6isBusyFNaNbNiNfmZb,"axG",@progbits,_D11concurrency8research36modular_bounded_wsq_batch_marked_top__T38MarkedTopBatchBoundedWorkStealingDequeTmVmi8ZQBv6isBusyFNaNbNiNfmZb,comdat
+	.weak	_D11concurrency8research36modular_bounded_wsq_batch_marked_top__T38MarkedTopBatchBoundedWorkStealingDequeTmVmi8ZQBv6isBusyFNaNbNiNfmZb
+	.p2align	2
+	.type	_D11concurrency8research36modular_bounded_wsq_batch_marked_top__T38MarkedTopBatchBoundedWorkStealingDequeTmVmi8ZQBv6isBusyFNaNbNiNfmZb,@function
+_D11concurrency8research36modular_bounded_wsq_batch_marked_top__T38MarkedTopBatchBoundedWorkStealingDequeTmVmi8ZQBv6isBusyFNaNbNiNfmZb:
+	.cfi_startproc
+	stp	x29, x30, [sp, #-16]!
+	.cfi_def_cfa_offset 16
+	mov	x29, sp
+	.cfi_def_cfa w29, 16
+	.cfi_offset w30, -8
+	.cfi_offset w29, -16
+	and	w0, w0, #0x1
+	.cfi_def_cfa wsp, 16
+	ldp	x29, x30, [sp], #16
+	.cfi_def_cfa_offset 0
+	.cfi_restore w30
+	.cfi_restore w29
+	ret
+.Lfunc_end8:
+	.size	_D11concurrency8research36modular_bounded_wsq_batch_marked_top__T38MarkedTopBatchBoundedWorkStealingDequeTmVmi8ZQBv6isBusyFNaNbNiNfmZb, .Lfunc_end8-_D11concurrency8research36modular_bounded_wsq_batch_marked_top__T38MarkedTopBatchBoundedWorkStealingDequeTmVmi8ZQBv6isBusyFNaNbNiNfmZb
+	.cfi_endproc
+
+	.section	.text._D11concurrency8research36modular_bounded_wsq_batch_marked_top__T38MarkedTopBatchBoundedWorkStealingDequeTmVmi8ZQBv9incrementFNaNbNiNfmZm,"axG",@progbits,_D11concurrency8research36modular_bounded_wsq_batch_marked_top__T38MarkedTopBatchBoundedWorkStealingDequeTmVmi8ZQBv9incrementFNaNbNiNfmZm,comdat
+	.weak	_D11concurrency8research36modular_bounded_wsq_batch_marked_top__T38MarkedTopBatchBoundedWorkStealingDequeTmVmi8ZQBv9incrementFNaNbNiNfmZm
+	.p2align	2
+	.type	_D11concurrency8research36modular_bounded_wsq_batch_marked_top__T38MarkedTopBatchBoundedWorkStealingDequeTmVmi8ZQBv9incrementFNaNbNiNfmZm,@function
+_D11concurrency8research36modular_bounded_wsq_batch_marked_top__T38MarkedTopBatchBoundedWorkStealingDequeTmVmi8ZQBv9incrementFNaNbNiNfmZm:
+	.cfi_startproc
+	stp	x29, x30, [sp, #-16]!
+	.cfi_def_cfa_offset 16
+	mov	x29, sp
+	.cfi_def_cfa w29, 16
+	.cfi_offset w30, -8
+	.cfi_offset w29, -16
+	add	x8, x0, #1
+	and	x0, x8, #0x7fffffffffffffff
+	.cfi_def_cfa wsp, 16
+	ldp	x29, x30, [sp], #16
+	.cfi_def_cfa_offset 0
+	.cfi_restore w30
+	.cfi_restore w29
+	ret
+.Lfunc_end9:
+	.size	_D11concurrency8research36modular_bounded_wsq_batch_marked_top__T38MarkedTopBatchBoundedWorkStealingDequeTmVmi8ZQBv9incrementFNaNbNiNfmZm, .Lfunc_end9-_D11concurrency8research36modular_bounded_wsq_batch_marked_top__T38MarkedTopBatchBoundedWorkStealingDequeTmVmi8ZQBv9incrementFNaNbNiNfmZm
+	.cfi_endproc
+
+	.section	.text._D11concurrency8research36modular_bounded_wsq_batch_marked_top__T38MarkedTopBatchBoundedWorkStealingDequeTmVmi8ZQBv10addCounterFNaNbNiNfmmZm,"axG",@progbits,_D11concurrency8research36modular_bounded_wsq_batch_marked_top__T38MarkedTopBatchBoundedWorkStealingDequeTmVmi8ZQBv10addCounterFNaNbNiNfmmZm,comdat
+	.weak	_D11concurrency8research36modular_bounded_wsq_batch_marked_top__T38MarkedTopBatchBoundedWorkStealingDequeTmVmi8ZQBv10addCounterFNaNbNiNfmmZm
+	.p2align	2
+	.type	_D11concurrency8research36modular_bounded_wsq_batch_marked_top__T38MarkedTopBatchBoundedWorkStealingDequeTmVmi8ZQBv10addCounterFNaNbNiNfmmZm,@function
+_D11concurrency8research36modular_bounded_wsq_batch_marked_top__T38MarkedTopBatchBoundedWorkStealingDequeTmVmi8ZQBv10addCounterFNaNbNiNfmmZm:
+	.cfi_startproc
+	stp	x29, x30, [sp, #-16]!
+	.cfi_def_cfa_offset 16
+	mov	x29, sp
+	.cfi_def_cfa w29, 16
+	.cfi_offset w30, -8
+	.cfi_offset w29, -16
+	add	x8, x1, x0
+	and	x0, x8, #0x7fffffffffffffff
+	.cfi_def_cfa wsp, 16
+	ldp	x29, x30, [sp], #16
+	.cfi_def_cfa_offset 0
+	.cfi_restore w30
+	.cfi_restore w29
+	ret
+.Lfunc_end10:
+	.size	_D11concurrency8research36modular_bounded_wsq_batch_marked_top__T38MarkedTopBatchBoundedWorkStealingDequeTmVmi8ZQBv10addCounterFNaNbNiNfmmZm, .Lfunc_end10-_D11concurrency8research36modular_bounded_wsq_batch_marked_top__T38MarkedTopBatchBoundedWorkStealingDequeTmVmi8ZQBv10addCounterFNaNbNiNfmmZm
+	.cfi_endproc
+
+	.section	.text._D11concurrency8research36modular_bounded_wsq_batch_marked_top__T38MarkedTopBatchBoundedWorkStealingDequeTmVmi8ZQBv8subtractFNaNbNiNfmmZm,"axG",@progbits,_D11concurrency8research36modular_bounded_wsq_batch_marked_top__T38MarkedTopBatchBoundedWorkStealingDequeTmVmi8ZQBv8subtractFNaNbNiNfmmZm,comdat
+	.weak	_D11concurrency8research36modular_bounded_wsq_batch_marked_top__T38MarkedTopBatchBoundedWorkStealingDequeTmVmi8ZQBv8subtractFNaNbNiNfmmZm
+	.p2align	2
+	.type	_D11concurrency8research36modular_bounded_wsq_batch_marked_top__T38MarkedTopBatchBoundedWorkStealingDequeTmVmi8ZQBv8subtractFNaNbNiNfmmZm,@function
+_D11concurrency8research36modular_bounded_wsq_batch_marked_top__T38MarkedTopBatchBoundedWorkStealingDequeTmVmi8ZQBv8subtractFNaNbNiNfmmZm:
+	.cfi_startproc
+	stp	x29, x30, [sp, #-16]!
+	.cfi_def_cfa_offset 16
+	mov	x29, sp
+	.cfi_def_cfa w29, 16
+	.cfi_offset w30, -8
+	.cfi_offset w29, -16
+	sub	x8, x0, x1
+	and	x0, x8, #0x7fffffffffffffff
+	.cfi_def_cfa wsp, 16
+	ldp	x29, x30, [sp], #16
+	.cfi_def_cfa_offset 0
+	.cfi_restore w30
+	.cfi_restore w29
+	ret
+.Lfunc_end11:
+	.size	_D11concurrency8research36modular_bounded_wsq_batch_marked_top__T38MarkedTopBatchBoundedWorkStealingDequeTmVmi8ZQBv8subtractFNaNbNiNfmmZm, .Lfunc_end11-_D11concurrency8research36modular_bounded_wsq_batch_marked_top__T38MarkedTopBatchBoundedWorkStealingDequeTmVmi8ZQBv8subtractFNaNbNiNfmmZm
+	.cfi_endproc
+
+	.section	.text._D11concurrency8research36modular_bounded_wsq_batch_marked_top__T38MarkedTopBatchBoundedWorkStealingDequeTmVmi8ZQBv7tryPushMFNaNbNiNfmZb,"axG",@progbits,_D11concurrency8research36modular_bounded_wsq_batch_marked_top__T38MarkedTopBatchBoundedWorkStealingDequeTmVmi8ZQBv7tryPushMFNaNbNiNfmZb,comdat
+	.weak	_D11concurrency8research36modular_bounded_wsq_batch_marked_top__T38MarkedTopBatchBoundedWorkStealingDequeTmVmi8ZQBv7tryPushMFNaNbNiNfmZb
+	.p2align	2
+	.type	_D11concurrency8research36modular_bounded_wsq_batch_marked_top__T38MarkedTopBatchBoundedWorkStealingDequeTmVmi8ZQBv7tryPushMFNaNbNiNfmZb,@function
+_D11concurrency8research36modular_bounded_wsq_batch_marked_top__T38MarkedTopBatchBoundedWorkStealingDequeTmVmi8ZQBv7tryPushMFNaNbNiNfmZb:
+	.cfi_startproc
+	stp	x29, x30, [sp, #-16]!
+	.cfi_def_cfa_offset 16
+	mov	x29, sp
+	.cfi_def_cfa w29, 16
+	.cfi_offset w30, -8
+	.cfi_offset w29, -16
+	.cfi_remember_state
+	ldr	x9, [x0, #64]
+	ldar	x8, [x0]
+	sub	x8, x9, x8, lsr #1
+	ands	x8, x8, #0x7fffffffffffff00
+	b.eq	.LBB12_2
+	cmp	x8, #0
+	cset	w0, eq
+	.cfi_def_cfa wsp, 16
+	ldp	x29, x30, [sp], #16
+	.cfi_def_cfa_offset 0
+	.cfi_restore w30
+	.cfi_restore w29
+	ret
+.LBB12_2:
+	.cfi_restore_state
+	add	x10, x0, w9, uxtb #3
+	add	x9, x9, #1
+	and	x9, x9, #0x7fffffffffffffff
+	str	x1, [x10, #128]
+	add	x10, x0, #64
+	dmb	ish
+	stlr	x9, [x10]
+	cmp	x8, #0
+	cset	w0, eq
+	.cfi_def_cfa wsp, 16
+	ldp	x29, x30, [sp], #16
+	.cfi_def_cfa_offset 0
+	.cfi_restore w30
+	.cfi_restore w29
+	ret
+.Lfunc_end12:
+	.size	_D11concurrency8research36modular_bounded_wsq_batch_marked_top__T38MarkedTopBatchBoundedWorkStealingDequeTmVmi8ZQBv7tryPushMFNaNbNiNfmZb, .Lfunc_end12-_D11concurrency8research36modular_bounded_wsq_batch_marked_top__T38MarkedTopBatchBoundedWorkStealingDequeTmVmi8ZQBv7tryPushMFNaNbNiNfmZb
+	.cfi_endproc
+
+	.section	.text._D4core6atomic__T10atomicLoadVEQBdQBb11MemoryOrderi0TmZQBmFNaNbNiNeNkMKOxmZm,"axG",@progbits,_D4core6atomic__T10atomicLoadVEQBdQBb11MemoryOrderi0TmZQBmFNaNbNiNeNkMKOxmZm,comdat
+	.weak	_D4core6atomic__T10atomicLoadVEQBdQBb11MemoryOrderi0TmZQBmFNaNbNiNeNkMKOxmZm
+	.p2align	2
+	.type	_D4core6atomic__T10atomicLoadVEQBdQBb11MemoryOrderi0TmZQBmFNaNbNiNeNkMKOxmZm,@function
+_D4core6atomic__T10atomicLoadVEQBdQBb11MemoryOrderi0TmZQBmFNaNbNiNeNkMKOxmZm:
+	.cfi_startproc
+	stp	x29, x30, [sp, #-16]!
+	.cfi_def_cfa_offset 16
+	mov	x29, sp
+	.cfi_def_cfa w29, 16
+	.cfi_offset w30, -8
+	.cfi_offset w29, -16
+	ldr	x0, [x0]
+	.cfi_def_cfa wsp, 16
+	ldp	x29, x30, [sp], #16
+	.cfi_def_cfa_offset 0
+	.cfi_restore w30
+	.cfi_restore w29
+	ret
+.Lfunc_end13:
+	.size	_D4core6atomic__T10atomicLoadVEQBdQBb11MemoryOrderi0TmZQBmFNaNbNiNeNkMKOxmZm, .Lfunc_end13-_D4core6atomic__T10atomicLoadVEQBdQBb11MemoryOrderi0TmZQBmFNaNbNiNeNkMKOxmZm
+	.cfi_endproc
+
+	.section	.text._D4core6atomic__T10atomicLoadVEQBdQBb11MemoryOrderi0TmZQBmFNaNbNiNeNkMKxmZm,"axG",@progbits,_D4core6atomic__T10atomicLoadVEQBdQBb11MemoryOrderi0TmZQBmFNaNbNiNeNkMKxmZm,comdat
+	.weak	_D4core6atomic__T10atomicLoadVEQBdQBb11MemoryOrderi0TmZQBmFNaNbNiNeNkMKxmZm
+	.p2align	2
+	.type	_D4core6atomic__T10atomicLoadVEQBdQBb11MemoryOrderi0TmZQBmFNaNbNiNeNkMKxmZm,@function
+_D4core6atomic__T10atomicLoadVEQBdQBb11MemoryOrderi0TmZQBmFNaNbNiNeNkMKxmZm:
+	.cfi_startproc
+	stp	x29, x30, [sp, #-16]!
+	.cfi_def_cfa_offset 16
+	mov	x29, sp
+	.cfi_def_cfa w29, 16
+	.cfi_offset w30, -8
+	.cfi_offset w29, -16
+	ldr	x0, [x0]
+	.cfi_def_cfa wsp, 16
+	ldp	x29, x30, [sp], #16
+	.cfi_def_cfa_offset 0
+	.cfi_restore w30
+	.cfi_restore w29
+	ret
+.Lfunc_end14:
+	.size	_D4core6atomic__T10atomicLoadVEQBdQBb11MemoryOrderi0TmZQBmFNaNbNiNeNkMKxmZm, .Lfunc_end14-_D4core6atomic__T10atomicLoadVEQBdQBb11MemoryOrderi0TmZQBmFNaNbNiNeNkMKxmZm
+	.cfi_endproc
+
+	.section	.text._D4core8internal6atomic__T10atomicLoadVEQBmQBb11MemoryOrderi0TmZQBmFNaNbNiNePNgmZNgm,"axG",@progbits,_D4core8internal6atomic__T10atomicLoadVEQBmQBb11MemoryOrderi0TmZQBmFNaNbNiNePNgmZNgm,comdat
+	.weak	_D4core8internal6atomic__T10atomicLoadVEQBmQBb11MemoryOrderi0TmZQBmFNaNbNiNePNgmZNgm
+	.p2align	2
+	.type	_D4core8internal6atomic__T10atomicLoadVEQBmQBb11MemoryOrderi0TmZQBmFNaNbNiNePNgmZNgm,@function
+_D4core8internal6atomic__T10atomicLoadVEQBmQBb11MemoryOrderi0TmZQBmFNaNbNiNePNgmZNgm:
+	.cfi_startproc
+	stp	x29, x30, [sp, #-16]!
+	.cfi_def_cfa_offset 16
+	mov	x29, sp
+	.cfi_def_cfa w29, 16
+	.cfi_offset w30, -8
+	.cfi_offset w29, -16
+	ldr	x0, [x0]
+	.cfi_def_cfa wsp, 16
+	ldp	x29, x30, [sp], #16
+	.cfi_def_cfa_offset 0
+	.cfi_restore w30
+	.cfi_restore w29
+	ret
+.Lfunc_end15:
+	.size	_D4core8internal6atomic__T10atomicLoadVEQBmQBb11MemoryOrderi0TmZQBmFNaNbNiNePNgmZNgm, .Lfunc_end15-_D4core8internal6atomic__T10atomicLoadVEQBmQBb11MemoryOrderi0TmZQBmFNaNbNiNePNgmZNgm
+	.cfi_endproc
+
+	.section	.text._D4core6atomic__T10atomicLoadVEQBdQBb11MemoryOrderi2TmZQBmFNaNbNiNeNkMKOxmZm,"axG",@progbits,_D4core6atomic__T10atomicLoadVEQBdQBb11MemoryOrderi2TmZQBmFNaNbNiNeNkMKOxmZm,comdat
+	.weak	_D4core6atomic__T10atomicLoadVEQBdQBb11MemoryOrderi2TmZQBmFNaNbNiNeNkMKOxmZm
+	.p2align	2
+	.type	_D4core6atomic__T10atomicLoadVEQBdQBb11MemoryOrderi2TmZQBmFNaNbNiNeNkMKOxmZm,@function
+_D4core6atomic__T10atomicLoadVEQBdQBb11MemoryOrderi2TmZQBmFNaNbNiNeNkMKOxmZm:
+	.cfi_startproc
+	stp	x29, x30, [sp, #-16]!
+	.cfi_def_cfa_offset 16
+	mov	x29, sp
+	.cfi_def_cfa w29, 16
+	.cfi_offset w30, -8
+	.cfi_offset w29, -16
+	ldar	x0, [x0]
+	.cfi_def_cfa wsp, 16
+	ldp	x29, x30, [sp], #16
+	.cfi_def_cfa_offset 0
+	.cfi_restore w30
+	.cfi_restore w29
+	ret
+.Lfunc_end16:
+	.size	_D4core6atomic__T10atomicLoadVEQBdQBb11MemoryOrderi2TmZQBmFNaNbNiNeNkMKOxmZm, .Lfunc_end16-_D4core6atomic__T10atomicLoadVEQBdQBb11MemoryOrderi2TmZQBmFNaNbNiNeNkMKOxmZm
+	.cfi_endproc
+
+	.section	.text._D4core6atomic__T10atomicLoadVEQBdQBb11MemoryOrderi2TmZQBmFNaNbNiNeNkMKxmZm,"axG",@progbits,_D4core6atomic__T10atomicLoadVEQBdQBb11MemoryOrderi2TmZQBmFNaNbNiNeNkMKxmZm,comdat
+	.weak	_D4core6atomic__T10atomicLoadVEQBdQBb11MemoryOrderi2TmZQBmFNaNbNiNeNkMKxmZm
+	.p2align	2
+	.type	_D4core6atomic__T10atomicLoadVEQBdQBb11MemoryOrderi2TmZQBmFNaNbNiNeNkMKxmZm,@function
+_D4core6atomic__T10atomicLoadVEQBdQBb11MemoryOrderi2TmZQBmFNaNbNiNeNkMKxmZm:
+	.cfi_startproc
+	stp	x29, x30, [sp, #-16]!
+	.cfi_def_cfa_offset 16
+	mov	x29, sp
+	.cfi_def_cfa w29, 16
+	.cfi_offset w30, -8
+	.cfi_offset w29, -16
+	ldar	x0, [x0]
+	.cfi_def_cfa wsp, 16
+	ldp	x29, x30, [sp], #16
+	.cfi_def_cfa_offset 0
+	.cfi_restore w30
+	.cfi_restore w29
+	ret
+.Lfunc_end17:
+	.size	_D4core6atomic__T10atomicLoadVEQBdQBb11MemoryOrderi2TmZQBmFNaNbNiNeNkMKxmZm, .Lfunc_end17-_D4core6atomic__T10atomicLoadVEQBdQBb11MemoryOrderi2TmZQBmFNaNbNiNeNkMKxmZm
+	.cfi_endproc
+
+	.section	.text._D4core8internal6atomic__T10atomicLoadVEQBmQBb11MemoryOrderi2TmZQBmFNaNbNiNePNgmZNgm,"axG",@progbits,_D4core8internal6atomic__T10atomicLoadVEQBmQBb11MemoryOrderi2TmZQBmFNaNbNiNePNgmZNgm,comdat
+	.weak	_D4core8internal6atomic__T10atomicLoadVEQBmQBb11MemoryOrderi2TmZQBmFNaNbNiNePNgmZNgm
+	.p2align	2
+	.type	_D4core8internal6atomic__T10atomicLoadVEQBmQBb11MemoryOrderi2TmZQBmFNaNbNiNePNgmZNgm,@function
+_D4core8internal6atomic__T10atomicLoadVEQBmQBb11MemoryOrderi2TmZQBmFNaNbNiNePNgmZNgm:
+	.cfi_startproc
+	stp	x29, x30, [sp, #-16]!
+	.cfi_def_cfa_offset 16
+	mov	x29, sp
+	.cfi_def_cfa w29, 16
+	.cfi_offset w30, -8
+	.cfi_offset w29, -16
+	ldar	x0, [x0]
+	.cfi_def_cfa wsp, 16
+	ldp	x29, x30, [sp], #16
+	.cfi_def_cfa_offset 0
+	.cfi_restore w30
+	.cfi_restore w29
+	ret
+.Lfunc_end18:
+	.size	_D4core8internal6atomic__T10atomicLoadVEQBmQBb11MemoryOrderi2TmZQBmFNaNbNiNePNgmZNgm, .Lfunc_end18-_D4core8internal6atomic__T10atomicLoadVEQBmQBb11MemoryOrderi2TmZQBmFNaNbNiNePNgmZNgm
+	.cfi_endproc
+
+	.section	.text._D4core6atomic__T11atomicStoreVEQBeQBc11MemoryOrderi0TmTmZQBpFNaNbNiNeKOmmZv,"axG",@progbits,_D4core6atomic__T11atomicStoreVEQBeQBc11MemoryOrderi0TmTmZQBpFNaNbNiNeKOmmZv,comdat
+	.weak	_D4core6atomic__T11atomicStoreVEQBeQBc11MemoryOrderi0TmTmZQBpFNaNbNiNeKOmmZv
+	.p2align	2
+	.type	_D4core6atomic__T11atomicStoreVEQBeQBc11MemoryOrderi0TmTmZQBpFNaNbNiNeKOmmZv,@function
+_D4core6atomic__T11atomicStoreVEQBeQBc11MemoryOrderi0TmTmZQBpFNaNbNiNeKOmmZv:
+	.cfi_startproc
+	stp	x29, x30, [sp, #-16]!
+	.cfi_def_cfa_offset 16
+	mov	x29, sp
+	.cfi_def_cfa w29, 16
+	.cfi_offset w30, -8
+	.cfi_offset w29, -16
+	str	x1, [x0]
+	.cfi_def_cfa wsp, 16
+	ldp	x29, x30, [sp], #16
+	.cfi_def_cfa_offset 0
+	.cfi_restore w30
+	.cfi_restore w29
+	ret
+.Lfunc_end19:
+	.size	_D4core6atomic__T11atomicStoreVEQBeQBc11MemoryOrderi0TmTmZQBpFNaNbNiNeKOmmZv, .Lfunc_end19-_D4core6atomic__T11atomicStoreVEQBeQBc11MemoryOrderi0TmTmZQBpFNaNbNiNeKOmmZv
+	.cfi_endproc
+
+	.section	.text._D4core6atomic__T11atomicStoreVEQBeQBc11MemoryOrderi0TmTmZQBpFNaNbNiNeKmmZv,"axG",@progbits,_D4core6atomic__T11atomicStoreVEQBeQBc11MemoryOrderi0TmTmZQBpFNaNbNiNeKmmZv,comdat
+	.weak	_D4core6atomic__T11atomicStoreVEQBeQBc11MemoryOrderi0TmTmZQBpFNaNbNiNeKmmZv
+	.p2align	2
+	.type	_D4core6atomic__T11atomicStoreVEQBeQBc11MemoryOrderi0TmTmZQBpFNaNbNiNeKmmZv,@function
+_D4core6atomic__T11atomicStoreVEQBeQBc11MemoryOrderi0TmTmZQBpFNaNbNiNeKmmZv:
+	.cfi_startproc
+	stp	x29, x30, [sp, #-16]!
+	.cfi_def_cfa_offset 16
+	mov	x29, sp
+	.cfi_def_cfa w29, 16
+	.cfi_offset w30, -8
+	.cfi_offset w29, -16
+	str	x1, [x0]
+	.cfi_def_cfa wsp, 16
+	ldp	x29, x30, [sp], #16
+	.cfi_def_cfa_offset 0
+	.cfi_restore w30
+	.cfi_restore w29
+	ret
+.Lfunc_end20:
+	.size	_D4core6atomic__T11atomicStoreVEQBeQBc11MemoryOrderi0TmTmZQBpFNaNbNiNeKmmZv, .Lfunc_end20-_D4core6atomic__T11atomicStoreVEQBeQBc11MemoryOrderi0TmTmZQBpFNaNbNiNeKmmZv
+	.cfi_endproc
+
+	.section	.text._D4core8internal6atomic__T11atomicStoreVEQBnQBc11MemoryOrderi0TmZQBnFNaNbNiNePmmZv,"axG",@progbits,_D4core8internal6atomic__T11atomicStoreVEQBnQBc11MemoryOrderi0TmZQBnFNaNbNiNePmmZv,comdat
+	.weak	_D4core8internal6atomic__T11atomicStoreVEQBnQBc11MemoryOrderi0TmZQBnFNaNbNiNePmmZv
+	.p2align	2
+	.type	_D4core8internal6atomic__T11atomicStoreVEQBnQBc11MemoryOrderi0TmZQBnFNaNbNiNePmmZv,@function
+_D4core8internal6atomic__T11atomicStoreVEQBnQBc11MemoryOrderi0TmZQBnFNaNbNiNePmmZv:
+	.cfi_startproc
+	stp	x29, x30, [sp, #-16]!
+	.cfi_def_cfa_offset 16
+	mov	x29, sp
+	.cfi_def_cfa w29, 16
+	.cfi_offset w30, -8
+	.cfi_offset w29, -16
+	str	x1, [x0]
+	.cfi_def_cfa wsp, 16
+	ldp	x29, x30, [sp], #16
+	.cfi_def_cfa_offset 0
+	.cfi_restore w30
+	.cfi_restore w29
+	ret
+.Lfunc_end21:
+	.size	_D4core8internal6atomic__T11atomicStoreVEQBnQBc11MemoryOrderi0TmZQBnFNaNbNiNePmmZv, .Lfunc_end21-_D4core8internal6atomic__T11atomicStoreVEQBnQBc11MemoryOrderi0TmZQBnFNaNbNiNePmmZv
+	.cfi_endproc
+
+	.section	.text._D4core6atomic__T11atomicFenceVEQBeQBc11MemoryOrderi3ZQBlFNaNbNiNfZv,"axG",@progbits,_D4core6atomic__T11atomicFenceVEQBeQBc11MemoryOrderi3ZQBlFNaNbNiNfZv,comdat
+	.weak	_D4core6atomic__T11atomicFenceVEQBeQBc11MemoryOrderi3ZQBlFNaNbNiNfZv
+	.p2align	2
+	.type	_D4core6atomic__T11atomicFenceVEQBeQBc11MemoryOrderi3ZQBlFNaNbNiNfZv,@function
+_D4core6atomic__T11atomicFenceVEQBeQBc11MemoryOrderi3ZQBlFNaNbNiNfZv:
+	.cfi_startproc
+	stp	x29, x30, [sp, #-16]!
+	.cfi_def_cfa_offset 16
+	mov	x29, sp
+	.cfi_def_cfa w29, 16
+	.cfi_offset w30, -8
+	.cfi_offset w29, -16
+	dmb	ish
+	.cfi_def_cfa wsp, 16
+	ldp	x29, x30, [sp], #16
+	.cfi_def_cfa_offset 0
+	.cfi_restore w30
+	.cfi_restore w29
+	ret
+.Lfunc_end22:
+	.size	_D4core6atomic__T11atomicFenceVEQBeQBc11MemoryOrderi3ZQBlFNaNbNiNfZv, .Lfunc_end22-_D4core6atomic__T11atomicFenceVEQBeQBc11MemoryOrderi3ZQBlFNaNbNiNfZv
+	.cfi_endproc
+
+	.section	.text._D4core8internal6atomic__T11atomicFenceVEQBnQBc11MemoryOrderi3ZQBlFNaNbNiNeZv,"axG",@progbits,_D4core8internal6atomic__T11atomicFenceVEQBnQBc11MemoryOrderi3ZQBlFNaNbNiNeZv,comdat
+	.weak	_D4core8internal6atomic__T11atomicFenceVEQBnQBc11MemoryOrderi3ZQBlFNaNbNiNeZv
+	.p2align	2
+	.type	_D4core8internal6atomic__T11atomicFenceVEQBnQBc11MemoryOrderi3ZQBlFNaNbNiNeZv,@function
+_D4core8internal6atomic__T11atomicFenceVEQBnQBc11MemoryOrderi3ZQBlFNaNbNiNeZv:
+	.cfi_startproc
+	stp	x29, x30, [sp, #-16]!
+	.cfi_def_cfa_offset 16
+	mov	x29, sp
+	.cfi_def_cfa w29, 16
+	.cfi_offset w30, -8
+	.cfi_offset w29, -16
+	dmb	ish
+	.cfi_def_cfa wsp, 16
+	ldp	x29, x30, [sp], #16
+	.cfi_def_cfa_offset 0
+	.cfi_restore w30
+	.cfi_restore w29
+	ret
+.Lfunc_end23:
+	.size	_D4core8internal6atomic__T11atomicFenceVEQBnQBc11MemoryOrderi3ZQBlFNaNbNiNeZv, .Lfunc_end23-_D4core8internal6atomic__T11atomicFenceVEQBnQBc11MemoryOrderi3ZQBlFNaNbNiNeZv
+	.cfi_endproc
+
+	.section	.text._D4core6atomic__T11atomicStoreVEQBeQBc11MemoryOrderi3TmTmZQBpFNaNbNiNeKOmmZv,"axG",@progbits,_D4core6atomic__T11atomicStoreVEQBeQBc11MemoryOrderi3TmTmZQBpFNaNbNiNeKOmmZv,comdat
+	.weak	_D4core6atomic__T11atomicStoreVEQBeQBc11MemoryOrderi3TmTmZQBpFNaNbNiNeKOmmZv
+	.p2align	2
+	.type	_D4core6atomic__T11atomicStoreVEQBeQBc11MemoryOrderi3TmTmZQBpFNaNbNiNeKOmmZv,@function
+_D4core6atomic__T11atomicStoreVEQBeQBc11MemoryOrderi3TmTmZQBpFNaNbNiNeKOmmZv:
+	.cfi_startproc
+	stp	x29, x30, [sp, #-16]!
+	.cfi_def_cfa_offset 16
+	mov	x29, sp
+	.cfi_def_cfa w29, 16
+	.cfi_offset w30, -8
+	.cfi_offset w29, -16
+	stlr	x1, [x0]
+	.cfi_def_cfa wsp, 16
+	ldp	x29, x30, [sp], #16
+	.cfi_def_cfa_offset 0
+	.cfi_restore w30
+	.cfi_restore w29
+	ret
+.Lfunc_end24:
+	.size	_D4core6atomic__T11atomicStoreVEQBeQBc11MemoryOrderi3TmTmZQBpFNaNbNiNeKOmmZv, .Lfunc_end24-_D4core6atomic__T11atomicStoreVEQBeQBc11MemoryOrderi3TmTmZQBpFNaNbNiNeKOmmZv
+	.cfi_endproc
+
+	.section	.text._D4core6atomic__T11atomicStoreVEQBeQBc11MemoryOrderi3TmTmZQBpFNaNbNiNeKmmZv,"axG",@progbits,_D4core6atomic__T11atomicStoreVEQBeQBc11MemoryOrderi3TmTmZQBpFNaNbNiNeKmmZv,comdat
+	.weak	_D4core6atomic__T11atomicStoreVEQBeQBc11MemoryOrderi3TmTmZQBpFNaNbNiNeKmmZv
+	.p2align	2
+	.type	_D4core6atomic__T11atomicStoreVEQBeQBc11MemoryOrderi3TmTmZQBpFNaNbNiNeKmmZv,@function
+_D4core6atomic__T11atomicStoreVEQBeQBc11MemoryOrderi3TmTmZQBpFNaNbNiNeKmmZv:
+	.cfi_startproc
+	stp	x29, x30, [sp, #-16]!
+	.cfi_def_cfa_offset 16
+	mov	x29, sp
+	.cfi_def_cfa w29, 16
+	.cfi_offset w30, -8
+	.cfi_offset w29, -16
+	stlr	x1, [x0]
+	.cfi_def_cfa wsp, 16
+	ldp	x29, x30, [sp], #16
+	.cfi_def_cfa_offset 0
+	.cfi_restore w30
+	.cfi_restore w29
+	ret
+.Lfunc_end25:
+	.size	_D4core6atomic__T11atomicStoreVEQBeQBc11MemoryOrderi3TmTmZQBpFNaNbNiNeKmmZv, .Lfunc_end25-_D4core6atomic__T11atomicStoreVEQBeQBc11MemoryOrderi3TmTmZQBpFNaNbNiNeKmmZv
+	.cfi_endproc
+
+	.section	.text._D4core8internal6atomic__T11atomicStoreVEQBnQBc11MemoryOrderi3TmZQBnFNaNbNiNePmmZv,"axG",@progbits,_D4core8internal6atomic__T11atomicStoreVEQBnQBc11MemoryOrderi3TmZQBnFNaNbNiNePmmZv,comdat
+	.weak	_D4core8internal6atomic__T11atomicStoreVEQBnQBc11MemoryOrderi3TmZQBnFNaNbNiNePmmZv
+	.p2align	2
+	.type	_D4core8internal6atomic__T11atomicStoreVEQBnQBc11MemoryOrderi3TmZQBnFNaNbNiNePmmZv,@function
+_D4core8internal6atomic__T11atomicStoreVEQBnQBc11MemoryOrderi3TmZQBnFNaNbNiNePmmZv:
+	.cfi_startproc
+	stp	x29, x30, [sp, #-16]!
+	.cfi_def_cfa_offset 16
+	mov	x29, sp
+	.cfi_def_cfa w29, 16
+	.cfi_offset w30, -8
+	.cfi_offset w29, -16
+	stlr	x1, [x0]
+	.cfi_def_cfa wsp, 16
+	ldp	x29, x30, [sp], #16
+	.cfi_def_cfa_offset 0
+	.cfi_restore w30
+	.cfi_restore w29
+	ret
+.Lfunc_end26:
+	.size	_D4core8internal6atomic__T11atomicStoreVEQBnQBc11MemoryOrderi3TmZQBnFNaNbNiNePmmZv, .Lfunc_end26-_D4core8internal6atomic__T11atomicStoreVEQBnQBc11MemoryOrderi3TmZQBnFNaNbNiNePmmZv
+	.cfi_endproc
+
+	.section	.text._D4core6atomic__T11atomicStoreVEQBeQBc11MemoryOrderi0TmTxmZQBqFNaNbNiNeKOmxmZv,"axG",@progbits,_D4core6atomic__T11atomicStoreVEQBeQBc11MemoryOrderi0TmTxmZQBqFNaNbNiNeKOmxmZv,comdat
+	.weak	_D4core6atomic__T11atomicStoreVEQBeQBc11MemoryOrderi0TmTxmZQBqFNaNbNiNeKOmxmZv
+	.p2align	2
+	.type	_D4core6atomic__T11atomicStoreVEQBeQBc11MemoryOrderi0TmTxmZQBqFNaNbNiNeKOmxmZv,@function
+_D4core6atomic__T11atomicStoreVEQBeQBc11MemoryOrderi0TmTxmZQBqFNaNbNiNeKOmxmZv:
+	.cfi_startproc
+	stp	x29, x30, [sp, #-16]!
+	.cfi_def_cfa_offset 16
+	mov	x29, sp
+	.cfi_def_cfa w29, 16
+	.cfi_offset w30, -8
+	.cfi_offset w29, -16
+	str	x1, [x0]
+	.cfi_def_cfa wsp, 16
+	ldp	x29, x30, [sp], #16
+	.cfi_def_cfa_offset 0
+	.cfi_restore w30
+	.cfi_restore w29
+	ret
+.Lfunc_end27:
+	.size	_D4core6atomic__T11atomicStoreVEQBeQBc11MemoryOrderi0TmTxmZQBqFNaNbNiNeKOmxmZv, .Lfunc_end27-_D4core6atomic__T11atomicStoreVEQBeQBc11MemoryOrderi0TmTxmZQBqFNaNbNiNeKOmxmZv
+	.cfi_endproc
+
+	.section	.text._D4core6atomic__T11atomicStoreVEQBeQBc11MemoryOrderi0TmTxmZQBqFNaNbNiNeKmxmZv,"axG",@progbits,_D4core6atomic__T11atomicStoreVEQBeQBc11MemoryOrderi0TmTxmZQBqFNaNbNiNeKmxmZv,comdat
+	.weak	_D4core6atomic__T11atomicStoreVEQBeQBc11MemoryOrderi0TmTxmZQBqFNaNbNiNeKmxmZv
+	.p2align	2
+	.type	_D4core6atomic__T11atomicStoreVEQBeQBc11MemoryOrderi0TmTxmZQBqFNaNbNiNeKmxmZv,@function
+_D4core6atomic__T11atomicStoreVEQBeQBc11MemoryOrderi0TmTxmZQBqFNaNbNiNeKmxmZv:
+	.cfi_startproc
+	stp	x29, x30, [sp, #-16]!
+	.cfi_def_cfa_offset 16
+	mov	x29, sp
+	.cfi_def_cfa w29, 16
+	.cfi_offset w30, -8
+	.cfi_offset w29, -16
+	str	x1, [x0]
+	.cfi_def_cfa wsp, 16
+	ldp	x29, x30, [sp], #16
+	.cfi_def_cfa_offset 0
+	.cfi_restore w30
+	.cfi_restore w29
+	ret
+.Lfunc_end28:
+	.size	_D4core6atomic__T11atomicStoreVEQBeQBc11MemoryOrderi0TmTxmZQBqFNaNbNiNeKmxmZv, .Lfunc_end28-_D4core6atomic__T11atomicStoreVEQBeQBc11MemoryOrderi0TmTxmZQBqFNaNbNiNeKmxmZv
+	.cfi_endproc
+
+	.section	.text._D4core6atomic__T3casVEQvQs11MemoryOrderi5VQvi0Z__TQBiTmTxmTxmZQBuFNaNbNiNePOmxmxmZb,"axG",@progbits,_D4core6atomic__T3casVEQvQs11MemoryOrderi5VQvi0Z__TQBiTmTxmTxmZQBuFNaNbNiNePOmxmxmZb,comdat
+	.weak	_D4core6atomic__T3casVEQvQs11MemoryOrderi5VQvi0Z__TQBiTmTxmTxmZQBuFNaNbNiNePOmxmxmZb
+	.p2align	2
+	.type	_D4core6atomic__T3casVEQvQs11MemoryOrderi5VQvi0Z__TQBiTmTxmTxmZQBuFNaNbNiNePOmxmxmZb,@function
+_D4core6atomic__T3casVEQvQs11MemoryOrderi5VQvi0Z__TQBiTmTxmTxmZQBuFNaNbNiNePOmxmxmZb:
+	.cfi_startproc
+	stp	x29, x30, [sp, #-16]!
+	.cfi_def_cfa_offset 16
+	mov	x29, sp
+	.cfi_def_cfa w29, 16
+	.cfi_offset w30, -8
+	.cfi_offset w29, -16
+	.cfi_remember_state
+.LBB29_1:
+	ldaxr	x8, [x0]
+	cmp	x8, x1
+	b.ne	.LBB29_4
+	stlxr	w8, x2, [x0]
+	cbnz	w8, .LBB29_1
+	mov	w0, #1
+	.cfi_def_cfa wsp, 16
+	ldp	x29, x30, [sp], #16
+	.cfi_def_cfa_offset 0
+	.cfi_restore w30
+	.cfi_restore w29
+	ret
+.LBB29_4:
+	.cfi_restore_state
+	mov	w0, wzr
+	clrex
+	.cfi_def_cfa wsp, 16
+	ldp	x29, x30, [sp], #16
+	.cfi_def_cfa_offset 0
+	.cfi_restore w30
+	.cfi_restore w29
+	ret
+.Lfunc_end29:
+	.size	_D4core6atomic__T3casVEQvQs11MemoryOrderi5VQvi0Z__TQBiTmTxmTxmZQBuFNaNbNiNePOmxmxmZb, .Lfunc_end29-_D4core6atomic__T3casVEQvQs11MemoryOrderi5VQvi0Z__TQBiTmTxmTxmZQBuFNaNbNiNePOmxmxmZb
+	.cfi_endproc
+
+	.section	.text._D4core6atomic__T3casVEQvQs11MemoryOrderi5VQvi0Z__TQBiTmTxmTxmZQBuFNaNbNiNePmxmxmZb,"axG",@progbits,_D4core6atomic__T3casVEQvQs11MemoryOrderi5VQvi0Z__TQBiTmTxmTxmZQBuFNaNbNiNePmxmxmZb,comdat
+	.weak	_D4core6atomic__T3casVEQvQs11MemoryOrderi5VQvi0Z__TQBiTmTxmTxmZQBuFNaNbNiNePmxmxmZb
+	.p2align	2
+	.type	_D4core6atomic__T3casVEQvQs11MemoryOrderi5VQvi0Z__TQBiTmTxmTxmZQBuFNaNbNiNePmxmxmZb,@function
+_D4core6atomic__T3casVEQvQs11MemoryOrderi5VQvi0Z__TQBiTmTxmTxmZQBuFNaNbNiNePmxmxmZb:
+	.cfi_startproc
+	stp	x29, x30, [sp, #-16]!
+	.cfi_def_cfa_offset 16
+	mov	x29, sp
+	.cfi_def_cfa w29, 16
+	.cfi_offset w30, -8
+	.cfi_offset w29, -16
+	.cfi_remember_state
+.LBB30_1:
+	ldaxr	x8, [x0]
+	cmp	x8, x1
+	b.ne	.LBB30_4
+	stlxr	w8, x2, [x0]
+	cbnz	w8, .LBB30_1
+	mov	w0, #1
+	.cfi_def_cfa wsp, 16
+	ldp	x29, x30, [sp], #16
+	.cfi_def_cfa_offset 0
+	.cfi_restore w30
+	.cfi_restore w29
+	ret
+.LBB30_4:
+	.cfi_restore_state
+	mov	w0, wzr
+	clrex
+	.cfi_def_cfa wsp, 16
+	ldp	x29, x30, [sp], #16
+	.cfi_def_cfa_offset 0
+	.cfi_restore w30
+	.cfi_restore w29
+	ret
+.Lfunc_end30:
+	.size	_D4core6atomic__T3casVEQvQs11MemoryOrderi5VQvi0Z__TQBiTmTxmTxmZQBuFNaNbNiNePmxmxmZb, .Lfunc_end30-_D4core6atomic__T3casVEQvQs11MemoryOrderi5VQvi0Z__TQBiTmTxmTxmZQBuFNaNbNiNePmxmxmZb
+	.cfi_endproc
+
+	.section	.text._D4core8internal6atomic__T35atomicCompareExchangeStrongNoResultVEQClQCa11MemoryOrderi5VQxi0TmZQCqFNaNbNiNePmxmmZb,"axG",@progbits,_D4core8internal6atomic__T35atomicCompareExchangeStrongNoResultVEQClQCa11MemoryOrderi5VQxi0TmZQCqFNaNbNiNePmxmmZb,comdat
+	.weak	_D4core8internal6atomic__T35atomicCompareExchangeStrongNoResultVEQClQCa11MemoryOrderi5VQxi0TmZQCqFNaNbNiNePmxmmZb
+	.p2align	2
+	.type	_D4core8internal6atomic__T35atomicCompareExchangeStrongNoResultVEQClQCa11MemoryOrderi5VQxi0TmZQCqFNaNbNiNePmxmmZb,@function
+_D4core8internal6atomic__T35atomicCompareExchangeStrongNoResultVEQClQCa11MemoryOrderi5VQxi0TmZQCqFNaNbNiNePmxmmZb:
+	.cfi_startproc
+	stp	x29, x30, [sp, #-16]!
+	.cfi_def_cfa_offset 16
+	mov	x29, sp
+	.cfi_def_cfa w29, 16
+	.cfi_offset w30, -8
+	.cfi_offset w29, -16
+	.cfi_remember_state
+.LBB31_1:
+	ldaxr	x8, [x0]
+	cmp	x8, x1
+	b.ne	.LBB31_4
+	stlxr	w8, x2, [x0]
+	cbnz	w8, .LBB31_1
+	mov	w0, #1
+	.cfi_def_cfa wsp, 16
+	ldp	x29, x30, [sp], #16
+	.cfi_def_cfa_offset 0
+	.cfi_restore w30
+	.cfi_restore w29
+	ret
+.LBB31_4:
+	.cfi_restore_state
+	mov	w0, wzr
+	clrex
+	.cfi_def_cfa wsp, 16
+	ldp	x29, x30, [sp], #16
+	.cfi_def_cfa_offset 0
+	.cfi_restore w30
+	.cfi_restore w29
+	ret
+.Lfunc_end31:
+	.size	_D4core8internal6atomic__T35atomicCompareExchangeStrongNoResultVEQClQCa11MemoryOrderi5VQxi0TmZQCqFNaNbNiNePmxmmZb, .Lfunc_end31-_D4core8internal6atomic__T35atomicCompareExchangeStrongNoResultVEQClQCa11MemoryOrderi5VQxi0TmZQCqFNaNbNiNePmxmmZb
+	.cfi_endproc
+
+	.section	.text._D4core8internal6atomic__T29atomicCompareExchangeNoResultVbi0VEQCjQBy11MemoryOrderi5VQxi0TmZQCoFNaNbNiNePmxmmZb,"axG",@progbits,_D4core8internal6atomic__T29atomicCompareExchangeNoResultVbi0VEQCjQBy11MemoryOrderi5VQxi0TmZQCoFNaNbNiNePmxmmZb,comdat
+	.weak	_D4core8internal6atomic__T29atomicCompareExchangeNoResultVbi0VEQCjQBy11MemoryOrderi5VQxi0TmZQCoFNaNbNiNePmxmmZb
+	.p2align	2
+	.type	_D4core8internal6atomic__T29atomicCompareExchangeNoResultVbi0VEQCjQBy11MemoryOrderi5VQxi0TmZQCoFNaNbNiNePmxmmZb,@function
+_D4core8internal6atomic__T29atomicCompareExchangeNoResultVbi0VEQCjQBy11MemoryOrderi5VQxi0TmZQCoFNaNbNiNePmxmmZb:
+	.cfi_startproc
+	stp	x29, x30, [sp, #-16]!
+	.cfi_def_cfa_offset 16
+	mov	x29, sp
+	.cfi_def_cfa w29, 16
+	.cfi_offset w30, -8
+	.cfi_offset w29, -16
+	.cfi_remember_state
+.LBB32_1:
+	ldaxr	x8, [x0]
+	cmp	x8, x1
+	b.ne	.LBB32_4
+	stlxr	w8, x2, [x0]
+	cbnz	w8, .LBB32_1
+	mov	w0, #1
+	.cfi_def_cfa wsp, 16
+	ldp	x29, x30, [sp], #16
+	.cfi_def_cfa_offset 0
+	.cfi_restore w30
+	.cfi_restore w29
+	ret
+.LBB32_4:
+	.cfi_restore_state
+	mov	w0, wzr
+	clrex
+	.cfi_def_cfa wsp, 16
+	ldp	x29, x30, [sp], #16
+	.cfi_def_cfa_offset 0
+	.cfi_restore w30
+	.cfi_restore w29
+	ret
+.Lfunc_end32:
+	.size	_D4core8internal6atomic__T29atomicCompareExchangeNoResultVbi0VEQCjQBy11MemoryOrderi5VQxi0TmZQCoFNaNbNiNePmxmmZb, .Lfunc_end32-_D4core8internal6atomic__T29atomicCompareExchangeNoResultVbi0VEQCjQBy11MemoryOrderi5VQxi0TmZQCoFNaNbNiNePmxmmZb
+	.cfi_endproc
+
+	.section	.text._D4core6atomic__T3casVEQvQs11MemoryOrderi5VQvi0Z__TQBiTmTxmTmZQBtFNaNbNiNePOmxmmZb,"axG",@progbits,_D4core6atomic__T3casVEQvQs11MemoryOrderi5VQvi0Z__TQBiTmTxmTmZQBtFNaNbNiNePOmxmmZb,comdat
+	.weak	_D4core6atomic__T3casVEQvQs11MemoryOrderi5VQvi0Z__TQBiTmTxmTmZQBtFNaNbNiNePOmxmmZb
+	.p2align	2
+	.type	_D4core6atomic__T3casVEQvQs11MemoryOrderi5VQvi0Z__TQBiTmTxmTmZQBtFNaNbNiNePOmxmmZb,@function
+_D4core6atomic__T3casVEQvQs11MemoryOrderi5VQvi0Z__TQBiTmTxmTmZQBtFNaNbNiNePOmxmmZb:
+	.cfi_startproc
+	stp	x29, x30, [sp, #-16]!
+	.cfi_def_cfa_offset 16
+	mov	x29, sp
+	.cfi_def_cfa w29, 16
+	.cfi_offset w30, -8
+	.cfi_offset w29, -16
+	.cfi_remember_state
+.LBB33_1:
+	ldaxr	x8, [x0]
+	cmp	x8, x1
+	b.ne	.LBB33_4
+	stlxr	w8, x2, [x0]
+	cbnz	w8, .LBB33_1
+	mov	w0, #1
+	.cfi_def_cfa wsp, 16
+	ldp	x29, x30, [sp], #16
+	.cfi_def_cfa_offset 0
+	.cfi_restore w30
+	.cfi_restore w29
+	ret
+.LBB33_4:
+	.cfi_restore_state
+	mov	w0, wzr
+	clrex
+	.cfi_def_cfa wsp, 16
+	ldp	x29, x30, [sp], #16
+	.cfi_def_cfa_offset 0
+	.cfi_restore w30
+	.cfi_restore w29
+	ret
+.Lfunc_end33:
+	.size	_D4core6atomic__T3casVEQvQs11MemoryOrderi5VQvi0Z__TQBiTmTxmTmZQBtFNaNbNiNePOmxmmZb, .Lfunc_end33-_D4core6atomic__T3casVEQvQs11MemoryOrderi5VQvi0Z__TQBiTmTxmTmZQBtFNaNbNiNePOmxmmZb
+	.cfi_endproc
+
+	.section	.text._D4core6atomic__T3casVEQvQs11MemoryOrderi5VQvi0Z__TQBiTmTxmTmZQBtFNaNbNiNePmxmmZb,"axG",@progbits,_D4core6atomic__T3casVEQvQs11MemoryOrderi5VQvi0Z__TQBiTmTxmTmZQBtFNaNbNiNePmxmmZb,comdat
+	.weak	_D4core6atomic__T3casVEQvQs11MemoryOrderi5VQvi0Z__TQBiTmTxmTmZQBtFNaNbNiNePmxmmZb
+	.p2align	2
+	.type	_D4core6atomic__T3casVEQvQs11MemoryOrderi5VQvi0Z__TQBiTmTxmTmZQBtFNaNbNiNePmxmmZb,@function
+_D4core6atomic__T3casVEQvQs11MemoryOrderi5VQvi0Z__TQBiTmTxmTmZQBtFNaNbNiNePmxmmZb:
+	.cfi_startproc
+	stp	x29, x30, [sp, #-16]!
+	.cfi_def_cfa_offset 16
+	mov	x29, sp
+	.cfi_def_cfa w29, 16
+	.cfi_offset w30, -8
+	.cfi_offset w29, -16
+	.cfi_remember_state
+.LBB34_1:
+	ldaxr	x8, [x0]
+	cmp	x8, x1
+	b.ne	.LBB34_4
+	stlxr	w8, x2, [x0]
+	cbnz	w8, .LBB34_1
+	mov	w0, #1
+	.cfi_def_cfa wsp, 16
+	ldp	x29, x30, [sp], #16
+	.cfi_def_cfa_offset 0
+	.cfi_restore w30
+	.cfi_restore w29
+	ret
+.LBB34_4:
+	.cfi_restore_state
+	mov	w0, wzr
+	clrex
+	.cfi_def_cfa wsp, 16
+	ldp	x29, x30, [sp], #16
+	.cfi_def_cfa_offset 0
+	.cfi_restore w30
+	.cfi_restore w29
+	ret
+.Lfunc_end34:
+	.size	_D4core6atomic__T3casVEQvQs11MemoryOrderi5VQvi0Z__TQBiTmTxmTmZQBtFNaNbNiNePmxmmZb, .Lfunc_end34-_D4core6atomic__T3casVEQvQs11MemoryOrderi5VQvi0Z__TQBiTmTxmTmZQBtFNaNbNiNePmxmmZb
+	.cfi_endproc
+
+	.section	.text._D11concurrency8research36modular_bounded_wsq_batch_marked_top__T38MarkedTopBatchBoundedWorkStealingDequeTmVmi8ZQBv12sizeSnapshotMxFNaNbNiNfZm,"axG",@progbits,_D11concurrency8research36modular_bounded_wsq_batch_marked_top__T38MarkedTopBatchBoundedWorkStealingDequeTmVmi8ZQBv12sizeSnapshotMxFNaNbNiNfZm,comdat
+	.weak	_D11concurrency8research36modular_bounded_wsq_batch_marked_top__T38MarkedTopBatchBoundedWorkStealingDequeTmVmi8ZQBv12sizeSnapshotMxFNaNbNiNfZm
+	.p2align	2
+	.type	_D11concurrency8research36modular_bounded_wsq_batch_marked_top__T38MarkedTopBatchBoundedWorkStealingDequeTmVmi8ZQBv12sizeSnapshotMxFNaNbNiNfZm,@function
+_D11concurrency8research36modular_bounded_wsq_batch_marked_top__T38MarkedTopBatchBoundedWorkStealingDequeTmVmi8ZQBv12sizeSnapshotMxFNaNbNiNfZm:
+	.cfi_startproc
+	stp	x29, x30, [sp, #-16]!
+	.cfi_def_cfa_offset 16
+	mov	x29, sp
+	.cfi_def_cfa w29, 16
+	.cfi_offset w30, -8
+	.cfi_offset w29, -16
+	ldr	x8, [x0]
+	ldr	x9, [x0, #64]
+	sub	x8, x9, x8, lsr #1
+	and	x8, x8, #0x7fffffffffffffff
+	cmp	x8, #257
+	csel	x0, x8, xzr, lo
+	.cfi_def_cfa wsp, 16
+	ldp	x29, x30, [sp], #16
+	.cfi_def_cfa_offset 0
+	.cfi_restore w30
+	.cfi_restore w29
+	ret
+.Lfunc_end35:
+	.size	_D11concurrency8research36modular_bounded_wsq_batch_marked_top__T38MarkedTopBatchBoundedWorkStealingDequeTmVmi8ZQBv12sizeSnapshotMxFNaNbNiNfZm, .Lfunc_end35-_D11concurrency8research36modular_bounded_wsq_batch_marked_top__T38MarkedTopBatchBoundedWorkStealingDequeTmVmi8ZQBv12sizeSnapshotMxFNaNbNiNfZm
+	.cfi_endproc
+
+	.section	.text._D11concurrency8research36modular_bounded_wsq_batch_marked_top__T38MarkedTopBatchBoundedWorkStealingDequeTmVmi8ZQBv13emptySnapshotMxFNaNbNiNfZb,"axG",@progbits,_D11concurrency8research36modular_bounded_wsq_batch_marked_top__T38MarkedTopBatchBoundedWorkStealingDequeTmVmi8ZQBv13emptySnapshotMxFNaNbNiNfZb,comdat
+	.weak	_D11concurrency8research36modular_bounded_wsq_batch_marked_top__T38MarkedTopBatchBoundedWorkStealingDequeTmVmi8ZQBv13emptySnapshotMxFNaNbNiNfZb
+	.p2align	2
+	.type	_D11concurrency8research36modular_bounded_wsq_batch_marked_top__T38MarkedTopBatchBoundedWorkStealingDequeTmVmi8ZQBv13emptySnapshotMxFNaNbNiNfZb,@function
+_D11concurrency8research36modular_bounded_wsq_batch_marked_top__T38MarkedTopBatchBoundedWorkStealingDequeTmVmi8ZQBv13emptySnapshotMxFNaNbNiNfZb:
+	.cfi_startproc
+	stp	x29, x30, [sp, #-16]!
+	.cfi_def_cfa_offset 16
+	mov	x29, sp
+	.cfi_def_cfa w29, 16
+	.cfi_offset w30, -8
+	.cfi_offset w29, -16
+	ldr	x8, [x0]
+	ldr	x9, [x0, #64]
+	sub	x8, x9, x8, lsr #1
+	and	x8, x8, #0x7fffffffffffffff
+	sub	x8, x8, #257
+	cmn	x8, #256
+	cset	w0, lo
+	.cfi_def_cfa wsp, 16
+	ldp	x29, x30, [sp], #16
+	.cfi_def_cfa_offset 0
+	.cfi_restore w30
+	.cfi_restore w29
+	ret
+.Lfunc_end36:
+	.size	_D11concurrency8research36modular_bounded_wsq_batch_marked_top__T38MarkedTopBatchBoundedWorkStealingDequeTmVmi8ZQBv13emptySnapshotMxFNaNbNiNfZb, .Lfunc_end36-_D11concurrency8research36modular_bounded_wsq_batch_marked_top__T38MarkedTopBatchBoundedWorkStealingDequeTmVmi8ZQBv13emptySnapshotMxFNaNbNiNfZb
+	.cfi_endproc
+
+	.section	.text._D4core6atomic__T26atomicPtrIsProperlyAlignedTmZQBfFNaNbNiNfPmZb,"axG",@progbits,_D4core6atomic__T26atomicPtrIsProperlyAlignedTmZQBfFNaNbNiNfPmZb,comdat
+	.weak	_D4core6atomic__T26atomicPtrIsProperlyAlignedTmZQBfFNaNbNiNfPmZb
+	.p2align	2
+	.type	_D4core6atomic__T26atomicPtrIsProperlyAlignedTmZQBfFNaNbNiNfPmZb,@function
+_D4core6atomic__T26atomicPtrIsProperlyAlignedTmZQBfFNaNbNiNfPmZb:
+	.cfi_startproc
+	stp	x29, x30, [sp, #-16]!
+	.cfi_def_cfa_offset 16
+	mov	x29, sp
+	.cfi_def_cfa w29, 16
+	.cfi_offset w30, -8
+	.cfi_offset w29, -16
+	tst	x0, #0x7
+	cset	w0, eq
+	.cfi_def_cfa wsp, 16
+	ldp	x29, x30, [sp], #16
+	.cfi_def_cfa_offset 0
+	.cfi_restore w30
+	.cfi_restore w29
+	ret
+.Lfunc_end37:
+	.size	_D4core6atomic__T26atomicPtrIsProperlyAlignedTmZQBfFNaNbNiNfPmZb, .Lfunc_end37-_D4core6atomic__T26atomicPtrIsProperlyAlignedTmZQBfFNaNbNiNfPmZb
+	.cfi_endproc
+
+	.section	.text._D4core6atomic__T26atomicPtrIsProperlyAlignedTOmZQBgFNaNbNiNfPOmZb,"axG",@progbits,_D4core6atomic__T26atomicPtrIsProperlyAlignedTOmZQBgFNaNbNiNfPOmZb,comdat
+	.weak	_D4core6atomic__T26atomicPtrIsProperlyAlignedTOmZQBgFNaNbNiNfPOmZb
+	.p2align	2
+	.type	_D4core6atomic__T26atomicPtrIsProperlyAlignedTOmZQBgFNaNbNiNfPOmZb,@function
+_D4core6atomic__T26atomicPtrIsProperlyAlignedTOmZQBgFNaNbNiNfPOmZb:
+	.cfi_startproc
+	stp	x29, x30, [sp, #-16]!
+	.cfi_def_cfa_offset 16
+	mov	x29, sp
+	.cfi_def_cfa w29, 16
+	.cfi_offset w30, -8
+	.cfi_offset w29, -16
+	tst	x0, #0x7
+	cset	w0, eq
+	.cfi_def_cfa wsp, 16
+	ldp	x29, x30, [sp], #16
+	.cfi_def_cfa_offset 0
+	.cfi_restore w30
+	.cfi_restore w29
+	ret
+.Lfunc_end38:
+	.size	_D4core6atomic__T26atomicPtrIsProperlyAlignedTOmZQBgFNaNbNiNfPOmZb, .Lfunc_end38-_D4core6atomic__T26atomicPtrIsProperlyAlignedTOmZQBgFNaNbNiNfPOmZb
+	.cfi_endproc
+
+	.type	_D3app12__ModuleInfoZ,@object
+	.section	.data._D3app12__ModuleInfoZ,"aw",@progbits
+	.globl	_D3app12__ModuleInfoZ
+	.p2align	3, 0x0
+_D3app12__ModuleInfoZ:
+	.word	2147483652
+	.word	0
+	.asciz	"app"
+	.size	_D3app12__ModuleInfoZ, 12
+
+	.hidden	_D3app11__moduleRefZ
+	.type	_D3app11__moduleRefZ,@object
+	.section	__minfo,"awR",@progbits,unique,1
+	.weak	_D3app11__moduleRefZ
+	.p2align	3, 0x0
+_D3app11__moduleRefZ:
+	.xword	_D3app12__ModuleInfoZ
+	.size	_D3app11__moduleRefZ, 8
+
+	.ident	"ldc version 1.41.0"
+	.section	".note.GNU-stack","",@progbits

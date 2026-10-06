@@ -1,0 +1,5 @@
+name "r0-1-p08f1-marked-top-codegen"
+description "R0.1 P08f1 marked-top LDC x86_64 ordering/codegen qualification"
+targetType "executable"
+
+sourcePaths "source" "../../candidate/source"

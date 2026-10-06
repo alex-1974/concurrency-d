@@ -1,0 +1,177 @@
+R0.1 P08f2c candidate-module AArch64 barrier qualification
+
+=== TOOLCHAIN ===
+LDC - the LLVM D compiler (1.41.0):
+  based on DMD v2.111.0 and LLVM 19.1.7
+  built with LDC - the LLVM D compiler (1.41.0)
+  Default target: x86_64-pc-linux-gnu
+  Host CPU: skylake
+  http://dlang.org - http://wiki.dlang.org/LDC
+
+
+  Registered Targets:
+    aarch64     - AArch64 (little endian)
+    aarch64_32  - AArch64 (little endian ILP32)
+    aarch64_be  - AArch64 (big endian)
+    amdgcn      - AMD GCN GPUs
+    arm         - ARM
+    arm64       - ARM64 (little endian)
+    arm64_32    - ARM64 (little endian ILP32)
+    armeb       - ARM (big endian)
+    avr         - Atmel AVR Microcontroller
+    bpf         - BPF (host endian)
+    bpfeb       - BPF (big endian)
+    bpfel       - BPF (little endian)
+    hexagon     - Hexagon
+    lanai       - Lanai
+    loongarch32 - 32-bit LoongArch
+    loongarch64 - 64-bit LoongArch
+    m68k        - Motorola 68000 family
+    mips        - MIPS (32-bit big endian)
+    mips64      - MIPS (64-bit big endian)
+    mips64el    - MIPS (64-bit little endian)
+    mipsel      - MIPS (32-bit little endian)
+    msp430      - MSP430 [experimental]
+    nvptx       - NVIDIA PTX 32-bit
+    nvptx64     - NVIDIA PTX 64-bit
+    ppc32       - PowerPC 32
+    ppc32le     - PowerPC 32 LE
+    ppc64       - PowerPC 64
+    ppc64le     - PowerPC 64 LE
+    r600        - AMD GPUs HD2XXX-HD6XXX
+    riscv32     - 32-bit RISC-V
+    riscv64     - 64-bit RISC-V
+    sparc       - Sparc
+    sparcel     - Sparc LE
+    sparcv9     - Sparc V9
+    systemz     - SystemZ
+    thumb       - Thumb
+    thumbeb     - Thumb (big endian)
+    ve          - VE
+    wasm32      - WebAssembly 32-bit
+    wasm64      - WebAssembly 64-bit
+    x86         - 32-bit X86: Pentium-Pro and above
+    x86-64      - 64-bit X86: EM64T and AMD64
+    xcore       - XCore
+    xtensa      - Xtensa 32
+
+=== SOURCE ===
+67c783c7fd7d699b60f457dff8539dd1d5825c57a79525b0d973f07172e5617d  research/r0_1_work_stealing_deque/candidate/source/concurrency/research/modular_bounded_wsq_batch_marked_top.d
+
+=== ASM BARRIER/DMB ===
+1-	.text
+2-	.file	"modular_bounded_wsq_batch_marked_top.d"
+3:	.section	.text._D11concurrency8research36modular_bounded_wsq_batch_marked_top21researchSeqCstBarrierFNbNiOPiZv,"ax",@progbits
+4:	.globl	_D11concurrency8research36modular_bounded_wsq_batch_marked_top21researchSeqCstBarrierFNbNiOPiZv
+5-	.p2align	2
+6:	.type	_D11concurrency8research36modular_bounded_wsq_batch_marked_top21researchSeqCstBarrierFNbNiOPiZv,@function
+7:_D11concurrency8research36modular_bounded_wsq_batch_marked_top21researchSeqCstBarrierFNbNiOPiZv:
+8-	.cfi_startproc
+9-	stp	x29, x30, [sp, #-16]!
+10-	.cfi_def_cfa_offset 16
+11-	mov	x29, sp
+12-	.cfi_def_cfa w29, 16
+13-	.cfi_offset w30, -8
+14-	.cfi_offset w29, -16
+15:	dmb	ish
+16-	.cfi_def_cfa wsp, 16
+17-	ldp	x29, x30, [sp], #16
+18-	.cfi_def_cfa_offset 0
+19-	.cfi_restore w30
+20-	.cfi_restore w29
+21-	ret
+22-.Lfunc_end0:
+23:	.size	_D11concurrency8research36modular_bounded_wsq_batch_marked_top21researchSeqCstBarrierFNbNiOPiZv, .Lfunc_end0-_D11concurrency8research36modular_bounded_wsq_batch_marked_top21researchSeqCstBarrierFNbNiOPiZv
+24-	.cfi_endproc
+25-
+26-	.section	.text._D4core6atomic__T11atomicFenceVEQBeQBc11MemoryOrderi5ZQBlFNaNbNiNfZv,"axG",@progbits,_D4core6atomic__T11atomicFenceVEQBeQBc11MemoryOrderi5ZQBlFNaNbNiNfZv,comdat
+27-	.weak	_D4core6atomic__T11atomicFenceVEQBeQBc11MemoryOrderi5ZQBlFNaNbNiNfZv
+28-	.p2align	2
+29-	.type	_D4core6atomic__T11atomicFenceVEQBeQBc11MemoryOrderi5ZQBlFNaNbNiNfZv,@function
+30-_D4core6atomic__T11atomicFenceVEQBeQBc11MemoryOrderi5ZQBlFNaNbNiNfZv:
+31-	.cfi_startproc
+32-	stp	x29, x30, [sp, #-16]!
+33-	.cfi_def_cfa_offset 16
+34-	mov	x29, sp
+35-	.cfi_def_cfa w29, 16
+36-	.cfi_offset w30, -8
+37-	.cfi_offset w29, -16
+38:	dmb	ish
+39-	.cfi_def_cfa wsp, 16
+40-	ldp	x29, x30, [sp], #16
+41-	.cfi_def_cfa_offset 0
+42-	.cfi_restore w30
+43-	.cfi_restore w29
+44-	ret
+45-.Lfunc_end1:
+46-	.size	_D4core6atomic__T11atomicFenceVEQBeQBc11MemoryOrderi5ZQBlFNaNbNiNfZv, .Lfunc_end1-_D4core6atomic__T11atomicFenceVEQBeQBc11MemoryOrderi5ZQBlFNaNbNiNfZv
+47-	.cfi_endproc
+48-
+49-	.section	.text._D4core8internal6atomic__T11atomicFenceVEQBnQBc11MemoryOrderi5ZQBlFNaNbNiNeZv,"axG",@progbits,_D4core8internal6atomic__T11atomicFenceVEQBnQBc11MemoryOrderi5ZQBlFNaNbNiNeZv,comdat
+50-	.weak	_D4core8internal6atomic__T11atomicFenceVEQBnQBc11MemoryOrderi5ZQBlFNaNbNiNeZv
+51-	.p2align	2
+52-	.type	_D4core8internal6atomic__T11atomicFenceVEQBnQBc11MemoryOrderi5ZQBlFNaNbNiNeZv,@function
+53-_D4core8internal6atomic__T11atomicFenceVEQBnQBc11MemoryOrderi5ZQBlFNaNbNiNeZv:
+54-	.cfi_startproc
+55-	stp	x29, x30, [sp, #-16]!
+56-	.cfi_def_cfa_offset 16
+57-	mov	x29, sp
+58-	.cfi_def_cfa w29, 16
+59-	.cfi_offset w30, -8
+60-	.cfi_offset w29, -16
+61:	dmb	ish
+62-	.cfi_def_cfa wsp, 16
+63-	ldp	x29, x30, [sp], #16
+64-	.cfi_def_cfa_offset 0
+65-	.cfi_restore w30
+66-	.cfi_restore w29
+67-	ret
+68-.Lfunc_end2:
+69-	.size	_D4core8internal6atomic__T11atomicFenceVEQBnQBc11MemoryOrderi5ZQBlFNaNbNiNeZv, .Lfunc_end2-_D4core8internal6atomic__T11atomicFenceVEQBnQBc11MemoryOrderi5ZQBlFNaNbNiNeZv
+70-	.cfi_endproc
+71-
+72-	.type	_D11concurrency8research36modular_bounded_wsq_batch_marked_top12__ModuleInfoZ,@object
+73-	.section	.data._D11concurrency8research36modular_bounded_wsq_batch_marked_top12__ModuleInfoZ,"aw",@progbits
+74-	.globl	_D11concurrency8research36modular_bounded_wsq_batch_marked_top12__ModuleInfoZ
+75-	.p2align	4, 0x0
+76-_D11concurrency8research36modular_bounded_wsq_batch_marked_top12__ModuleInfoZ:
+77-	.word	2147483652
+78-	.word	0
+79-	.asciz	"concurrency.research.modular_bounded_wsq_batch_marked_top"
+80-	.zero	2
+81-	.size	_D11concurrency8research36modular_bounded_wsq_batch_marked_top12__ModuleInfoZ, 68
+
+=== LLVM IR BARRIER/FENCE ===
+10-$_D4core8internal6atomic__T11atomicFenceVEQBnQBc11MemoryOrderi5ZQBlFNaNbNiNeZv = comdat any
+11-
+12-@_D11concurrency8research36modular_bounded_wsq_batch_marked_top12__ModuleInfoZ = global %0 { i32 -2147483644, i32 0, [58 x i8] c"concurrency.research.modular_bounded_wsq_batch_marked_top\00" } ; [#uses = 1]
+13-@_D11concurrency8research36modular_bounded_wsq_batch_marked_top11__moduleRefZ = linkonce_odr hidden global ptr @_D11concurrency8research36modular_bounded_wsq_batch_marked_top12__ModuleInfoZ, section "__minfo" ; [#uses = 1]
+14-@llvm.used = appending global [1 x ptr] [ptr @_D11concurrency8research36modular_bounded_wsq_batch_marked_top11__moduleRefZ], section "llvm.metadata" ; [#uses = 0]
+15-
+16-; [#uses = 0]
+17-; Function Attrs: mustprogress nofree norecurse nounwind willreturn uwtable
+18:define void @_D11concurrency8research36modular_bounded_wsq_batch_marked_top21researchSeqCstBarrierFNbNiOPiZv(ptr nocapture readnone %fenceWord_arg) local_unnamed_addr #0 {
+19:  fence seq_cst
+20-  ret void
+21-}
+22-
+23-; [#uses = 0]
+24-; Function Attrs: alwaysinline uwtable
+25-define weak_odr void @_D4core6atomic__T11atomicFenceVEQBeQBc11MemoryOrderi5ZQBlFNaNbNiNfZv() local_unnamed_addr #1 comdat {
+26:  fence seq_cst
+27-  ret void
+28-}
+29-
+30-; [#uses = 0]
+31-; Function Attrs: alwaysinline uwtable
+32-define weak_odr void @_D4core8internal6atomic__T11atomicFenceVEQBnQBc11MemoryOrderi5ZQBlFNaNbNiNeZv() local_unnamed_addr #1 comdat {
+33:  fence seq_cst
+34-  ret void
+35-}
+36-
+37-attributes #0 = { mustprogress nofree norecurse nounwind willreturn uwtable "frame-pointer"="all" "target-cpu"="generic" }
+38-attributes #1 = { alwaysinline uwtable "frame-pointer"="all" "target-cpu"="generic" }
+39-
+40-!llvm.ident = !{!0}
+41-
+42-!0 = !{!"ldc version 1.41.0"}
