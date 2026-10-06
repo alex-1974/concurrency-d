@@ -1,0 +1,7 @@
+name "r0-1-p04b-modular-counter"
+description "R0.1 P04b modulo-2^64 bounded work-stealing deque probe"
+targetType "executable"
+
+sourcePaths "source" "../../candidate/source"
+
+versions "ConcurrencyResearchProbe"
