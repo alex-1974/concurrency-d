@@ -1,0 +1,7 @@
+name "r0-1-p04-wraparound"
+description "R0.1 P04 physical ring and logical counter wraparound probe"
+targetType "executable"
+
+sourcePaths "source" "../../candidate/source"
+
+versions "ConcurrencyResearchProbe"

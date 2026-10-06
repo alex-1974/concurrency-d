@@ -166,4 +166,32 @@ public:
     {
         return sizeSnapshot() == 0;
     }
+
+    version (ConcurrencyResearchProbe)
+    {
+        /**
+         * Research-only hook for counter-domain probes.
+         *
+         * The deque must be logically empty when this is called.
+         * This is not and must never become production API.
+         */
+        void researchSetEmptyIndex(long index)
+            @nogc nothrow
+        {
+            atomicStore!(MemoryOrder.raw)(_top, index);
+            atomicStore!(MemoryOrder.raw)(_bottom, index);
+        }
+
+        long researchTopSnapshot() const
+            @nogc nothrow
+        {
+            return atomicLoad!(MemoryOrder.raw)(_top);
+        }
+
+        long researchBottomSnapshot() const
+            @nogc nothrow
+        {
+            return atomicLoad!(MemoryOrder.raw)(_bottom);
+        }
+    }
 }
