@@ -1,0 +1,8 @@
+* text=auto
+*.d text eol=lf
+*.md text eol=lf
+*.sdl text eol=lf
+
+/research export-ignore
+/benchmarks export-ignore
+/.github export-ignore

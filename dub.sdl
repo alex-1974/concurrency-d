@@ -1,0 +1,4 @@
+name "concurrency-d"
+description "High-performance generic concurrency and task execution primitives for D"
+targetType "library"
+sourcePaths "source"

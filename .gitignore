@@ -1,0 +1,17 @@
+.dub/
+dub.selections.json
+docs.json
+__dummy.html
+
+concurrency-d
+concurrency-d-test-*
+*.o
+*.obj
+*.a
+*.lib
+*.so
+*.dll
+*.dylib
+*.exe
+
+.workspace/
