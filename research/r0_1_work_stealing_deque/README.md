@@ -89,3 +89,23 @@ R0.1 does not define:
 - final worker parking strategy.
 
 Those depend on later research.
+
+## Cross-repository ownership tracking
+
+The production ownership of a qualified work-stealing deque is tracked in:
+
+- `containers-d` issue #37:
+  https://github.com/alex-1974/containers-d/issues/37
+
+R0.1 remains in `concurrency-d` until the algorithm, memory-ordering model,
+element contract, and performance characteristics are sufficiently qualified.
+
+After qualification:
+
+- promote to `containers-d` if the deque has a scheduler-independent container
+  contract;
+- keep it internal to `concurrency-d` if scheduler/task-specific policy is
+  required for the best design.
+
+`concurrency-d` must not depend on a production `WorkStealingDeque` from
+`containers-d` before that promotion decision is complete.
