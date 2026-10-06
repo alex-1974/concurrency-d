@@ -1,0 +1,5 @@
+name "r0-1-p08c-multi-thief-streaming"
+description "R0.1 P08c fixed-affinity one-owner multi-thief streaming"
+targetType "executable"
+
+sourcePaths "source" "../../candidate/source"
