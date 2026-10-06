@@ -1,0 +1,5 @@
+name "r0-1-p12f-sharded-spill"
+description "R0.1 P12f sharded spill overflow comparison"
+targetType "executable"
+
+sourcePaths "source" "../../candidate/source"
