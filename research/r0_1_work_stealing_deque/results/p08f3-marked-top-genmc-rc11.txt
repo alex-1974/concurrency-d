@@ -1,0 +1,94 @@
+R0.1 P08f3 marked-top GenMC RC11 qualification
+
+=== GENMC ===
+GenMC (https://plv.mpi-sws.org/genmc):
+  GenMC v0.19.0 (commit #9f6c4c0)
+  Built with LLVM 21.1.8 (RelWithDebInfo)
+
+=== MODEL ===
+RC11
+
+=== EXPECTED ===
+marked_top_sc.c: SAFE
+marked_top_relaxed_control.c: assertion violation reachable
+
+=== SC RESULT ===
+GenMC v0.19.0 (LLVM 21.1.8)
+Copyright (C) 2024 MPI-SWS. All rights reserved.
+
+*** Compilation complete.
+*** Transformation complete.
+Tip: Estimating state-space size before verification. For better performance, you can use --disable-estimation.
+*** Estimation complete.
+Total executions estimate: 4 (+- 0)
+Time to completion estimate: 0.02s
+*** Verification complete.
+No errors were detected.
+Number of complete executions explored: 3
+Total wall-clock time: 0.05s
+
+=== RELAXED CONTROL RESULT ===
+GenMC v0.19.0 (LLVM 21.1.8)
+Copyright (C) 2024 MPI-SWS. All rights reserved.
+
+*** Compilation complete.
+*** Transformation complete.
+Tip: Estimating state-space size before verification. For better performance, you can use --disable-estimation.
+Error: Safety violation!
+Event (0, 13) in graph:
+<-1, 0>:
+	(0, 1): Wna (topState, 0) marked_top_relaxed_control.c:81
+	(0, 2): Wna (bottom, 4) marked_top_relaxed_control.c:82
+	(0, 3): Wna (ownerState, 4294967295) marked_top_relaxed_control.c:84
+	(0, 4): Wna (batchCasSucceeded, 0) marked_top_relaxed_control.c:85
+	(0, 5): Wna (batchBottom, 4294967295) marked_top_relaxed_control.c:86
+	(0, 6): THREAD_CREATE [thread 1] pthread.h:146
+	(0, 7): THREAD_CREATE [thread 2] pthread.h:146
+	(0, 8): THREAD_JOIN [thread 1] pthread.h:163
+	(0, 9): THREAD_JOIN [thread 2] pthread.h:163
+	(0, 10): Rrlx (ownerState, 0) [(1, 3)] marked_top_relaxed_control.c:116
+	(0, 11): Rrlx (batchCasSucceeded, 1) [(2, 3)] marked_top_relaxed_control.c:121
+	(0, 12): Rrlx (batchBottom, 4) [(2, 5)] marked_top_relaxed_control.c:126
+	(0, 13): ERROR marked_top_relaxed_control.c:130
+<0, 1> owner:
+	(1, 1): Wrlx (bottom, 3) marked_top_relaxed_control.c:26
+	(1, 2): Rrlx (topState, 0) [(0, 1)] marked_top_relaxed_control.c:32
+	(1, 3): Wrlx (ownerState, 0) marked_top_relaxed_control.c:36
+	(1, 4): THREAD_END
+<0, 2> batch:
+	(2, 1): CRsc (topState, 0) [(0, 1)] marked_top_relaxed_control.c:51
+	(2, 2): CWsc (topState, 1) marked_top_relaxed_control.c:51
+	(2, 3): Wrlx (batchCasSucceeded, 1) marked_top_relaxed_control.c:58
+	(2, 4): Racq (bottom, 4) [(0, 2)] marked_top_relaxed_control.c:66
+	(2, 5): Wrlx (batchBottom, 4) marked_top_relaxed_control.c:70
+	(2, 6): THREAD_END
+Coherence:
+batchBottom: [ (0, 5): Wna (G#(0, 16), 4294967295) (2, 5): Wrlx (G#(0, 16), 4) ]
+batchCasSucceeded: [ (0, 4): Wna (G#(0, 12), 0) (2, 3): Wrlx (G#(0, 12), 1) ]
+ownerState: [ (0, 3): Wna (G#(0, 8), 4294967295) (1, 3): Wrlx (G#(0, 8), 0) ]
+bottom: [ (0, 2): Wna (G#(0, 4), 4) (1, 1): Wrlx (G#(0, 4), 3) ]
+topState: [ (0, 1): Wna (G#(0, 0), 0) (2, 2): CWsc (G#(0, 0), 1) ]
+
+Trace to (0, 13):
+[main] marked_top_relaxed_control.c: 81: atomic_init(&topState, 0);
+[main] marked_top_relaxed_control.c: 82: atomic_init(&bottom, 4);
+[main] marked_top_relaxed_control.c: 84: atomic_init(&ownerState, -1);
+[main] marked_top_relaxed_control.c: 85: atomic_init(&batchCasSucceeded, 0);
+[main] marked_top_relaxed_control.c: 86: atomic_init(&batchBottom, -1);
+[main] pthread.h: 146: (*__newthread) = __VERIFIER_thread_create(__attr, __start_routine, __arg);
+[owner] marked_top_relaxed_control.c: 26: atomic_store_explicit(
+[owner] marked_top_relaxed_control.c: 32: atomic_load_explicit(
+[owner] marked_top_relaxed_control.c: 36: atomic_store_explicit(
+[batch] marked_top_relaxed_control.c: 51: atomic_compare_exchange_strong_explicit(
+[batch] marked_top_relaxed_control.c: 58: atomic_store_explicit(
+[batch] marked_top_relaxed_control.c: 66: atomic_load_explicit(
+[batch] marked_top_relaxed_control.c: 70: atomic_store_explicit(
+[main] pthread.h: 163: void *__retval = __VERIFIER_thread_join(__th);
+[main] marked_top_relaxed_control.c: 116: atomic_load_explicit(
+[main] marked_top_relaxed_control.c: 121: atomic_load_explicit(
+[main] marked_top_relaxed_control.c: 126: atomic_load_explicit(
+[main] marked_top_relaxed_control.c: 130: assert(
+
+*** Estimation unsuccessful.
+Total executions estimate: 4 (+- 0)
+Time to completion estimate: 0.03s
