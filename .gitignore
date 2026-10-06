@@ -21,3 +21,15 @@ concurrency-d-test-*
 
 # Generated R0.1 codegen artifacts
 /research/r0_1_work_stealing_deque/probes/p05_codegen/out/
+
+# Generated P07 research executables and compiler output
+/research/r0_1_work_stealing_deque/probes/p07_taskflow_reference/fence_lowering_probe/fence-lowering
+/research/r0_1_work_stealing_deque/probes/p07_taskflow_reference/fence_probe/fence-cpp
+/research/r0_1_work_stealing_deque/probes/p07_taskflow_reference/fence_probe/fence-d
+/research/r0_1_work_stealing_deque/probes/p07_taskflow_reference/pop_protocol_probe/protocol-cpp
+/research/r0_1_work_stealing_deque/probes/p07_taskflow_reference/pop_protocol_probe/protocol-d
+/research/r0_1_work_stealing_deque/probes/p07_taskflow_reference/pop_protocol_separate/protocol-cpp
+/research/r0_1_work_stealing_deque/probes/p07_taskflow_reference/pop_protocol_separate/protocol-d
+/research/r0_1_work_stealing_deque/probes/p07_taskflow_reference/rmw_fence_forms/rmw-fence-forms
+/research/r0_1_work_stealing_deque/probes/p07_taskflow_reference/taskflow-reference
+/research/r0_1_work_stealing_deque/probes/p07_taskflow_reference/store_load_fence_probe/out/

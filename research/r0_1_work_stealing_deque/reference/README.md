@@ -15,6 +15,14 @@ Initial targets:
 
 ## Taskflow
 
+Pinned R0.1 reference:
+
+- commit: `bbd7251d577b33a4aeff434ce5f5569b94d4cc48`
+- bounded WSQ source: `taskflow/core/wsq.hpp`
+- benchmarked type: `tf::BoundedWSQ<std::size_t, LogSize>`
+- compiler control: GCC 15.2.0
+- primary x86_64 target: `-march=skylake`
+
 Study:
 
 - bounded WSQ;

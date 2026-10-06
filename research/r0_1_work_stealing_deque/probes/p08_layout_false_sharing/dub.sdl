@@ -1,0 +1,7 @@
+name "r0-1-p08-layout-false-sharing"
+description "R0.1 P08 compact versus cacheline-separated RMW WSQ"
+targetType "executable"
+
+sourcePaths "source" "../../candidate/source"
+
+versions "ConcurrencyResearchProbe"

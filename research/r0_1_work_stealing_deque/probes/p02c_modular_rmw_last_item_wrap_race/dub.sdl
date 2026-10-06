@@ -1,0 +1,7 @@
+name "r0-1-p02c-modular-rmw-last-item-wrap-race"
+description "R0.1 P02c modular counter last-item race across ulong wrap"
+targetType "executable"
+
+sourcePaths "source" "../../candidate/source"
+
+versions "ConcurrencyResearchProbe"

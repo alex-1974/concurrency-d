@@ -1,0 +1,7 @@
+name "r0-1-p06c-rmw-hot-paths"
+description "R0.1 P06c modular baseline versus RMW-fence modular WSQ hot paths"
+targetType "executable"
+
+sourcePaths "source" "../../candidate/source"
+
+versions "ConcurrencyResearchProbe"

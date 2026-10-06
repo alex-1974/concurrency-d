@@ -48,9 +48,18 @@ private void fill(Q)(ref Q queue)
     reset(queue);
 
     foreach (i; 0 .. Q.capacity)
-        assert(queue.tryPush(i + 1));
+    {
+        const pushed =
+            queue.tryPush(i + 1);
 
-    assert(queue.sizeSnapshot() == Q.capacity);
+        if (!pushed)
+            throw new Exception(
+                "benchmark preparation push failed");
+    }
+
+    if (queue.sizeSnapshot() != Q.capacity)
+        throw new Exception(
+            "benchmark preparation size mismatch");
 }
 
 private void prepare(Q, Workload workload)(ref Q queue)
@@ -67,10 +76,19 @@ private void prepare(Q, Workload workload)(ref Q queue)
     {
         reset(queue);
 
-        assert(queue.tryPush(1));
-        assert(queue.tryPush(2));
+        const first =
+            queue.tryPush(1);
 
-        assert(queue.sizeSnapshot() == 2);
+        const second =
+            queue.tryPush(2);
+
+        if (!first || !second)
+            throw new Exception(
+                "benchmark pair preparation push failed");
+
+        if (queue.sizeSnapshot() != 2)
+            throw new Exception(
+                "benchmark pair preparation size mismatch");
     }
     else static if (workload == Workload.emptySteal)
     {
