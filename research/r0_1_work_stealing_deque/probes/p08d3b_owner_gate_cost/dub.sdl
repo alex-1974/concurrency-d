@@ -1,0 +1,5 @@
+name "r0-1-p08d3b-owner-gate-cost"
+description "R0.1 P08d3b uncontended owner pop gate cost"
+targetType "executable"
+
+sourcePaths "source" "../../candidate/source"

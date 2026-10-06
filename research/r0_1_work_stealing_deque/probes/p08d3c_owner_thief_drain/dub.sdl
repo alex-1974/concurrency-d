@@ -1,0 +1,5 @@
+name "r0-1-p08d3c-owner-thief-drain"
+description "R0.1 P08d3c concurrent owner-pop and thief batch drain"
+targetType "executable"
+
+sourcePaths "source" "../../candidate/source"
