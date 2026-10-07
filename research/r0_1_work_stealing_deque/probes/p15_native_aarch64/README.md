@@ -60,3 +60,8 @@ Native execution is preferred.
 
 If no native AArch64 machine is available, record the limitation explicitly.
 Cross-compilation/code-generation inspection alone does not close P15.
+
+## Bring-up
+
+The initial native AArch64 GitHub Actions bring-up is requested on the
+research branch using the dedicated `ubuntu-24.04-arm` workflow.
