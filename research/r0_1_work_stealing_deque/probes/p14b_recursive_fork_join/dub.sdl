@@ -1,0 +1,7 @@
+name "r0-1-p14b-recursive-fork-join"
+description "R0.1 P14b recursive fork-join scheduler workload"
+targetType "executable"
+
+sourcePaths "source" "../../candidate/source"
+
+versions "ConcurrencyResearchProbe"
