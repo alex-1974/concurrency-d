@@ -1,6 +1,6 @@
 # P16 — Ownership and Promotion Decision
 
-Status: DECISION RECORDED
+Status: PASS
 
 ## Decision
 
@@ -283,21 +283,21 @@ concurrency-d owns:
 This boundary avoids both duplication and scheduler leakage into the container
 library.
 
-## Required cross-repository follow-up
+## Cross-repository handoff
 
-The existing containers-d ownership tracker is:
+The containers-d ownership tracker was updated and completed:
 
-    alex-1974/containers-d issue #37
-    "Research concurrent work-stealing deque for concurrency-d"
+- alex-1974/containers-d issue #37
+  "Research concurrent work-stealing deque for concurrency-d"
 
-P16 requires that tracker to be updated with:
+The production/API promotion work is now tracked separately in:
 
-- P09–P15 evidence;
-- accepted P08e marked-top candidate;
-- rejected alternatives where relevant;
-- native AArch64 result;
-- this explicit promotion decision;
-- a separate follow-up for containers-d implementation/API work.
+- alex-1974/containers-d issue #38
+  "Promote qualified work-stealing deque family"
+
+Issue #37 records the P09-P16 evidence and the ownership decision.
+Issue #38 owns the containers-d-specific design, implementation, API, tests,
+performance requalification, and integration work.
 
 No concurrency-d -> containers-d dependency should be introduced until the
 promoted containers-d implementation passes its own production qualification.
@@ -308,7 +308,8 @@ Decision produced:
 
     PROMOTE TO containers-d
 
-The decision portion of P16 is complete.
+Cross-repository ownership handoff: COMPLETE.
 
-The remaining required P16 action is the cross-repository update of
-containers-d issue #37.
+P16 result:
+
+    PASS
