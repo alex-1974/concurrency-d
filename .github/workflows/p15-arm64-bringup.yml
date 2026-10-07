@@ -1,6 +1,14 @@
 name: P15 ARM64 Bring-up
 
 on:
+  push:
+    branches:
+      - research/r0-1-work-stealing-deque
+    paths:
+      - ".github/workflows/p15-arm64-bringup.yml"
+      - "research/r0_1_work_stealing_deque/probes/p15_native_aarch64/**"
+      - "research/r0_1_work_stealing_deque/probes/p14c_irregular_bursty/**"
+      - "research/r0_1_work_stealing_deque/candidate/**"
   workflow_dispatch:
 
 jobs:
