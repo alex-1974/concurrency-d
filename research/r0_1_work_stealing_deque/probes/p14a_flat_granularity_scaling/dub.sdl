@@ -1,0 +1,7 @@
+name "r0-1-p14a-flat-granularity-scaling"
+description "R0.1 P14a flat fine-medium-coarse scheduler scaling"
+targetType "executable"
+
+sourcePaths "source" "../../candidate/source"
+
+versions "ConcurrencyResearchProbe"
