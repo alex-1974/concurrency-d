@@ -1,0 +1,7 @@
+name "r0-1-p14f-recursive-inline-diagnostic"
+description "R0.1 P14f recursive hot-path inline diagnostic"
+targetType "executable"
+
+sourcePaths "source" "../../candidate/source"
+
+versions "ConcurrencyResearchProbe"

@@ -1,0 +1,1002 @@
+module app;
+
+import concurrency.research.modular_bounded_wsq_batch_marked_top :
+    MarkedTopBatchBoundedWorkStealingDeque;
+
+import core.atomic :
+    MemoryOrder,
+    atomicFetchAdd,
+    atomicLoad,
+    atomicStore;
+
+import core.thread :
+    Thread;
+
+version (linux)
+{
+    import core.sys.linux.sched :
+        CPU_SET,
+        cpu_set_t,
+        sched_getcpu,
+        sched_setaffinity;
+}
+
+import std.algorithm.sorting :
+    sort;
+
+import std.datetime.stopwatch :
+    StopWatch;
+
+import std.stdio :
+    writefln,
+    writeln;
+
+enum size_t MaxWorkers = 4;
+
+enum size_t LogSize = 10;
+enum size_t Capacity = size_t(1) << LogSize;
+enum size_t BatchSize = 8;
+
+enum uint MaxDepth = 18;
+
+enum ulong TotalTasks =
+    (1UL << (MaxDepth + 1)) - 1;
+
+enum size_t WorkRounds = 16;
+
+enum size_t Warmups = 2;
+enum size_t Samples = 9;
+
+enum StealMode
+{
+    single,
+    batch
+}
+
+/*
+ * Keep the queue payload at 8 bytes.
+ *
+ * High byte:
+ *     tree depth
+ *
+ * Low 56 bits:
+ *     binary-tree node id
+ */
+struct TaskRef
+{
+    ulong encoded;
+}
+
+alias Queue =
+    MarkedTopBatchBoundedWorkStealingDeque!(
+        TaskRef,
+        LogSize);
+
+struct WorkerStats
+{
+    ulong executed;
+    ulong localPops;
+
+    ulong stolenTasks;
+    ulong stealClaims;
+    ulong failedSteals;
+
+    ulong spawned;
+    ulong overflowInline;
+
+    ulong valueSum;
+    ulong valueXor;
+    ulong workChecksum;
+}
+
+struct RunResult
+{
+    ulong elapsedNs;
+
+    ulong executed;
+    ulong localPops;
+
+    ulong stolenTasks;
+    ulong stealClaims;
+    ulong failedSteals;
+
+    ulong spawned;
+    ulong overflowInline;
+
+    ulong ownerBusyRetries;
+
+    ulong minWorkerExecuted;
+    ulong maxWorkerExecuted;
+}
+
+struct Distribution
+{
+    double median;
+    double p10;
+    double p90;
+}
+
+private TaskRef makeTask(
+    ulong id,
+    uint depth)
+    @safe @nogc nothrow
+{
+    return TaskRef(
+        (cast(ulong) depth << 56) |
+        id);
+}
+
+private ulong taskId(
+    TaskRef task)
+    @safe @nogc nothrow
+{
+    return
+        task.encoded &
+        0x00ff_ffff_ffff_ffffUL;
+}
+
+private uint taskDepth(
+    TaskRef task)
+    @safe @nogc nothrow
+{
+    return
+        cast(uint)
+            (task.encoded >> 56);
+}
+
+private void pinCurrentThread(
+    size_t cpu)
+{
+    version (linux)
+    {
+        cpu_set_t mask;
+
+        CPU_SET(
+            cpu,
+            &mask);
+
+        if (
+            sched_setaffinity(
+                0,
+                cpu_set_t.sizeof,
+                &mask) != 0)
+        {
+            throw new Exception(
+                "sched_setaffinity failed");
+        }
+
+        const actual =
+            sched_getcpu();
+
+        if (
+            actual < 0 ||
+            cast(size_t) actual != cpu)
+        {
+            throw new Exception(
+                "affinity verification failed");
+        }
+    }
+    else
+    {
+        throw new Exception(
+            "Linux affinity required");
+    }
+}
+
+private ulong doWork(
+    ulong value)
+    @safe @nogc nothrow
+{
+    ulong x =
+        value +
+        0x9e3779b97f4a7c15UL;
+
+    foreach (i; 0 .. WorkRounds)
+    {
+        x ^= x >> 12;
+        x ^= x << 25;
+        x ^= x >> 27;
+
+        x *=
+            0x2545f4914f6cdd1dUL;
+
+        x +=
+            cast(ulong) i +
+            0x9e3779b97f4a7c15UL;
+    }
+
+    return x;
+}
+
+private ulong expectedWorkChecksum()
+{
+    ulong result;
+
+    foreach (id; 1UL .. TotalTasks + 1)
+    {
+        result ^=
+            doWork(id);
+    }
+
+    return result;
+}
+
+/*
+ * Execute one task.
+ *
+ * Child tasks are counted in outstanding BEFORE either child is published or
+ * executed inline. Therefore outstanding cannot transiently reach zero while
+ * descendants still exist.
+ *
+ * Overflow follows the selected P12 work-first policy.
+ */
+private void executeTask(
+    TaskRef task,
+    size_t workerIndex,
+    Queue[] queues,
+    ref WorkerStats stats,
+    shared long* outstanding,
+    shared ulong* completed)
+{
+    const id =
+        taskId(task);
+
+    const depth =
+        taskDepth(task);
+
+    ++stats.executed;
+
+    stats.valueSum +=
+        id;
+
+    stats.valueXor ^=
+        id;
+
+    stats.workChecksum ^=
+        doWork(id);
+
+    if (depth < MaxDepth)
+    {
+        atomicFetchAdd!(
+            MemoryOrder.rel)(
+                *outstanding,
+                cast(long) 2);
+
+        stats.spawned += 2;
+
+        const nextDepth =
+            depth + 1;
+
+        const left =
+            makeTask(
+                id << 1,
+                nextDepth);
+
+        const right =
+            makeTask(
+                (id << 1) | 1,
+                nextDepth);
+
+        if (
+            !queues[
+                workerIndex]
+            .tryPush(left))
+        {
+            /*
+             * Diagnostic only.
+             *
+             * P14b observed zero overflow. Abort here so executeTask is
+             * non-recursive and LDC may optimize the normal hot path without
+             * recursive-function constraints.
+             */
+            assert(
+                false,
+                "unexpected overflow in P14f diagnostic");
+        }
+
+        if (
+            !queues[
+                workerIndex]
+            .tryPush(right))
+        {
+            assert(
+                false,
+                "unexpected overflow in P14f diagnostic");
+        }
+    }
+
+    atomicFetchAdd!(
+        MemoryOrder.rel)(
+            *completed,
+            1);
+
+    atomicFetchAdd!(
+        MemoryOrder.rel)(
+            *outstanding,
+            cast(long) -1);
+}
+
+private Thread makeWorker(
+    size_t workerIndex,
+    size_t workerCount,
+    StealMode mode,
+    Queue[] queues,
+    shared size_t* readyCount,
+    shared bool* start,
+    shared bool* rootSeeded,
+    shared long* outstanding,
+    shared ulong* completed,
+    shared WorkerStats* publishedStats)
+{
+    return new Thread({
+        pinCurrentThread(
+            workerIndex);
+
+        WorkerStats stats;
+
+        TaskRef[BatchSize]
+            batch;
+
+        size_t nextVictim =
+            workerCount > 1
+            ? (workerIndex + 1) %
+                workerCount
+            : workerIndex;
+
+        atomicFetchAdd!(
+            MemoryOrder.rel)(
+                *readyCount,
+                1);
+
+        while (
+            !atomicLoad!(
+                MemoryOrder.acq)(
+                    *start))
+        {
+            Thread.yield();
+        }
+
+        /*
+         * Worker 0 is the owner that seeds the root.
+         */
+        if (workerIndex == 0)
+        {
+            atomicFetchAdd!(
+                MemoryOrder.rel)(
+                    *outstanding,
+                    cast(long) 1);
+
+            const root =
+                makeTask(
+                    1,
+                    0);
+
+            if (
+                !queues[0]
+                .tryPush(root))
+            {
+                throw new Exception(
+                    "root push failed");
+            }
+
+            atomicStore!(
+                MemoryOrder.rel)(
+                    *rootSeeded,
+                    true);
+        }
+
+        for (;;)
+        {
+            const local =
+                queues[
+                    workerIndex]
+                .pop();
+
+            if (local.found)
+            {
+                ++stats.localPops;
+
+                executeTask(
+                    local.value,
+                    workerIndex,
+                    queues,
+                    stats,
+                    outstanding,
+                    completed);
+
+                continue;
+            }
+
+            bool foundWork;
+
+            if (workerCount > 1)
+            {
+                foreach (
+                    _;
+                    0 ..
+                    workerCount - 1)
+                {
+                    const victim =
+                        nextVictim;
+
+                    nextVictim =
+                        (nextVictim + 1) %
+                        workerCount;
+
+                    if (
+                        victim ==
+                        workerIndex)
+                    {
+                        continue;
+                    }
+
+                    final switch (mode)
+                    {
+                        case StealMode.single:
+                        {
+                            const stolen =
+                                queues[victim]
+                                .steal();
+
+                            if (!stolen.found)
+                            {
+                                ++stats.failedSteals;
+                                break;
+                            }
+
+                            ++stats.stealClaims;
+                            ++stats.stolenTasks;
+
+                            executeTask(
+                                stolen.value,
+                                workerIndex,
+                                queues,
+                                stats,
+                                outstanding,
+                                completed);
+
+                            foundWork = true;
+                            break;
+                        }
+
+                        case StealMode.batch:
+                        {
+                            const taken =
+                                queues[victim]
+                                .stealBatch(
+                                    batch[]);
+
+                            if (taken == 0)
+                            {
+                                ++stats.failedSteals;
+                                break;
+                            }
+
+                            ++stats.stealClaims;
+
+                            stats.stolenTasks +=
+                                taken;
+
+                            /*
+                             * Execute one immediately.
+                             *
+                             * Move the remaining stolen tasks into this
+                             * worker's owner-local deque. If that local deque
+                             * is full, execute them inline according to P12.
+                             */
+                            executeTask(
+                                batch[0],
+                                workerIndex,
+                                queues,
+                                stats,
+                                outstanding,
+                                completed);
+
+                            foreach (
+                                task;
+                                batch[
+                                    1 ..
+                                    taken])
+                            {
+                                if (
+                                    queues[
+                                        workerIndex]
+                                    .tryPush(task))
+                                {
+                                    continue;
+                                }
+
+                                ++stats.overflowInline;
+
+                                executeTask(
+                                    task,
+                                    workerIndex,
+                                    queues,
+                                    stats,
+                                    outstanding,
+                                    completed);
+                            }
+
+                            foundWork = true;
+                            break;
+                        }
+                    }
+
+                    if (foundWork)
+                        break;
+                }
+            }
+
+            if (foundWork)
+                continue;
+
+            if (
+                atomicLoad!(
+                    MemoryOrder.acq)(
+                        *rootSeeded) &&
+                atomicLoad!(
+                    MemoryOrder.acq)(
+                        *outstanding) == 0)
+            {
+                break;
+            }
+
+            Thread.yield();
+        }
+
+        publishedStats[
+            workerIndex] =
+            cast(shared)
+                stats;
+    });
+}
+
+private RunResult run(
+    size_t workerCount,
+    StealMode mode)
+{
+    auto queues =
+        new Queue[MaxWorkers];
+
+    shared size_t readyCount;
+    shared bool start;
+    shared bool rootSeeded;
+
+    shared long outstanding;
+    shared ulong completed;
+
+    shared WorkerStats[MaxWorkers]
+        publishedStats;
+
+    Thread[MaxWorkers]
+        threads;
+
+    foreach (worker; 0 .. workerCount)
+    {
+        threads[worker] =
+            makeWorker(
+                worker,
+                workerCount,
+                mode,
+                queues,
+                &readyCount,
+                &start,
+                &rootSeeded,
+                &outstanding,
+                &completed,
+                publishedStats.ptr);
+
+        threads[worker].start();
+    }
+
+    while (
+        atomicLoad!(
+            MemoryOrder.acq)(
+                readyCount) !=
+        workerCount)
+    {
+        Thread.yield();
+    }
+
+    queues[0]
+        .researchResetOwnerBusyRetries();
+
+    StopWatch sw;
+    sw.start();
+
+    atomicStore!(
+        MemoryOrder.rel)(
+            start,
+            true);
+
+    foreach (i; 0 .. workerCount)
+        threads[i].join();
+
+    sw.stop();
+
+    RunResult result;
+
+    result.elapsedNs =
+        cast(ulong)
+            sw.peek.total!"nsecs";
+
+    result.ownerBusyRetries =
+        queues[0]
+        .researchOwnerBusyRetriesSnapshot();
+
+    ulong valueSum;
+    ulong valueXor;
+    ulong workChecksum;
+
+    result.minWorkerExecuted =
+        ulong.max;
+
+    foreach (worker; 0 .. workerCount)
+    {
+        const stats =
+            cast(WorkerStats)
+                publishedStats[
+                    worker];
+
+        result.executed +=
+            stats.executed;
+
+        result.localPops +=
+            stats.localPops;
+
+        result.stolenTasks +=
+            stats.stolenTasks;
+
+        result.stealClaims +=
+            stats.stealClaims;
+
+        result.failedSteals +=
+            stats.failedSteals;
+
+        result.spawned +=
+            stats.spawned;
+
+        result.overflowInline +=
+            stats.overflowInline;
+
+        valueSum +=
+            stats.valueSum;
+
+        valueXor ^=
+            stats.valueXor;
+
+        workChecksum ^=
+            stats.workChecksum;
+
+        if (
+            stats.executed <
+            result.minWorkerExecuted)
+        {
+            result.minWorkerExecuted =
+                stats.executed;
+        }
+
+        if (
+            stats.executed >
+            result.maxWorkerExecuted)
+        {
+            result.maxWorkerExecuted =
+                stats.executed;
+        }
+    }
+
+    if (
+        result.executed !=
+        TotalTasks)
+    {
+        throw new Exception(
+            "execution count mismatch");
+    }
+
+    if (
+        result.spawned !=
+        TotalTasks - 1)
+    {
+        throw new Exception(
+            "spawn count mismatch");
+    }
+
+    if (
+        atomicLoad!(
+            MemoryOrder.acq)(
+                completed) !=
+        TotalTasks)
+    {
+        throw new Exception(
+            "completed count mismatch");
+    }
+
+    if (
+        atomicLoad!(
+            MemoryOrder.acq)(
+                outstanding) !=
+        0)
+    {
+        throw new Exception(
+            "outstanding count mismatch");
+    }
+
+    const n =
+        TotalTasks;
+
+    const expectedSum =
+        n * (n + 1) / 2;
+
+    if (
+        valueSum !=
+        expectedSum)
+    {
+        throw new Exception(
+            "value sum mismatch");
+    }
+
+    ulong expectedXor;
+
+    final switch (n & 3)
+    {
+        case 0:
+            expectedXor = n;
+            break;
+
+        case 1:
+            expectedXor = 1;
+            break;
+
+        case 2:
+            expectedXor = n + 1;
+            break;
+
+        case 3:
+            expectedXor = 0;
+            break;
+    }
+
+    if (
+        valueXor !=
+        expectedXor)
+    {
+        throw new Exception(
+            "value xor mismatch");
+    }
+
+    if (
+        workChecksum !=
+        expectedWorkChecksum())
+    {
+        throw new Exception(
+            "work checksum mismatch");
+    }
+
+    foreach (worker; 0 .. workerCount)
+    {
+        if (
+            !queues[
+                worker]
+            .emptySnapshot())
+        {
+            throw new Exception(
+                "queue not empty");
+        }
+    }
+
+    return result;
+}
+
+private Distribution distribution(
+    ulong[] values)
+{
+    values.sort();
+
+    return Distribution(
+        cast(double)
+            values[
+                values.length / 2],
+        cast(double)
+            values[
+                (values.length - 1) *
+                10 / 100],
+        cast(double)
+            values[
+                (values.length - 1) *
+                90 / 100]);
+}
+
+private string modeName(
+    StealMode mode)
+{
+    final switch (mode)
+    {
+        case StealMode.single:
+            return "single";
+
+        case StealMode.batch:
+            return "batch";
+    }
+}
+
+private void benchmark(
+    size_t workerCount,
+    StealMode mode)
+{
+    foreach (_; 0 .. Warmups)
+    {
+        run(
+            workerCount,
+            mode);
+    }
+
+    ulong[Samples]
+        elapsed;
+
+    ulong totalExecuted;
+    ulong totalLocalPops;
+
+    ulong totalStolen;
+    ulong totalClaims;
+    ulong totalFailedSteals;
+
+    ulong totalSpawned;
+    ulong totalOverflow;
+    ulong totalBusyRetries;
+
+    ulong minWorkerExecuted =
+        ulong.max;
+
+    ulong maxWorkerExecuted;
+
+    foreach (sample; 0 .. Samples)
+    {
+        const result =
+            run(
+                workerCount,
+                mode);
+
+        elapsed[sample] =
+            result.elapsedNs;
+
+        totalExecuted +=
+            result.executed;
+
+        totalLocalPops +=
+            result.localPops;
+
+        totalStolen +=
+            result.stolenTasks;
+
+        totalClaims +=
+            result.stealClaims;
+
+        totalFailedSteals +=
+            result.failedSteals;
+
+        totalSpawned +=
+            result.spawned;
+
+        totalOverflow +=
+            result.overflowInline;
+
+        totalBusyRetries +=
+            result.ownerBusyRetries;
+
+        if (
+            result.minWorkerExecuted <
+            minWorkerExecuted)
+        {
+            minWorkerExecuted =
+                result.minWorkerExecuted;
+        }
+
+        if (
+            result.maxWorkerExecuted >
+            maxWorkerExecuted)
+        {
+            maxWorkerExecuted =
+                result.maxWorkerExecuted;
+        }
+    }
+
+    const d =
+        distribution(
+            elapsed[]);
+
+    const double nsPerTask =
+        d.median /
+        TotalTasks;
+
+    const double tasksPerSecond =
+        cast(double)
+            TotalTasks *
+        1_000_000_000.0 /
+        d.median;
+
+    const double stolenPerClaim =
+        totalClaims != 0
+        ? cast(double)
+            totalStolen /
+            totalClaims
+        : 0.0;
+
+    const double localRatio =
+        cast(double)
+            totalLocalPops /
+        totalExecuted;
+
+    const double overflowPerTask =
+        cast(double)
+            totalOverflow /
+        totalExecuted;
+
+    writefln(
+        "%-6s workers=%s "
+        ~ "median=%8.3f ns/task "
+        ~ "p10/p90=%8.3f/%8.3f "
+        ~ "tasks/s=%10.1f",
+        modeName(mode),
+        workerCount,
+        nsPerTask,
+        d.p10 / TotalTasks,
+        d.p90 / TotalTasks,
+        tasksPerSecond);
+
+    writefln(
+        "       localRatio=%.3f "
+        ~ "claims=%s stolen/claim=%.3f "
+        ~ "failedSteals=%s",
+        localRatio,
+        totalClaims,
+        stolenPerClaim,
+        totalFailedSteals);
+
+    writefln(
+        "       spawned=%s overflow/task=%.6f "
+        ~ "ownerBusyRetries=%s",
+        totalSpawned,
+        overflowPerTask,
+        totalBusyRetries);
+
+    writefln(
+        "       workerExecutedRange=%s..%s",
+        minWorkerExecuted,
+        maxWorkerExecuted);
+}
+
+void main()
+{
+    writeln(
+        "R0.1 P14f recursive inline diagnostic");
+
+    writefln(
+        "depth=%s totalTasks=%s work=%s "
+        ~ "capacity=%s batch=%s "
+        ~ "warmups=%s samples=%s",
+        MaxDepth,
+        TotalTasks,
+        WorkRounds,
+        Capacity,
+        BatchSize,
+        Warmups,
+        Samples);
+
+    foreach (
+        workers;
+        [1, 2, 4])
+    {
+        benchmark(
+            workers,
+            StealMode.single);
+
+        benchmark(
+            workers,
+            StealMode.batch);
+    }
+
+    writeln();
+
+    writeln(
+        "R0.1 P14f PASS");
+}
