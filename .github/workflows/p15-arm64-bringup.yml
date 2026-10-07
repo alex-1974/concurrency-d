@@ -1,0 +1,68 @@
+name: P15 ARM64 Bring-up
+
+on:
+  workflow_dispatch:
+
+jobs:
+  arm64-bringup:
+    runs-on: ubuntu-24.04-arm
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Host information
+        run: |
+          echo '=== UNAME ==='
+          uname -a
+          uname -m
+
+          echo
+          echo '=== CPU ==='
+          lscpu
+
+          echo
+          echo '=== OS ==='
+          cat /etc/os-release
+
+      - name: Verify native ARM64
+        run: |
+          ARCH="$(uname -m)"
+          echo "architecture=$ARCH"
+
+          if [ "$ARCH" != "aarch64" ] && [ "$ARCH" != "arm64" ]; then
+            echo "ERROR: expected native ARM64 runner"
+            false
+          fi
+
+      - name: Install LDC 1.41.0
+        run: |
+          curl -fsS \
+            https://dlang.org/install.sh \
+            -o /tmp/install-dlang.sh
+
+          bash /tmp/install-dlang.sh \
+            install ldc-1.41.0
+
+          echo "$HOME/dlang/ldc-1.41.0/bin" >> "$GITHUB_PATH"
+
+      - name: Toolchain
+        run: |
+          ldc2 --version
+          dub --version
+
+      - name: Candidate compile smoke
+        working-directory: research/r0_1_work_stealing_deque/probes/p14c_irregular_bursty
+        run: |
+          dub build \
+            --compiler=ldc2 \
+            --build=release \
+            --force
+
+      - name: Candidate runtime smoke
+        working-directory: research/r0_1_work_stealing_deque/probes/p14c_irregular_bursty
+        run: |
+          dub run \
+            --compiler=ldc2 \
+            --build=release \
+            --force
