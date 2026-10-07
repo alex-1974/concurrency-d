@@ -1,0 +1,7 @@
+name "r0-1-p14c-irregular-bursty"
+description "R0.1 P14c deterministic irregular bursty scheduler workload"
+targetType "executable"
+
+sourcePaths "source" "../../candidate/source"
+
+versions "ConcurrencyResearchProbe"
