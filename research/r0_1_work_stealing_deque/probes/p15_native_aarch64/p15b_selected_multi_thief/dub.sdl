@@ -1,0 +1,6 @@
+name "r0-1-p15b-selected-multi-thief"
+description "P15 native AArch64 selected P08e multi-thief accounting"
+targetType "executable"
+
+sourcePaths "source" "../../../candidate/source"
+versions "ConcurrencyResearchProbe"
