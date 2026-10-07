@@ -5,10 +5,11 @@ import concurrency.research.modular_bounded_wsq_batch_marked_top :
 
 import core.atomic :
     MemoryOrder,
-    atomicFetchAdd,
-    atomicLoad;
+    atomicLoad,
+    atomicStore;
 
-import core.thread : Thread;
+import core.thread :
+    Thread;
 
 import std.stdio :
     writefln,
@@ -26,12 +27,20 @@ alias Queue =
         size_t,
         LogSize);
 
-private shared ulong stolenCount;
-private shared ulong stolenSum;
-private shared ulong stolenXor;
+final class ThiefState
+{
+    size_t[] values;
+
+    void record(
+        size_t value)
+    {
+        values ~= value;
+    }
+}
 
 private Thread makeThief(
     size_t id,
+    ThiefState state,
     Queue* queue,
     shared bool* start,
     shared bool* done)
@@ -52,22 +61,9 @@ private Thread makeThief(
 
             if (result.found)
             {
-                atomicFetchAdd!(
-                    MemoryOrder.rel)(
-                        stolenCount,
-                        1);
+                state.record(
+                    result.value);
 
-                atomicFetchAdd!(
-                    MemoryOrder.rel)(
-                        stolenSum,
-                        cast(ulong)
-                            result.value);
-
-                /*
-                 * XOR via a CAS loop is avoided here: every value is also
-                 * validated through exact count/sum plus final owner drain.
-                 * Per-thief xor is local and folded after join.
-                 */
                 continue;
             }
 
@@ -87,50 +83,51 @@ private Thread makeThief(
 
 void main()
 {
-    ulong expectedTotalCount;
-    ulong expectedTotalSum;
+    ulong totalOwner;
+    ulong totalStolen;
 
     foreach (round; 0 .. Rounds)
     {
         Queue queue;
 
-        foreach (i; 0 .. Capacity)
-        {
-            const value =
-                round * Capacity +
-                i + 1;
+        const first =
+            round * Capacity +
+            1;
 
-            if (!queue.tryPush(value))
+        const last =
+            (round + 1) *
+            Capacity;
+
+        foreach (value; first .. last + 1)
+        {
+            if (
+                !queue.tryPush(
+                    value))
             {
                 throw new Exception(
                     "fill failed");
             }
-
-            ++expectedTotalCount;
-            expectedTotalSum +=
-                value;
         }
 
         shared bool start;
         shared bool done;
 
+        ThiefState[Thieves] states;
         Thread[Thieves] threads;
-
-        const beforeCount =
-            atomicLoad!(
-                MemoryOrder.acq)(
-                    stolenCount);
-
-        const beforeSum =
-            atomicLoad!(
-                MemoryOrder.acq)(
-                    stolenSum);
 
         foreach (id; 0 .. Thieves)
         {
+            states[id] =
+                new ThiefState;
+
+            states[id].values.reserve(
+                Capacity / Thieves +
+                64);
+
             threads[id] =
                 makeThief(
                     id,
+                    states[id],
                     &queue,
                     &start,
                     &done);
@@ -138,16 +135,14 @@ void main()
             threads[id].start();
         }
 
-        import core.atomic :
-            atomicStore;
-
         atomicStore!(
             MemoryOrder.rel)(
                 start,
                 true);
 
-        ulong ownerCount;
-        ulong ownerSum;
+        size_t[] ownerValues;
+        ownerValues.reserve(
+            Capacity);
 
         for (;;)
         {
@@ -157,8 +152,7 @@ void main()
             if (!result.found)
                 break;
 
-            ++ownerCount;
-            ownerSum +=
+            ownerValues ~=
                 result.value;
         }
 
@@ -170,103 +164,105 @@ void main()
         foreach (thread; threads)
             thread.join();
 
-        const afterCount =
-            atomicLoad!(
-                MemoryOrder.acq)(
-                    stolenCount);
+        bool[Capacity] seen;
+        size_t roundOwner;
+        size_t roundStolen;
 
-        const afterSum =
-            atomicLoad!(
-                MemoryOrder.acq)(
-                    stolenSum);
+        foreach (value; ownerValues)
+        {
+            if (
+                value < first ||
+                value > last)
+            {
+                throw new Exception(
+                    "owner value out of range");
+            }
 
-        const roundStolenCount =
-            afterCount -
-            beforeCount;
+            const index =
+                value - first;
 
-        const roundStolenSum =
-            afterSum -
-            beforeSum;
+            if (seen[index])
+            {
+                throw new Exception(
+                    "duplicate owner value");
+            }
+
+            seen[index] = true;
+            ++roundOwner;
+        }
+
+        foreach (state; states)
+        {
+            foreach (value; state.values)
+            {
+                if (
+                    value < first ||
+                    value > last)
+                {
+                    throw new Exception(
+                        "stolen value out of range");
+                }
+
+                const index =
+                    value - first;
+
+                if (seen[index])
+                {
+                    throw new Exception(
+                        "duplicate stolen value");
+                }
+
+                seen[index] = true;
+                ++roundStolen;
+            }
+        }
 
         if (
-            ownerCount +
-            roundStolenCount !=
+            roundOwner +
+            roundStolen !=
             Capacity)
         {
             throw new Exception(
                 "round count mismatch");
         }
 
-        const first =
-            cast(ulong)
-                round * Capacity +
-                1;
-
-        const last =
-            cast(ulong)
-                (round + 1) *
-                Capacity;
-
-        const expectedRoundSum =
-            (first + last) *
-            Capacity /
-            2;
-
-        if (
-            ownerSum +
-            roundStolenSum !=
-            expectedRoundSum)
+        foreach (present; seen)
         {
-            throw new Exception(
-                "round sum mismatch");
+            if (!present)
+            {
+                throw new Exception(
+                    "missing value");
+            }
         }
 
-        if (!queue.emptySnapshot())
+        if (
+            !queue.emptySnapshot())
         {
             throw new Exception(
                 "queue not empty");
         }
+
+        totalOwner +=
+            roundOwner;
+
+        totalStolen +=
+            roundStolen;
     }
 
-    const finalCount =
-        atomicLoad!(
-            MemoryOrder.acq)(
-                stolenCount);
-
-    const finalSum =
-        atomicLoad!(
-            MemoryOrder.acq)(
-                stolenSum);
-
-    if (finalCount == 0)
+    if (totalStolen == 0)
     {
         throw new Exception(
             "no thief progress");
     }
 
-    if (
-        finalCount >
-        expectedTotalCount)
-    {
-        throw new Exception(
-            "stolen count overflow");
-    }
-
-    if (
-        finalSum >
-        expectedTotalSum)
-    {
-        throw new Exception(
-            "stolen sum overflow");
-    }
-
     writefln(
-        "rounds=%s capacity=%s thieves=%s stolen=%s",
+        "rounds=%s capacity=%s thieves=%s owner=%s stolen=%s",
         Rounds,
         Capacity,
         Thieves,
-        finalCount);
+        totalOwner,
+        totalStolen);
 
     writeln(
-        "R0.1 P15b PASS: selected P08e multi-thief accounting");
+        "R0.1 P15b PASS: selected P08e multi-thief exact accounting");
 }
