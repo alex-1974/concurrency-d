@@ -1,0 +1,7 @@
+name "r0-1-p14h-irregular-cold-overflow"
+description "R0.1 P14h irregular workload with cold overflow helper"
+targetType "executable"
+
+sourcePaths "source" "../../candidate/source"
+
+versions "ConcurrencyResearchProbe"
