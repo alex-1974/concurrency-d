@@ -1,4 +1,4 @@
-name: P15 ARM64 Bring-up
+name: P15 Native ARM64 Qualification
 
 on:
   push:
@@ -7,12 +7,15 @@ on:
     paths:
       - ".github/workflows/p15-arm64-bringup.yml"
       - "research/r0_1_work_stealing_deque/probes/p15_native_aarch64/**"
+      - "research/r0_1_work_stealing_deque/probes/p08e0_marked_top_batch/**"
+      - "research/r0_1_work_stealing_deque/probes/p08e1_marked_top_concurrency/**"
+      - "research/r0_1_work_stealing_deque/probes/p13b_distributed_production/**"
       - "research/r0_1_work_stealing_deque/probes/p14c_irregular_bursty/**"
       - "research/r0_1_work_stealing_deque/candidate/**"
   workflow_dispatch:
 
 jobs:
-  arm64-bringup:
+  native-arm64:
     runs-on: ubuntu-24.04-arm
 
     steps:
@@ -21,6 +24,10 @@ jobs:
 
       - name: Host information
         run: |
+          echo '=== COMMIT ==='
+          git rev-parse HEAD
+
+          echo
           echo '=== UNAME ==='
           uname -a
           uname -m
@@ -59,15 +66,47 @@ jobs:
           ldc2 --version
           dub --version
 
-      - name: Candidate compile smoke
-        working-directory: research/r0_1_work_stealing_deque/probes/p14c_irregular_bursty
+      - name: Core correctness
+        working-directory: research/r0_1_work_stealing_deque/probes/p08e0_marked_top_batch
         run: |
-          dub build \
+          dub run \
             --compiler=ldc2 \
             --build=release \
             --force
 
-      - name: Candidate runtime smoke
+      - name: Last-item race
+        working-directory: research/r0_1_work_stealing_deque/probes/p15_native_aarch64/p15a_selected_last_item
+        run: |
+          dub run \
+            --compiler=ldc2 \
+            --build=release \
+            --force
+
+      - name: Multi-thief accounting
+        working-directory: research/r0_1_work_stealing_deque/probes/p15_native_aarch64/p15b_selected_multi_thief
+        run: |
+          dub run \
+            --compiler=ldc2 \
+            --build=release \
+            --force
+
+      - name: Marked-top batch overlap
+        working-directory: research/r0_1_work_stealing_deque/probes/p08e1_marked_top_concurrency
+        run: |
+          dub run \
+            --compiler=ldc2 \
+            --build=release \
+            --force
+
+      - name: Scheduler-like qualification
+        working-directory: research/r0_1_work_stealing_deque/probes/p13b_distributed_production
+        run: |
+          dub run \
+            --compiler=ldc2 \
+            --build=release \
+            --force
+
+      - name: End-to-end scheduler workload
         working-directory: research/r0_1_work_stealing_deque/probes/p14c_irregular_bursty
         run: |
           dub run \
