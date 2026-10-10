@@ -171,6 +171,8 @@ void main(string[] args)
     size_t tasks = 1024;
     size_t rounds = 1;
     string scenario = "scalar";
+    string policyFilter = "both";
+    size_t budgetFilter;
 
     if (args.length > 1)
         workers = to!size_t(args[1]);
@@ -180,6 +182,10 @@ void main(string[] args)
         rounds = to!size_t(args[3]);
     if (args.length > 4)
         scenario = args[4];
+    if (args.length > 5)
+        policyFilter = args[5];
+    if (args.length > 6)
+        budgetFilter = to!size_t(args[6]);
 
     if (workers == 0 || workers > 64 ||
         tasks == 0 || tasks > 2_000_000 ||
@@ -189,6 +195,15 @@ void main(string[] args)
     if (scenario != "scalar" && scenario != "wide" &&
         scenario != "void" && scenario != "all")
         throw new Exception("scenario must be scalar/wide/void/all");
+
+    if (policyFilter != "gc" && policyFilter != "recycle" &&
+        policyFilter != "both")
+        throw new Exception("policy must be gc/recycle/both");
+
+    if (budgetFilter != 0 && budgetFilter != 8 &&
+        budgetFilter != 64 && budgetFilter != 512 &&
+        budgetFilter != 4096)
+        throw new Exception("budget must be 0/8/64/512/4096");
 
     // One process, paired policies and alternating order across rounds.
     // Budget 8 intentionally exercises constrained reclaim/pressure;
@@ -206,11 +221,18 @@ void main(string[] args)
     {
         foreach (budget; budgets[])
         {
+            if (budgetFilter != 0 && budget != budgetFilter)
+                continue;
+
             foreach (variant; 0 .. 2)
             {
                 const policy = ((variant + round) % 2) == 0
                     ? OwnedRecordPolicy.freshGc
                     : OwnedRecordPolicy.recycleTyped;
+
+                if (policyFilter != "both" &&
+                    policyName(policy) != policyFilter)
+                    continue;
 
                 if (scenario == "scalar" || scenario == "all")
                     runCase!ScalarWork("scalar", workers, tasks,
