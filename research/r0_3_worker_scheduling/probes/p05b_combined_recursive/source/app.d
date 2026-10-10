@@ -99,7 +99,10 @@ struct WorkerStats
 
     ulong spawned;
     ulong overflowInline;
-    ulong directContinuations;
+    version (AArch64)
+    {
+        ulong directContinuations;
+    }
 
     ulong valueSum;
     ulong valueXor;
@@ -119,7 +122,10 @@ struct RunResult
 
     ulong spawned;
     ulong overflowInline;
-    ulong directContinuations;
+    version (AArch64)
+    {
+        ulong directContinuations;
+    }
 
     ulong minWorkerExecuted;
     ulong maxWorkerExecuted;
@@ -380,10 +386,11 @@ private void executeOverflowInline(
  * This function itself is deliberately non-recursive. Overflow retains the
  * selected P12 execute-inline semantics through executeOverflowInline.
  */
+version (AArch64)
+{
 private void executeTask(
     TaskRef initialTask,
     size_t workerIndex,
-    size_t workerCount,
     Queue[] queues,
     ref WorkerStats stats,
     shared long* outstanding,
@@ -434,29 +441,11 @@ private void executeTask(
                     (id << 1) | 1,
                     records);
 
-            /*
-             * Native AArch64 benefits strongly from keeping one continuation
-             * local after enough scheduler-visible work exists.
-             *
-             * Hosted and local x86_64 evidence does not support the same
-             * generic fast path, so retain enqueue-all there.
-             *
-             * This is compile-time specialization; there is no runtime
-             * architecture branch in the worker hot path.
-             */
-            version (AArch64)
-            {
-                const useDirect =
-                    atomicLoad!(
-                        MemoryOrder.raw)(
-                            *outstanding) >=
-                    cast(long) workerCount;
-            }
-            else
-            {
-                enum useDirect =
-                    false;
-            }
+            const useDirect =
+                atomicLoad!(
+                    MemoryOrder.raw)(
+                        *outstanding) >=
+                cast(long) queues.length;
 
             if (useDirect)
             {
@@ -548,6 +537,100 @@ private void executeTask(
             direct;
     }
 }
+}
+else
+{
+private void executeTask(
+    TaskRef task,
+    size_t workerIndex,
+    Queue[] queues,
+    ref WorkerStats stats,
+    shared long* outstanding,
+    shared ulong* completed,
+    shared TaskRecord* records)
+{
+    const id =
+        taskId(task);
+
+    const depth =
+        taskDepth(task);
+
+    ++stats.executed;
+
+    stats.valueSum +=
+        id;
+
+    stats.valueXor ^=
+        id;
+
+    stats.workChecksum ^=
+        executeWork(task);
+
+    if (depth < MaxDepth)
+    {
+        atomicFetchAdd!(
+            MemoryOrder.rel)(
+                *outstanding,
+                cast(long) 2);
+
+        stats.spawned += 2;
+
+        auto left =
+            makeTask(
+                id << 1,
+                records);
+
+        auto right =
+            makeTask(
+                (id << 1) | 1,
+                records);
+
+        if (
+            !queues[
+                workerIndex]
+            .tryPush(left))
+        {
+            ++stats.overflowInline;
+
+            executeOverflowInline(
+                left,
+                workerIndex,
+                queues,
+                stats,
+                outstanding,
+                completed,
+                records);
+        }
+
+        if (
+            !queues[
+                workerIndex]
+            .tryPush(right))
+        {
+            ++stats.overflowInline;
+
+            executeOverflowInline(
+                right,
+                workerIndex,
+                queues,
+                stats,
+                outstanding,
+                completed,
+                records);
+        }
+    }
+
+    atomicFetchAdd!(
+        MemoryOrder.rel)(
+            *completed,
+            1);
+
+    atomicFetchAdd!(
+        MemoryOrder.rel)(
+            *outstanding,
+            cast(long) -1);
+}
+}
 
 private Thread makeWorker(
     size_t workerIndex,
@@ -633,7 +716,6 @@ private Thread makeWorker(
                 executeTask(
                     local.value,
                     workerIndex,
-                    workerCount,
                     queues,
                     stats,
                     outstanding,
@@ -686,7 +768,6 @@ private Thread makeWorker(
                             executeTask(
                                 stolen.value,
                                 workerIndex,
-                                workerCount,
                                 queues,
                                 stats,
                                 outstanding,
@@ -725,7 +806,6 @@ private Thread makeWorker(
                             executeTask(
                                 batch[0],
                                 workerIndex,
-                                workerCount,
                                 queues,
                                 stats,
                                 outstanding,
@@ -751,7 +831,6 @@ private Thread makeWorker(
                                 executeTask(
                                     task,
                                     workerIndex,
-                                    workerCount,
                                     queues,
                                     stats,
                                     outstanding,
@@ -923,8 +1002,11 @@ private RunResult run(
         result.overflowInline +=
             stats.overflowInline;
 
-        result.directContinuations +=
-            stats.directContinuations;
+        version (AArch64)
+        {
+            result.directContinuations +=
+                stats.directContinuations;
+        }
 
         valueSum +=
             stats.valueSum;
@@ -1097,7 +1179,10 @@ private void benchmark(
 
     ulong totalSpawned;
     ulong totalOverflow;
-    ulong totalDirectContinuations;
+    version (AArch64)
+    {
+        ulong totalDirectContinuations;
+    }
 
     ulong minWorkerExecuted =
         ulong.max;
@@ -1135,8 +1220,11 @@ private void benchmark(
         totalOverflow +=
             result.overflowInline;
 
-        totalDirectContinuations +=
-            result.directContinuations;
+        version (AArch64)
+        {
+            totalDirectContinuations +=
+                result.directContinuations;
+        }
 
         if (
             result.minWorkerExecuted <
@@ -1207,12 +1295,22 @@ private void benchmark(
         stolenPerClaim,
         totalFailedSteals);
 
-    writefln(
-        "       spawned=%s overflow/task=%.6f "
-        ~ "directContinuations=%s",
-        totalSpawned,
-        overflowPerTask,
-        totalDirectContinuations);
+    version (AArch64)
+    {
+        writefln(
+            "       spawned=%s overflow/task=%.6f "
+            ~ "directContinuations=%s",
+            totalSpawned,
+            overflowPerTask,
+            totalDirectContinuations);
+    }
+    else
+    {
+        writefln(
+            "       spawned=%s overflow/task=%.6f",
+            totalSpawned,
+            overflowPerTask);
+    }
 
     writefln(
         "       workerExecutedRange=%s..%s",
