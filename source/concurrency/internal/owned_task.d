@@ -641,27 +641,84 @@ unittest
 
 unittest
 {
-    // Retention capacity is explicit rather than growing without bound.
+    // Retention capacity is a *concurrent* budget, not a lifetime counter.
+    // A record must never be reclaimed while its worker is still in it.
+    import core.atomic : MemoryOrder, atomicStore;
+    import core.time : MonoTime, dur;
+
+    shared bool entered;
+    shared bool release;
+
+    GatedTask gate;
+    gate.entered = &entered;
+    gate.release = &release;
+
     auto executor = new OwnedTaskExecutor(1, 1, 1);
-    auto first = executor.submit(&addTwo);
+    auto first = executor.submit(gate);
+    waitForFlag(&entered);
 
-    bool capacityRejected;
-    try
+    assert(executor.retainedCount() == 1);
+    assert(executor.trySubmit(&addTwo) is null);
+    assert(executor.reclaimCompleted() == 1);
+
+    atomicStore!(MemoryOrder.rel)(release, true);
+    assert(first.get() == 17);
+
+    // Result publication happens before the post-dispatch marker: allow
+    // the worker to leave the thunk before expecting a reclaimed slot.
+    const deadline = MonoTime.currTime + dur!"seconds"(10);
+    TaskHandle!int second;
+    while (second is null)
     {
-        executor.submit(&addTwo);
-    }
-    catch (Exception error)
-    {
-        capacityRejected =
-            error.msg == "retained task capacity exhausted";
+        assert(MonoTime.currTime < deadline,
+            "completed task was never made reclaimable");
+        second = executor.trySubmit(&addTwo);
+        if (second is null)
+            Thread.yield();
     }
 
-    assert(capacityRejected);
-    assert(first.get() == 42);
+    assert(second.get() == 42);
+    assert(executor.retainedCount() <= 1);
 
     executor.closeAndJoin();
-    assert(executor.acceptedCount() == 1);
-    assert(executor.completedCount() == 1);
+    assert(executor.retainedCount() == 0);
+    assert(executor.acceptedCount() == 2);
+    assert(executor.completedCount() == 2);
+}
+
+unittest
+{
+    // Several thousand tasks can pass through a tiny bounded retention
+    // budget without a permanent "capacity exhausted" state.
+    enum size_t Tasks = 2048;
+
+    foreach (workers; [1, 4])
+    {
+        auto executor = new OwnedTaskExecutor(workers, 3, 8);
+        size_t results;
+
+        foreach (i; 0 .. Tasks)
+        {
+            auto h = executor.submit(&addTwo);
+            if ((i % 7) == 0)
+            {
+                assert(h.get() == 42);
+                ++results;
+            }
+            // Other handles are deliberately dropped. The worker and
+            // retained record still guarantee exactly one completion.
+        }
+
+        executor.closeAndJoin();
+
+        assert(executor.acceptedCount() == Tasks);
+        assert(executor.completedCount() == Tasks);
+        assert(executor.retainedCount() == 0);
+        assert(results > 0);
+
+        // A handle obtained before reclamation remains independently
+        // usable because it owns a separate result cell.
+    }
 }
 
 unittest
