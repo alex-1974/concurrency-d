@@ -1,6 +1,6 @@
 # R0.4 P01 — Portable parking baseline in the M0 submission pool
 
-Status: **candidate, pending CI and targeted stress qualification**.
+Status: **portable P01 implementation candidate**; compiler tests qualified, native wake-latency and idle-CPU measurements outstanding.
 Tracking: [#10](https://github.com/alex-1974/concurrency-d/issues/10).
 
 ## Wait-state model
@@ -17,8 +17,9 @@ truth. The actual predicate consists of:
 - `closed`: rejects new tasks;
 - `accepted/completed`: tracks in-flight obligations even after claims.
 
-A worker snapshots `generation` *before* its normal local-pop,
-inbox-batch and round-robin-steal search. If search fails and shutdown
+A worker first attempts its owner-local pop without touching the inbox mutex.
+If local work is unavailable, it snapshots `generation` *before* the
+external inbox-batch and round-robin-steal search. If search fails and shutdown
 has not drained the pool, it acquires the mutex and waits only while:
 
 ```text
@@ -55,7 +56,7 @@ zero-spin parking is optimal for throughput or wake latency.
 - Repeated idle -> isolated task -> idle transitions.
 - Shutdown while workers are parked.
 - Submit/close racing; exactly once for accepted tasks.
-- DMD 2.111, LDC 1.41 and native ARM64 CI.
+- DMD 2.111, LDC 1.41 and native ARM64 CI (record exact run for final revision).
 
 ## Deferred
 
