@@ -288,9 +288,7 @@ package(concurrency) final class OwnedTaskExecutor
     auto trySubmit(F)(F callable) @system
     {
         alias R = ReturnType!F;
-        auto cell = new ResultCell!R();
-        auto handle = new TaskHandle!R(cell);
-        auto node = new OwnedNode!(F, R)(callable, cell);
+        TaskHandle!R handle;
 
         synchronized (_mutex)
         {
@@ -305,8 +303,18 @@ package(concurrency) final class OwnedTaskExecutor
                 reapCompletedUnderLock();
 
                 if (_retained.length >= _maxRetained)
-                    return typeof(handle).init;
+                    return TaskHandle!R.init;
             }
+
+            // All owned producers serialize on _mutex. Only workers can
+            // remove ingress slots, so a positive capacity check remains
+            // valid until publication. Backpressure needs no allocations.
+            if (!_pool.hasIngressCapacity())
+                return TaskHandle!R.init;
+
+            auto cell = new ResultCell!R();
+            handle = new TaskHandle!R(cell);
+            auto node = new OwnedNode!(F, R)(callable, cell);
 
             // Install the strong GC root before any worker can claim the
             // record. If admission fails, clear the tail GC slot too.
