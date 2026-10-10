@@ -187,6 +187,17 @@ private final class OwnedNode(F, R)
         atomicStore!(MemoryOrder.raw)(_record.prefix.returned, 0u);
     }
 
+    // Only call after the previous dispatch's post-return release marker
+    // became visible to the producer with acquire ordering. The previous
+    // TaskHandle owns its distinct ResultCell and remains independently valid.
+    void rearm(F callable, ResultCell!R cell)
+    {
+        _record.callable = callable;
+        _record.cell = cell;
+        _record.prefix.header.execute = &execute;
+        atomicStore!(MemoryOrder.raw)(_record.prefix.returned, 0u);
+    }
+
     TaskRef reference()
     {
         return TaskRef(cast(shared(TaskHeader)*) &_record.prefix.header);
@@ -242,6 +253,12 @@ private final class OwnedNode(F, R)
  * retaining all accepted nodes until join is deliberate and explicitly
  * bounded; a future pool should reclaim completed nodes incrementally.
  */
+package(concurrency) enum OwnedRecordPolicy
+{
+    freshGc,
+    recycleTyped
+}
+
 package(concurrency) final class OwnedTaskExecutor
 {
     private enum Lifecycle : ubyte
@@ -255,14 +272,22 @@ package(concurrency) final class OwnedTaskExecutor
     private Mutex _mutex;
     private Condition _lifecycleChanged;
     private RetainedTask[] _retained;
+    private RetainedTask[] _spare;
     private size_t _maxRetained;
+    private OwnedRecordPolicy _recordPolicy;
+    private size_t _freshNodes;
+    private size_t _reusedNodes;
 
     // _mutex serializes admission against shutdown. Exactly one caller
     // performs the worker join; other closers wait for the same outcome.
     private Lifecycle _lifecycle;
     private Throwable _shutdownFailure;
 
-    this(size_t workers, size_t ingressCapacity, size_t maxRetained = 4096)
+    this(
+        size_t workers,
+        size_t ingressCapacity,
+        size_t maxRetained = 4096,
+        OwnedRecordPolicy policy = OwnedRecordPolicy.freshGc)
     {
         if (maxRetained == 0)
             throw new Exception("maxRetained must be positive");
@@ -273,6 +298,7 @@ package(concurrency) final class OwnedTaskExecutor
         _lifecycleChanged = new Condition(_mutex);
         _lifecycle = Lifecycle.running;
         _maxRetained = maxRetained;
+        _recordPolicy = policy;
     }
 
     /**
@@ -290,7 +316,6 @@ package(concurrency) final class OwnedTaskExecutor
         alias R = ReturnType!F;
         auto cell = new ResultCell!R();
         auto handle = new TaskHandle!R(cell);
-        auto node = new OwnedNode!(F, R)(callable, cell);
 
         synchronized (_mutex)
         {
@@ -308,6 +333,33 @@ package(concurrency) final class OwnedTaskExecutor
                     return typeof(handle).init;
             }
 
+            OwnedNode!(F, R) node;
+            if (_recordPolicy == OwnedRecordPolicy.recycleTyped)
+            {
+                // Exact type-match is essential: a node can be rearmed only
+                // for the identical concrete F/R layout. Different closure
+                // shapes use independent nodes and cannot alias old handles.
+                foreach (i; 0 .. _spare.length)
+                {
+                    node = cast(OwnedNode!(F, R)) _spare[i].node;
+                    if (node !is null)
+                    {
+                        _spare[i] = _spare[$ - 1];
+                        _spare[$ - 1] = RetainedTask.init;
+                        _spare.length = _spare.length - 1;
+                        node.rearm(callable, cell);
+                        ++_reusedNodes;
+                        break;
+                    }
+                }
+            }
+
+            if (node is null)
+            {
+                node = new OwnedNode!(F, R)(callable, cell);
+                ++_freshNodes;
+            }
+
             // Install the strong GC root before any worker can claim the
             // record. If admission fails, clear the tail GC slot too.
             _retained ~= RetainedTask(node, node.returnedFlag());
@@ -317,6 +369,12 @@ package(concurrency) final class OwnedTaskExecutor
             {
                 _retained[$ - 1] = RetainedTask.init;
                 _retained.length = _retained.length - 1;
+
+                if (_recordPolicy == OwnedRecordPolicy.recycleTyped &&
+                    _spare.length < _maxRetained)
+                {
+                    _spare ~= RetainedTask(node, node.returnedFlag());
+                }
 
                 if (status == SubmissionResult.closed)
                     throw new Exception("executor is closed");
@@ -347,6 +405,14 @@ package(concurrency) final class OwnedTaskExecutor
                 continue;
             }
 
+            if (_recordPolicy == OwnedRecordPolicy.recycleTyped &&
+                _spare.length < _maxRetained)
+            {
+                // Keep a strong root in the typed spare cache. The old
+                // consumer handle continues to own its own result cell.
+                _spare ~= _retained[i];
+            }
+
             _retained[i] = _retained[$ - 1];
             _retained[$ - 1] = RetainedTask.init;
             _retained.length = _retained.length - 1;
@@ -371,6 +437,27 @@ package(concurrency) final class OwnedTaskExecutor
     {
         synchronized (_mutex)
             return _retained.length;
+    }
+
+    /** Number of concrete node allocations made by the executor. */
+    size_t freshNodeCount()
+    {
+        synchronized (_mutex)
+            return _freshNodes;
+    }
+
+    /** Number of times a previously completed typed node was rearmed. */
+    size_t reusedNodeCount()
+    {
+        synchronized (_mutex)
+            return _reusedNodes;
+    }
+
+    /** Strongly retained spare nodes, distinct from in-flight records. */
+    size_t spareCount()
+    {
+        synchronized (_mutex)
+            return _spare.length;
     }
 
     /** Retry while ingress or the in-flight record budget is full. */
@@ -443,6 +530,9 @@ package(concurrency) final class OwnedTaskExecutor
                 foreach (ref entry; _retained)
                     entry = RetainedTask.init;
                 _retained.length = 0;
+                foreach (ref entry; _spare)
+                    entry = RetainedTask.init;
+                _spare.length = 0;
             }
 
             _shutdownFailure = failure;
