@@ -174,28 +174,90 @@ work rather than queue snapshots, because concurrent queue size/empty
 snapshots are stale by construction and not part of the production
 containers-d API.
 
-## Decision
+## Stability follow-up
 
-Select for R0.3 P05:
+The first saturation-gated candidate passed the focused P04 comparison on both
+architectures, but the first combined P05 run exposed a hosted-x86_64
+irregular regression:
 
 ```text
-continuation policy:
-    saturation-gated direct-one
-
-gate:
-    use direct continuation only when
-    scheduler-visible outstanding work >= worker count
-
-execution:
-    iterative local continuation
-    siblings published to local deque
-
-overflow:
-    retain P12 execute-inline fallback
+single irregular candidate / baseline = 1.1276x
 ```
 
-Unconditional direct-one remains retained negative/architecture-specific
-evidence.
+The same source had previously measured faster than baseline.
+
+That run-to-run disagreement is retained as evidence that a generic global
+`outstanding >= workerCount` continuation decision is not stable enough to
+select across architectures.
+
+A second generic experiment increased the continuation headroom to:
+
+```text
+outstanding >= 4 * workerCount
+```
+
+Native AArch64 remained strongly favorable, but repeated hosted-x86_64
+qualification still failed:
+
+```text
+recursive batch / 4 workers = 1.1145x
+```
+
+Therefore changing the generic threshold does not remove the architecture
+disagreement.
+
+## Final P04 decision
+
+Select compile-time architecture specialization:
+
+```text
+AArch64:
+    saturation-gated direct-one
+    use direct continuation when
+    scheduler-visible outstanding work >= worker count
+
+other currently qualified targets:
+    enqueue-all
+```
+
+In D this is expressed with a compile-time `version (AArch64)` branch.
+
+There is no runtime architecture test in the worker hot path.
+
+### Why specialize
+
+The native AArch64 evidence is large and repeatable.
+
+Final P05 matched AArch64 ratios with the specialized candidate:
+
+```text
+recursive:
+  batch  1w 0.7581x
+  single 1w 0.7577x
+  batch  2w 0.8774x
+  single 2w 0.8813x
+  batch  4w 0.8177x
+  single 4w 0.7971x
+
+irregular:
+  single    0.7889x
+  batch     0.7917x
+```
+
+The x86_64 specialization deliberately retains enqueue-all and therefore
+returns to baseline-class performance:
+
+```text
+recursive:
+  0.9797x .. 1.0004x in the final matched run
+
+irregular:
+  single 0.9597x
+  batch  0.9573x
+```
+
+These small deviations are normal matched-run variation; no different x86
+continuation algorithm is selected.
 
 ## Combined policy entering P05
 
@@ -207,7 +269,10 @@ searching workers:
     all idle workers may search
 
 continuation:
-    saturation-gated direct-one
+    AArch64:
+        saturation-gated direct-one
+    other currently qualified targets:
+        enqueue-all
 
 steal width:
     single and batch remain explicit workload-dependent modes
