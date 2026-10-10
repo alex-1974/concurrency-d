@@ -8,6 +8,7 @@ on:
       - "source/concurrency/internal/**"
       - "benchmarks/task_pipeline/**"
       - "tools/research/r05_pipeline_matrix.py"
+      - "tools/research/r05_mixed_producer_matrix.py"
       - ".github/workflows/r05-storage-qualification.yml"
       - "dub.sdl"
   workflow_dispatch:
@@ -59,6 +60,18 @@ jobs:
             --scenarios scalar wide void \
             --budgets 8 64 512 4096 \
             --output="evidence/r05-ci/${{ matrix.label }}"
+
+      - name: Mixed callable multi-producer comparison (diagnostic only)
+        shell: bash
+        run: |
+          python3 tools/research/r05_mixed_producer_matrix.py \
+            --compiler="$DC" \
+            --workers=4 \
+            --tasks=3000 \
+            --rounds=2 \
+            --producers 1 4 \
+            --budgets 8 512 \
+            --output="evidence/r05-ci/${{ matrix.label }}/mixed"
 
       - name: Upload raw evidence and medians
         if: always()
