@@ -42,6 +42,42 @@ package(concurrency) TaskRef prepareScalar(T)(
     return TaskRef(&record.header);
 }
 
+/**
+ * Void operations need no result slot but still publish a completion flag.
+ * Arg is currently constrained by the atomic load/store capability used
+ * for published work data (e.g. shared pointer handles).
+ */
+package(concurrency) struct VoidTaskRecord(Arg)
+{
+    TaskHeader header;
+    alias WorkFn = void function(Arg) @safe @nogc nothrow;
+    WorkFn work;
+    Arg argument;
+    shared uint done;
+
+    static void invoke(shared(TaskHeader)* header)
+        @trusted @nogc nothrow
+    {
+        auto r = cast(shared(VoidTaskRecord!Arg)*) header;
+        const fn = atomicLoad!(MemoryOrder.raw)(r.work);
+        auto argument = atomicLoad!(MemoryOrder.raw)(r.argument);
+        fn(argument);
+        atomicStore!(MemoryOrder.rel)(r.done, 1u);
+    }
+}
+
+package(concurrency) TaskRef prepareVoid(Arg)(
+    shared(VoidTaskRecord!Arg)* record,
+    VoidTaskRecord!Arg.WorkFn work,
+    Arg input)
+{
+    record.header.execute = &VoidTaskRecord!Arg.invoke;
+    record.work = work;
+    record.argument = input;
+    record.done = 0u;
+    return TaskRef(&record.header);
+}
+
 version (unittest)
 {
     import concurrency.internal.submission_pool :
@@ -56,6 +92,12 @@ version (unittest)
     private long twice(long x) @safe @nogc nothrow
     {
         return x + x;
+    }
+
+    private void countOne(shared uint* counter) @safe @nogc nothrow
+    {
+        import core.atomic : atomicFetchAdd;
+        atomicFetchAdd!(MemoryOrder.rel)(*counter, 1u);
     }
 }
 
@@ -108,4 +150,38 @@ unittest
     pool.closeAndJoin();
     assert(atomicLoad!(MemoryOrder.acq)(record.done) == 1u);
     assert(atomicLoad!(MemoryOrder.raw)(record.output) == 42L);
+}
+
+unittest
+{
+    enum size_t N = 63;
+    shared uint counter;
+    auto records = new shared VoidTaskRecord!(shared(uint)*)[N];
+    auto pool = new SubmissionWorkerPool(2, 2);
+
+    foreach (i; 0 .. N)
+    {
+        TaskRef task = prepareVoid!(shared(uint)*)(
+            &records[i], &countOne, &counter);
+
+        for (;;)
+        {
+            auto status = pool.trySubmit(task);
+            if (status == SubmissionResult.accepted)
+                break;
+
+            assert(status == SubmissionResult.full);
+            Thread.yield();
+        }
+    }
+
+    pool.closeAndJoin();
+    assert(pool.acceptedCount() == N);
+    assert(pool.completedCount() == N);
+    assert(atomicLoad!(MemoryOrder.acq)(counter) == N);
+    foreach (i; 0 .. N)
+    {
+        assert(atomicLoad!(MemoryOrder.acq)(
+            records[i].done) == 1u);
+    }
 }
