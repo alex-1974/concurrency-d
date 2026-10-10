@@ -68,6 +68,12 @@ jobs:
         shell: bash
         run: dub run --config=task-pipeline-benchmark --build=release --compiler="$DC" --force -- 2 768 1 scalar
 
+      - name: R0.5 mixed multi-producer correctness smoke (no timing gate)
+        shell: bash
+        run: |
+          dub run --config=task-pipeline-mixed-benchmark --build=release --compiler="$DC" --force -- 4 4 384 8 gc
+          dub run --config=task-pipeline-mixed-benchmark --build=release --compiler="$DC" --force -- 4 4 384 8 recycle
+
   native-arm64:
     name: Consumer / native ARM64 / LDC 1.41
     runs-on: ubuntu-24.04-arm
@@ -106,3 +112,9 @@ jobs:
       - name: R0.5 paired storage diagnostic (not a performance gate)
         shell: bash
         run: dub run --config=task-pipeline-benchmark --build=release --compiler="$DC" --force -- 2 768 1 scalar
+
+      - name: R0.5 mixed multi-producer correctness smoke (no timing gate)
+        shell: bash
+        run: |
+          dub run --config=task-pipeline-mixed-benchmark --build=release --compiler="$DC" --force -- 4 4 384 8 gc
+          dub run --config=task-pipeline-mixed-benchmark --build=release --compiler="$DC" --force -- 4 4 384 8 recycle
