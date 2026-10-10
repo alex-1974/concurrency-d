@@ -151,8 +151,8 @@ private final class TaskInbox
     }
 
     /**
-     * Capture the wake generation BEFORE trying local pop, inbox drain and
-     * cross-worker steals. Publication can then race with search safely.
+     * Capture a generation BEFORE the external inbox/steal search.
+     * The uncontended owner-local pop is independent of this mutex.
      */
     size_t wakeGeneration()
     {
@@ -341,15 +341,18 @@ package(concurrency) final class SubmissionWorkerPool
 
         for (;;)
         {
-            // The ticket must precede the entire empty-work search.
-            const observed = _inbox.wakeGeneration();
-
+            // The local-owner fast path needs no inbox mutex or wake ticket.
+            // Only the owning worker can append to this deque.
             auto local = _queues[self].pop();
             if (local.found)
             {
                 executeOne(local.value);
                 continue;
             }
+
+            // Capture the ticket before checking external ingress and
+            // attempting steals. Publication after this point changes it.
+            const observed = _inbox.wakeGeneration();
 
             const taken = _inbox.takeBatch(batch[]);
             if (taken != 0)
