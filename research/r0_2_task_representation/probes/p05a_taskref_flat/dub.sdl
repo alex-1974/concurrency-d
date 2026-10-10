@@ -1,0 +1,7 @@
+name "r0-2-p05a-taskref-flat"
+description "R0.2 P05a TaskRef flat scheduler-neighborhood workload"
+targetType "executable"
+
+dependency "containers-d" version="0.2.0"
+
+sourcePaths "source"
