@@ -1270,7 +1270,7 @@ private void benchmark(
 
 void main()
 {
-    const graph =
+    auto graph =
         buildGraph();
 
     const expected =
