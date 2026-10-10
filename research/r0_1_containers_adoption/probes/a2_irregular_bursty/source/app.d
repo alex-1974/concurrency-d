@@ -33,7 +33,7 @@ import std.stdio :
 
 enum size_t Workers = 4;
 
-enum size_t Capacity = size_t(1) << LogSize;
+enum size_t Capacity = 1024;
 enum size_t BatchSize = 8;
 
 enum uint MaxDepth = 18;
