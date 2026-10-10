@@ -108,7 +108,7 @@ private Thread makeProducer(
         {
             const value = cast(int) taskId;
 
-            final switch (taskId % 3)
+            switch (taskId % 3)
             {
                 case 0:
                     SmallWork work;
@@ -153,6 +153,9 @@ private Thread makeProducer(
                         atomicFetchAdd!(MemoryOrder.rel)(*observed, 1UL);
                     }
                     break;
+
+                default:
+                    throw new Exception("unexpected task type");
             }
 
             atomicFetchAdd!(MemoryOrder.rel)(*admitted, 1UL);
