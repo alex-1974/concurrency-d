@@ -314,8 +314,7 @@ package(concurrency) final class OwnedTaskExecutor
     auto trySubmit(F)(F callable) @system
     {
         alias R = ReturnType!F;
-        auto cell = new ResultCell!R();
-        auto handle = new TaskHandle!R(cell);
+        TaskHandle!R handle;
 
         synchronized (_mutex)
         {
@@ -330,9 +329,18 @@ package(concurrency) final class OwnedTaskExecutor
                 reapCompletedUnderLock();
 
                 if (_retained.length >= _maxRetained)
-                    return typeof(handle).init;
+                    return TaskHandle!R.init;
             }
 
+            // Admission is serialized by this executor's mutex. Since
+            // workers can only remove inbox entries, a positive capacity
+            // check stays valid until trySubmit below. Avoid allocating
+            // the ResultCell and handle on every unsuccessful retry.
+            if (!_pool.hasIngressCapacity())
+                return TaskHandle!R.init;
+
+            auto cell = new ResultCell!R();
+            handle = new TaskHandle!R(cell);
             OwnedNode!(F, R) node;
             if (_recordPolicy == OwnedRecordPolicy.recycleTyped)
             {
