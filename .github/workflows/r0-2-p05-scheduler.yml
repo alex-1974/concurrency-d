@@ -1,0 +1,112 @@
+name: R0.2 P05 scheduler neighborhood
+
+on:
+  push:
+    branches:
+      - research/r0-2-task-representation
+    paths:
+      - ".github/workflows/r0-2-p05-scheduler.yml"
+      - "research/r0_2_task_representation/probes/p05a_taskref_flat/**"
+      - "research/r0_2_task_representation/probes/p05b_taskref_recursive/**"
+      - "research/r0_2_task_representation/probes/p05c_taskref_irregular/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  scheduler:
+    name: P05 / ${{ matrix.compiler }}
+    runs-on: ubuntu-24.04
+
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler:
+          - dmd-2.111.0
+          - ldc-1.41.0
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Install D
+        uses: dlang-community/setup-dlang@v2
+        with:
+          compiler: ${{ matrix.compiler }}
+          dub: 1.40.0
+
+      - name: P05a flat
+        shell: bash
+        run: |
+          dub run \
+            --root=research/r0_2_task_representation/probes/p05a_taskref_flat \
+            --compiler="$DC" \
+            --build=release \
+            --force
+
+      - name: P05b recursive
+        shell: bash
+        run: |
+          dub run \
+            --root=research/r0_2_task_representation/probes/p05b_taskref_recursive \
+            --compiler="$DC" \
+            --build=release \
+            --force
+
+      - name: P05c irregular
+        shell: bash
+        run: |
+          dub run \
+            --root=research/r0_2_task_representation/probes/p05c_taskref_irregular \
+            --compiler="$DC" \
+            --build=release \
+            --force
+
+  scheduler-arm64:
+    name: P05 / native ARM64 / LDC 1.41
+    runs-on: ubuntu-24.04-arm
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Install LDC
+        uses: dlang-community/setup-dlang@v2
+        with:
+          compiler: ldc-1.41.0
+
+      - name: Platform evidence
+        shell: bash
+        run: |
+          "$DC" --version
+          uname -m
+          lscpu
+          test "$(uname -m)" = "aarch64"
+
+      - name: P05a flat
+        shell: bash
+        run: |
+          dub run \
+            --root=research/r0_2_task_representation/probes/p05a_taskref_flat \
+            --compiler="$DC" \
+            --build=release \
+            --force
+
+      - name: P05b recursive
+        shell: bash
+        run: |
+          dub run \
+            --root=research/r0_2_task_representation/probes/p05b_taskref_recursive \
+            --compiler="$DC" \
+            --build=release \
+            --force
+
+      - name: P05c irregular
+        shell: bash
+        run: |
+          dub run \
+            --root=research/r0_2_task_representation/probes/p05c_taskref_irregular \
+            --compiler="$DC" \
+            --build=release \
+            --force
