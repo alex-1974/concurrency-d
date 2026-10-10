@@ -33,10 +33,17 @@ jobs:
           lscpu
           test "$(uname -m)" = "aarch64"
 
+      - name: Materialize retained R0.1 reference
+        shell: bash
+        run: |
+          git fetch origin research/r0-1-work-stealing-deque
+          git worktree add --detach /tmp/r0-1-reference FETCH_HEAD
+          git -C /tmp/r0-1-reference rev-parse HEAD
+
       - name: Balanced flat reference and TaskRef
         shell: bash
         run: |
-          REF=research/r0_1_work_stealing_deque/probes/p14a_flat_granularity_scaling
+          REF=/tmp/r0-1-reference/research/r0_1_work_stealing_deque/probes/p14a_flat_granularity_scaling
           CAND=research/r0_2_task_representation/probes/p05a_taskref_flat
 
           dub run --root="$REF" --compiler="$DC" --build=release --force > /tmp/flat-ref-1.txt
@@ -78,7 +85,7 @@ jobs:
       - name: Balanced recursive reference and TaskRef
         shell: bash
         run: |
-          REF=research/r0_1_work_stealing_deque/probes/p14g_recursive_cold_overflow
+          REF=/tmp/r0-1-reference/research/r0_1_work_stealing_deque/probes/p14g_recursive_cold_overflow
           CAND=research/r0_2_task_representation/probes/p05b_taskref_recursive
 
           dub run --root="$REF" --compiler="$DC" --build=release --force > /tmp/rec-ref-1.txt
@@ -120,7 +127,7 @@ jobs:
       - name: Balanced irregular reference and TaskRef
         shell: bash
         run: |
-          REF=research/r0_1_work_stealing_deque/probes/p14c_irregular_bursty
+          REF=/tmp/r0-1-reference/research/r0_1_work_stealing_deque/probes/p14c_irregular_bursty
           CAND=research/r0_2_task_representation/probes/p05c_taskref_irregular
 
           dub run --root="$REF" --compiler="$DC" --build=release --force > /tmp/irr-ref-1.txt
