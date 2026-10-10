@@ -836,3 +836,40 @@ unittest
         atomicLoad!(MemoryOrder.acq)(admitted));
     assert(executor.completedCount() == executor.acceptedCount());
 }
+
+unittest
+{
+    // A gated worker cannot consume the sole waiting ingress slot.
+    // Rejected attempts must not allocate temporary result cells, handles
+    // or records merely to learn that the queue is already full.
+    import core.atomic : MemoryOrder, atomicStore;
+    import core.memory : GC;
+
+    shared bool entered;
+    shared bool release;
+    GatedTask gated;
+    gated.entered = &entered;
+    gated.release = &release;
+
+    auto executor = new OwnedTaskExecutor(1, 1, 4);
+    auto running = executor.submit(gated);
+    waitForFlag(&entered);
+
+    auto queued = executor.submit(&addTwo);
+    const before = GC.allocatedInCurrentThread();
+
+    foreach (_; 0 .. 300)
+        assert(executor.trySubmit(&addTwo) is null);
+
+    const after = GC.allocatedInCurrentThread();
+    assert(after == before,
+        "full queue rejection allocated on the producer thread");
+
+    atomicStore!(MemoryOrder.rel)(release, true);
+    assert(running.get() == 17);
+    assert(queued.get() == 42);
+    executor.closeAndJoin();
+
+    assert(executor.acceptedCount() == 2);
+    assert(executor.completedCount() == 2);
+}
