@@ -347,7 +347,7 @@ private Thread makeWorker(
 
         for (;;)
         {
-            const local =
+            auto local =
                 queues[
                     workerIndex]
                 .pop();
@@ -392,7 +392,7 @@ private Thread makeWorker(
                     {
                         case StealMode.single:
                         {
-                            const stolen =
+                            auto stolen =
                                 queues[victim]
                                 .steal();
 
