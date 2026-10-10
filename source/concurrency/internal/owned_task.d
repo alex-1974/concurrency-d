@@ -24,6 +24,11 @@ import concurrency.internal.task_record :
 import core.sync.condition :
     Condition;
 
+import core.atomic :
+    MemoryOrder,
+    atomicLoad,
+    atomicStore;
+
 import core.sync.mutex :
     Mutex;
 
@@ -134,6 +139,30 @@ package(concurrency) final class TaskHandle(R)
 }
 
 /**
+ * Common leading record layout for the owned-executor completion callback.
+ * The release flag is set after returning from dispatch, not by the user
+ * callable and not merely when the result cell becomes ready.
+ */
+private struct CompletionPrefix
+{
+    TaskHeader header;
+    shared uint returned;
+}
+
+private void markReturned(TaskRef task)
+    @trusted nothrow
+{
+    auto prefix = cast(shared(CompletionPrefix)*) task.ptr;
+    atomicStore!(MemoryOrder.rel)(prefix.returned, 1u);
+}
+
+private struct RetainedTask
+{
+    Object node;
+    shared uint* returned;
+}
+
+/**
  * Concrete node with an embedded header-first record. The class itself
  * supplies GC retention; only the record header address reaches the deque.
  */
@@ -141,10 +170,12 @@ private final class OwnedNode(F, R)
 {
     private struct Record
     {
-        TaskHeader header;
+        CompletionPrefix prefix;
         F callable;
         ResultCell!R cell;
     }
+
+    static assert(Record.prefix.offsetof == 0);
 
     private Record _record;
 
@@ -152,12 +183,18 @@ private final class OwnedNode(F, R)
     {
         _record.callable = callable;
         _record.cell = cell;
-        _record.header.execute = &execute;
+        _record.prefix.header.execute = &execute;
+        atomicStore!(MemoryOrder.raw)(_record.prefix.returned, 0u);
     }
 
     TaskRef reference()
     {
-        return TaskRef(cast(shared(TaskHeader)*) &_record.header);
+        return TaskRef(cast(shared(TaskHeader)*) &_record.prefix.header);
+    }
+
+    shared(uint)* returnedFlag()
+    {
+        return &_record.prefix.returned;
     }
 
     private static void execute(shared(TaskHeader)* header)
@@ -217,7 +254,7 @@ package(concurrency) final class OwnedTaskExecutor
     private SubmissionWorkerPool _pool;
     private Mutex _mutex;
     private Condition _lifecycleChanged;
-    private Object[] _retained;
+    private RetainedTask[] _retained;
     private size_t _maxRetained;
 
     // _mutex serializes admission against shutdown. Exactly one caller
@@ -230,7 +267,8 @@ package(concurrency) final class OwnedTaskExecutor
         if (maxRetained == 0)
             throw new Exception("maxRetained must be positive");
 
-        _pool = new SubmissionWorkerPool(workers, ingressCapacity);
+        _pool = new SubmissionWorkerPool(
+            workers, ingressCapacity, &markReturned);
         _mutex = new Mutex();
         _lifecycleChanged = new Condition(_mutex);
         _lifecycle = Lifecycle.running;
@@ -238,8 +276,10 @@ package(concurrency) final class OwnedTaskExecutor
     }
 
     /**
-     * Returns null if bounded ingress is currently full; throws on close
-     * or when the explicit record retention budget has been exhausted.
+     * Returns null when bounded ingress or the in-flight retention budget
+     * is full. A completed record becomes reclaimable after the worker
+     * returns from dispatch and records its completion; no accepted work
+     * is forgotten. Throws after the executor starts draining.
      *
      * Arbitrary mutable cross-thread captures are caller responsibility.
      * Successful admission keeps both record and result cell alive until
@@ -258,15 +298,24 @@ package(concurrency) final class OwnedTaskExecutor
                 throw new Exception("executor is closed");
 
             if (_retained.length >= _maxRetained)
-                throw new Exception("retained task capacity exhausted");
+            {
+                // O(capacity) cold path. This is intentionally deferred
+                // until the fixed budget fills; no extra lock is imposed
+                // on worker-local task execution.
+                reapCompletedUnderLock();
+
+                if (_retained.length >= _maxRetained)
+                    return typeof(handle).init;
+            }
 
             // Install the strong GC root before any worker can claim the
-            // record. If admission fails, undo only our tail insertion.
-            _retained ~= node;
+            // record. If admission fails, clear the tail GC slot too.
+            _retained ~= RetainedTask(node, node.returnedFlag());
             const status = _pool.trySubmit(node.reference());
 
             if (status != SubmissionResult.accepted)
             {
+                _retained[$ - 1] = RetainedTask.init;
                 _retained.length = _retained.length - 1;
 
                 if (status == SubmissionResult.closed)
@@ -280,7 +329,51 @@ package(concurrency) final class OwnedTaskExecutor
         return handle;
     }
 
-    /** Retry while ingress is transiently full. No lock held when yielding. */
+    /**
+     * Reclaim only records whose worker has completed all record accesses.
+     * Caller holds _mutex. Clearing the vacated tail is required because a
+     * GC-scanned D array backing allocation can outlive its logical length.
+     */
+    private void reapCompletedUnderLock()
+    {
+        size_t i;
+
+        while (i < _retained.length)
+        {
+            if (atomicLoad!(MemoryOrder.acq)(
+                *_retained[i].returned) == 0u)
+            {
+                ++i;
+                continue;
+            }
+
+            _retained[i] = _retained[$ - 1];
+            _retained[$ - 1] = RetainedTask.init;
+            _retained.length = _retained.length - 1;
+        }
+    }
+
+    /**
+     * Explicit maintenance opportunity, including idle executors that have
+     * not reached the retained-record cap yet. Returns remaining roots.
+     */
+    size_t reclaimCompleted()
+    {
+        synchronized (_mutex)
+        {
+            reapCompletedUnderLock();
+            return _retained.length;
+        }
+    }
+
+    /** Test/diagnostic observation; excludes rejected ephemeral nodes. */
+    size_t retainedCount()
+    {
+        synchronized (_mutex)
+            return _retained.length;
+    }
+
+    /** Retry while ingress or the in-flight record budget is full. */
     auto submit(F)(F callable) @system
     {
         for (;;)
@@ -343,6 +436,15 @@ package(concurrency) final class OwnedTaskExecutor
 
         synchronized (_mutex)
         {
+            if (failure is null)
+            {
+                // All worker callbacks have returned by now. Clearing
+                // these references cannot invalidate a queued record.
+                foreach (ref entry; _retained)
+                    entry = RetainedTask.init;
+                _retained.length = 0;
+            }
+
             _shutdownFailure = failure;
             _lifecycle = Lifecycle.stopped;
             _lifecycleChanged.notifyAll();
@@ -539,27 +641,84 @@ unittest
 
 unittest
 {
-    // Retention capacity is explicit rather than growing without bound.
+    // Retention capacity is a *concurrent* budget, not a lifetime counter.
+    // A record must never be reclaimed while its worker is still in it.
+    import core.atomic : MemoryOrder, atomicStore;
+    import core.time : MonoTime, dur;
+
+    shared bool entered;
+    shared bool release;
+
+    GatedTask gate;
+    gate.entered = &entered;
+    gate.release = &release;
+
     auto executor = new OwnedTaskExecutor(1, 1, 1);
-    auto first = executor.submit(&addTwo);
+    auto first = executor.submit(gate);
+    waitForFlag(&entered);
 
-    bool capacityRejected;
-    try
+    assert(executor.retainedCount() == 1);
+    assert(executor.trySubmit(&addTwo) is null);
+    assert(executor.reclaimCompleted() == 1);
+
+    atomicStore!(MemoryOrder.rel)(release, true);
+    assert(first.get() == 17);
+
+    // Result publication happens before the post-dispatch marker: allow
+    // the worker to leave the thunk before expecting a reclaimed slot.
+    const deadline = MonoTime.currTime + dur!"seconds"(10);
+    TaskHandle!int second;
+    while (second is null)
     {
-        executor.submit(&addTwo);
-    }
-    catch (Exception error)
-    {
-        capacityRejected =
-            error.msg == "retained task capacity exhausted";
+        assert(MonoTime.currTime < deadline,
+            "completed task was never made reclaimable");
+        second = executor.trySubmit(&addTwo);
+        if (second is null)
+            Thread.yield();
     }
 
-    assert(capacityRejected);
-    assert(first.get() == 42);
+    assert(second.get() == 42);
+    assert(executor.retainedCount() <= 1);
 
     executor.closeAndJoin();
-    assert(executor.acceptedCount() == 1);
-    assert(executor.completedCount() == 1);
+    assert(executor.retainedCount() == 0);
+    assert(executor.acceptedCount() == 2);
+    assert(executor.completedCount() == 2);
+}
+
+unittest
+{
+    // Several thousand tasks can pass through a tiny bounded retention
+    // budget without a permanent "capacity exhausted" state.
+    enum size_t Tasks = 2048;
+
+    foreach (workers; [1, 4])
+    {
+        auto executor = new OwnedTaskExecutor(workers, 3, 8);
+        size_t results;
+
+        foreach (i; 0 .. Tasks)
+        {
+            auto h = executor.submit(&addTwo);
+            if ((i % 7) == 0)
+            {
+                assert(h.get() == 42);
+                ++results;
+            }
+            // Other handles are deliberately dropped. The worker and
+            // retained record still guarantee exactly one completion.
+        }
+
+        executor.closeAndJoin();
+
+        assert(executor.acceptedCount() == Tasks);
+        assert(executor.completedCount() == Tasks);
+        assert(executor.retainedCount() == 0);
+        assert(results > 0);
+
+        // A handle obtained before reclamation remains independently
+        // usable because it owns a separate result cell.
+    }
 }
 
 unittest
