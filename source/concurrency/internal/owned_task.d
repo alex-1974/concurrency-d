@@ -331,7 +331,9 @@ unittest
     auto executor = new OwnedTaskExecutor(2, 4, 32);
 
     auto scalar = executor.submit(&addTwo);
-    auto captured = executor.submit(CapturedValue(23));
+    CapturedValue valueCallable;
+    valueCallable.offset = 23;
+    auto captured = executor.submit(valueCallable);
     auto empty = executor.submit(&noop);
 
     // Each TaskHandle waits independently, without closing the executor.
