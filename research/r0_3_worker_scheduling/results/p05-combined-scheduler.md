@@ -1,6 +1,6 @@
 # R0.3 P05 — Combined worker-scheduling qualification
 
-Status: CI REQUALIFYING — LOCAL XPS RERUN PENDING
+Status: PASS
 
 ## Selected combined policy
 
@@ -199,21 +199,135 @@ Only AArch64 performs a P05-vs-P01 candidate comparison.
 This preserves semantic and code-shape fairness instead of relaxing the
 performance threshold.
 
-## Remaining gate
+## Corrected local XPS qualification
 
-R0.3 requires local native-x86_64 qualification on the project XPS.
+The corrected local run executed on:
 
-The corrected local gate must:
+```text
+commit 191eaacf4badee3dd6c162ded192dc499c223e6b
+Intel Core i7-9750H
+6 cores / 12 threads
+Linux x86_64
+LDC 1.41.0
+DMD frontend 2.111.0
+LLVM 19.1.7
+host CPU skylake
+DUB 1.40.0
+```
 
-- use LDC 1.41.0;
-- record platform/toolchain identity;
-- run the combined flat workload;
-- run the selected x86 recursive implementation, which is P01 enqueue-all;
-- run the selected x86 irregular implementation, which is P01 enqueue-all;
-- repeat both selected workloads three times;
-- preserve exact correctness checks;
-- report run-to-run spread.
+The selected x86 policy was explicitly recorded by the runner as:
 
-No duplicate x86 candidate binary is used for performance comparison.
+```text
+recursive=P01 enqueue-all implementation
+irregular=P01 enqueue-all implementation
+duplicate-candidate comparison=disabled
+```
 
-P05 becomes final PASS only after that corrected evidence is recorded.
+All selected implementation runs passed exact correctness checks.
+
+### Flat combined workload
+
+Representative medians:
+
+```text
+work0:
+  single 1w   9.414
+  batch  1w   9.480
+  single 2w  10.751
+  batch  2w  12.091
+  single 4w  15.036
+  batch  4w  25.908
+
+work16:
+  single 1w  47.886
+  batch  1w  47.618
+  single 2w  49.373
+  batch  2w  43.305
+  single 4w  52.740
+  batch  4w  36.731
+
+work64:
+  single 1w 181.003
+  batch  1w 179.941
+  single 2w 159.919
+  batch  2w 119.326
+  single 4w 142.955
+  batch  4w  68.711
+```
+
+The established R0.1/R0.2 workload-sensitive single-versus-batch pattern
+remains visible.
+
+### Selected x86 recursive implementation
+
+Median across three complete runs:
+
+```text
+batch  1w 65.293 ns/task
+single 1w 62.837
+
+batch  2w 55.071
+single 2w 55.431
+
+batch  4w 55.746
+single 4w 56.607
+```
+
+Observed run-to-run spread:
+
+```text
+1w: 1.0292x .. 1.0843x
+2w: 1.2237x .. 1.2765x
+4w: 1.2479x .. 1.2605x
+```
+
+This spread is retained as benchmark-environment evidence.
+
+It is not a candidate-regression signal because the selected x86 implementation
+is exactly the baseline implementation itself.
+
+Future local performance gates should continue to report repeated-run spread
+and should avoid interpreting a single XPS sample as a stable policy delta.
+
+### Selected x86 irregular implementation
+
+Median across three complete runs:
+
+```text
+single 51.868 ns/task
+batch  51.899 ns/task
+```
+
+Run-to-run spread:
+
+```text
+single 1.1405x
+batch  1.1355x
+```
+
+Again, this is the directly selected enqueue-all implementation, not a
+duplicate candidate binary.
+
+### Local result
+
+```text
+R0.3 P05 XPS SELECTED-X86 QUALIFICATION: PASS
+overall_rc=0
+```
+
+## Final P05 result
+
+All required qualification environments are now covered:
+
+- DMD 2.111 correctness on x86_64: PASS;
+- LDC 1.41 selected x86 policy: PASS;
+- local XPS native x86_64 / LDC 1.41: PASS;
+- native AArch64 / LDC 1.41: PASS.
+
+The combined worker-scheduling policy is ready for P06.
+
+## P05 result
+
+```text
+R0.3 P05 COMBINED WORKER SCHEDULER: PASS
+```
