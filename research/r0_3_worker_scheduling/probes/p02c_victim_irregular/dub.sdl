@@ -1,0 +1,7 @@
+name "r0-3-p02c-victim-irregular"
+description "R0.3 P02c victim-selection comparison: irregular graph"
+targetType "executable"
+
+dependency "containers-d" version="0.2.0"
+
+sourcePaths "source" "../../common/source"
