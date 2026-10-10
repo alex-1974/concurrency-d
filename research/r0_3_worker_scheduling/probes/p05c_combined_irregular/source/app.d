@@ -116,7 +116,10 @@ struct WorkerStats
 
     ulong spawned;
     ulong overflowInline;
-    ulong directContinuations;
+    version (AArch64)
+    {
+        ulong directContinuations;
+    }
 
     ulong idleTransitions;
 
@@ -138,7 +141,10 @@ struct RunResult
 
     ulong spawned;
     ulong overflowInline;
-    ulong directContinuations;
+    version (AArch64)
+    {
+        ulong directContinuations;
+    }
     ulong idleTransitions;
 
     ulong minWorkerExecuted;
@@ -579,6 +585,8 @@ private Graph buildGraph()
  * Descendants are added to outstanding before publication or inline
  * execution, so termination cannot observe zero while descendants exist.
  */
+version (AArch64)
+{
 private void executeOverflowInline(
     TaskRef task,
     size_t workerIndex,
@@ -704,24 +712,11 @@ private void executeTask(
             stats.spawned +=
                 children;
 
-            /*
-             * See the recursive probe for the architecture rationale.
-             * AArch64 keeps a direct continuation once enough work is
-             * scheduler-visible; x86_64 retains enqueue-all.
-             */
-            version (AArch64)
-            {
-                const useDirect =
-                    atomicLoad!(
-                        MemoryOrder.raw)(
-                            *outstanding) >=
-                    cast(long) Workers;
-            }
-            else
-            {
-                enum useDirect =
-                    false;
-            }
+            const useDirect =
+                atomicLoad!(
+                    MemoryOrder.raw)(
+                        *outstanding) >=
+                cast(long) Workers;
 
             if (useDirect)
             {
@@ -815,6 +810,88 @@ private void executeTask(
         task =
             direct;
     }
+}
+}
+else
+{
+private void executeTask(
+    TaskRef task,
+    size_t workerIndex,
+    Queue[] queues,
+    ref WorkerStats stats,
+    shared long* outstanding,
+    shared ulong* completed,
+    shared TaskRecord* records)
+{
+    const path =
+        taskPath(task);
+
+    ++stats.executed;
+
+    stats.valueSum +=
+        path;
+
+    stats.valueXor ^=
+        path;
+
+    stats.workChecksum ^=
+        executeWork(
+            task);
+
+    const children =
+        taskChildCount(
+            task);
+
+    if (children != 0)
+    {
+        atomicFetchAdd!(
+            MemoryOrder.rel)(
+                *outstanding,
+                cast(long) children);
+
+        stats.spawned +=
+            children;
+
+        foreach (child; 0 .. children)
+        {
+            auto next =
+                makeTask(
+                    taskChildIndex(
+                        task,
+                        child),
+                    records);
+
+            if (
+                queues[
+                    workerIndex]
+                .tryPush(next))
+            {
+                continue;
+            }
+
+            ++stats.overflowInline;
+
+            executeTask(
+                next,
+                workerIndex,
+                queues,
+                stats,
+                outstanding,
+                completed,
+                records);
+        }
+    }
+
+    atomicFetchAdd!(
+        MemoryOrder.rel)(
+            *completed,
+            1);
+
+    atomicFetchAdd!(
+        MemoryOrder.rel)(
+            *outstanding,
+            cast(long) -1);
+}
 }
 
 private Thread makeWorker(
@@ -1156,8 +1233,11 @@ private RunResult run(
         result.overflowInline +=
             stats.overflowInline;
 
-        result.directContinuations +=
-            stats.directContinuations;
+        version (AArch64)
+        {
+            result.directContinuations +=
+                stats.directContinuations;
+        }
 
         result.idleTransitions +=
             stats.idleTransitions;
@@ -1308,7 +1388,10 @@ private void benchmark(
 
     ulong totalSpawned;
     ulong totalOverflow;
-    ulong totalDirectContinuations;
+    version (AArch64)
+    {
+        ulong totalDirectContinuations;
+    }
     ulong totalIdleTransitions;
 
     ulong minWorkerExecuted =
@@ -1348,8 +1431,11 @@ private void benchmark(
         totalOverflow +=
             result.overflowInline;
 
-        totalDirectContinuations +=
-            result.directContinuations;
+        version (AArch64)
+        {
+            totalDirectContinuations +=
+                result.directContinuations;
+        }
 
         totalIdleTransitions +=
             result.idleTransitions;
@@ -1425,12 +1511,22 @@ private void benchmark(
         totalFailedSteals,
         totalIdleTransitions);
 
-    writefln(
-        "       spawned=%s overflow/task=%.6f "
-        ~ "directContinuations=%s",
-        totalSpawned,
-        overflowPerTask,
-        totalDirectContinuations);
+    version (AArch64)
+    {
+        writefln(
+            "       spawned=%s overflow/task=%.6f "
+            ~ "directContinuations=%s",
+            totalSpawned,
+            overflowPerTask,
+            totalDirectContinuations);
+    }
+    else
+    {
+        writefln(
+            "       spawned=%s overflow/task=%.6f",
+            totalSpawned,
+            overflowPerTask);
+    }
 
     writefln(
         "       workerExecutedRange=%s..%s",
