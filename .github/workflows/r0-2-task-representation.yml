@@ -112,6 +112,15 @@ jobs:
             echo "R0.2 P04 negative PASS: direct stack TaskRef escape rejected"
           fi
 
+      - name: P05a TaskRef flat scheduler
+        shell: bash
+        run: |
+          dub run \
+            --root=research/r0_2_task_representation/probes/p05a_taskref_flat \
+            --compiler="$DC" \
+            --build=release \
+            --force
+
   p01-arm64:
     name: P01 / native ARM64 / LDC 1.41
     runs-on: ubuntu-24.04-arm
@@ -205,3 +214,12 @@ jobs:
           else
             echo "R0.2 P04 negative PASS: direct stack TaskRef escape rejected"
           fi
+
+      - name: P05a TaskRef flat scheduler
+        shell: bash
+        run: |
+          dub run \
+            --root=research/r0_2_task_representation/probes/p05a_taskref_flat \
+            --compiler="$DC" \
+            --build=release \
+            --force
