@@ -57,11 +57,11 @@ jobs:
             --build=release \
             --force
 
-      - name: P02b queue plus dispatch
+      - name: P02c atomic alignment diagnostic
         shell: bash
         run: |
           dub run \
-            --root=research/r0_2_task_representation/probes/p02b_queue_dispatch \
+            --root=research/r0_2_task_representation/probes/p02c_atomic_alignment \
             --compiler="$DC" \
             --build=release \
             --force
@@ -105,11 +105,11 @@ jobs:
             --build=release \
             --force
 
-      - name: P02b queue plus dispatch
+      - name: P02c atomic alignment diagnostic
         shell: bash
         run: |
           dub run \
-            --root=research/r0_2_task_representation/probes/p02b_queue_dispatch \
+            --root=research/r0_2_task_representation/probes/p02c_atomic_alignment \
             --compiler="$DC" \
             --build=release \
             --force
