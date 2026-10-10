@@ -48,6 +48,15 @@ jobs:
             --compiler="$DC" \
             --force
 
+      - name: P02 dispatch kernel
+        shell: bash
+        run: |
+          dub run \
+            --root=research/r0_2_task_representation/probes/p02_dispatch_kernel \
+            --compiler="$DC" \
+            --build=release \
+            --force
+
   p01-arm64:
     name: P01 / native ARM64 / LDC 1.41
     runs-on: ubuntu-24.04-arm
