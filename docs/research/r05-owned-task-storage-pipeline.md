@@ -47,6 +47,13 @@ dub run --config=task-pipeline-benchmark --compiler=ldc2 --build=release --force
 
 # Wider GC-visible closure and void task contracts
 dub run --config=task-pipeline-benchmark --compiler=ldc2 --build=release --force -- 4 20000 5 all
+
+# Preferred: each scenario/budget/policy gets a fresh Linux process;
+# results include per-run peak RSS and paired median speedups.
+python3 tools/research/r05_pipeline_matrix.py \
+  --compiler=ldc2 --workers=4 --tasks=20000 --rounds=5 \
+  --scenarios scalar wide void --budgets 8 64 512 4096 \
+  --output=evidence/r05-local-xps
 ```
 
 Arguments: `workers tasks per-case-rounds scalar|wide|void|all`.
@@ -84,6 +91,14 @@ No allocator-only microbenchmark is presented as end-to-end performance.
 
 CI compiles/tests on DMD 2.111 and LDC 1.41 (x86-64) and native ARM64
 LDC, then prints a short two-policy diagnostic with 768 tasks.
+A separate R0.5 research-evidence workflow executes a 3-round, 6000-task
+matrix on LDC/x86-64 and native LDC/ARM64 and uploads raw and summarized
+CSV evidence. That matrix launches **one new Linux process per case**,
+collects per-child peak resident memory through `wait4`, and reverses
+the paired policy order between rounds. This is necessary because
+`ru_maxrss` observed from a single continuing process cannot decrease
+after an earlier larger benchmark case. The matrix CSV contains peak RSS
+in Linux KiB. The runner still introduces scheduling and thermal noise.
 Hosted runner numbers do **not** constitute a numerical performance
 quality gate and should not be ranked across dissimilar hardware.
 Repeat the optimized LDC runs on a controlled XPS before a policy
