@@ -192,7 +192,7 @@ private final class OwnedNode(F, R)
         return TaskRef(cast(shared(TaskHeader)*) &_record.prefix.header);
     }
 
-    shared uint* returnedFlag()
+    shared(uint)* returnedFlag()
     {
         return &_record.prefix.returned;
     }
