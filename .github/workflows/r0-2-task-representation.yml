@@ -104,3 +104,12 @@ jobs:
             --compiler="$DC" \
             --build=release \
             --force
+
+      - name: P02b queue plus dispatch
+        shell: bash
+        run: |
+          dub run \
+            --root=research/r0_2_task_representation/probes/p02b_queue_dispatch \
+            --compiler="$DC" \
+            --build=release \
+            --force
