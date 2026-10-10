@@ -1,0 +1,117 @@
+name: R0.2 P05d claimed-record diagnostic
+
+on:
+  push:
+    branches:
+      - research/r0-2-task-representation
+    paths:
+      - ".github/workflows/r0-2-p05d-claimed-record.yml"
+      - "research/r0_2_task_representation/probes/p05b_taskref_recursive/**"
+      - "research/r0_2_task_representation/probes/p05d_claimed_record_recursive/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  compare:
+    name: P05d / ${{ matrix.compiler }}
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler:
+          - dmd-2.111.0
+          - ldc-1.41.0
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: dlang-community/setup-dlang@v2
+        with:
+          compiler: ${{ matrix.compiler }}
+          dub: 1.40.0
+
+      - name: Current shared-atomic recursive path
+        shell: bash
+        run: |
+          dub run \
+            --root=research/r0_2_task_representation/probes/p05b_taskref_recursive \
+            --compiler="$DC" \
+            --build=release \
+            --force
+
+      - name: Claimed-record recursive path
+        shell: bash
+        run: |
+          dub run \
+            --root=research/r0_2_task_representation/probes/p05d_claimed_record_recursive \
+            --compiler="$DC" \
+            --build=release \
+            --force
+
+  compare-arm64:
+    name: P05d / native ARM64 / LDC 1.41
+    runs-on: ubuntu-24.04-arm
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: dlang-community/setup-dlang@v2
+        with:
+          compiler: ldc-1.41.0
+
+      - name: Platform evidence
+        shell: bash
+        run: |
+          "$DC" --version
+          uname -m
+          lscpu
+          test "$(uname -m)" = "aarch64"
+
+      - name: Balanced recursive comparison
+        shell: bash
+        run: |
+          BASE=research/r0_2_task_representation/probes/p05b_taskref_recursive
+          CAND=research/r0_2_task_representation/probes/p05d_claimed_record_recursive
+
+          dub run --root="$BASE" --compiler="$DC" --build=release --force > /tmp/base-1.txt
+          dub run --root="$CAND" --compiler="$DC" --build=release --force > /tmp/cand-2.txt
+          dub run --root="$CAND" --compiler="$DC" --build=release --force > /tmp/cand-1.txt
+          dub run --root="$BASE" --compiler="$DC" --build=release --force > /tmp/base-2.txt
+
+          cat /tmp/base-1.txt
+          cat /tmp/cand-2.txt
+          cat /tmp/cand-1.txt
+          cat /tmp/base-2.txt
+
+          python3 - <<'PY'
+          import re
+          from pathlib import Path
+
+          def parse(path):
+              text = Path(path).read_text()
+              out = {}
+              rx = re.compile(
+                  r'^(single|batch)\s+workers=(\d+)\s+'
+                  r'median=\s*([0-9.]+) ns/task',
+                  re.M,
+              )
+              for mode, workers, value in rx.findall(text):
+                  out[(mode, int(workers))] = float(value)
+              if len(out) != 6:
+                  raise SystemExit(f"{path}: expected 6 medians, got {len(out)}")
+              return out
+
+          bases = [parse("/tmp/base-1.txt"), parse("/tmp/base-2.txt")]
+          cands = [parse("/tmp/cand-1.txt"), parse("/tmp/cand-2.txt")]
+
+          print("P05d claimed-record / shared-atomic ratios")
+          for key in sorted(bases[0], key=lambda x: (x[1], x[0])):
+              base = sum(x[key] for x in bases) / 2.0
+              cand = sum(x[key] for x in cands) / 2.0
+              print(
+                  f"{key[0]:6s} workers={key[1]} "
+                  f"base={base:8.3f} cand={cand:8.3f} ratio={cand/base:7.4f}x"
+              )
+          PY
