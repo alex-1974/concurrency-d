@@ -1,0 +1,7 @@
+name "r0-3-p01c-baseline-irregular"
+description "R0.3 P01c worker-scheduling baseline: irregular graph"
+targetType "executable"
+
+dependency "containers-d" version="0.2.0"
+
+sourcePaths "source"
