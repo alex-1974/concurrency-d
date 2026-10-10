@@ -1,0 +1,7 @@
+name "r0-2-p05c-taskref-irregular"
+description "R0.2 P05c TaskRef irregular scheduler-neighborhood workload"
+targetType "executable"
+
+dependency "containers-d" version="0.2.0"
+
+sourcePaths "source"
