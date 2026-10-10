@@ -14,7 +14,7 @@ main() {
     OUT_DIR="research/r0_2_task_representation/evidence"
     mkdir -p "$OUT_DIR" || return 1
 
-    SUMMARY="$OUT_DIR/xps-\${STAMP}-summary.txt"
+    SUMMARY="$OUT_DIR/xps-${STAMP}-summary.txt"
 
     {
         echo "=== R0.2 P05 XPS QUALIFICATION ==="
@@ -37,9 +37,9 @@ main() {
     run_probe() {
         NAME="$1"
         ROOT="$2"
-        LOG="$OUT_DIR/xps-\${STAMP}-\${NAME}.log"
+        LOG="$OUT_DIR/xps-${STAMP}-${NAME}.log"
 
-        echo "=== \${NAME} ===" | tee -a "$SUMMARY"
+        echo "=== ${NAME} ===" | tee -a "$SUMMARY"
 
         dub run \
             --root="$ROOT" \
@@ -48,7 +48,7 @@ main() {
             --force \
             2>&1 | tee "$LOG"
 
-        PROBE_RC=\${PIPESTATUS[0]}
+        PROBE_RC=${PIPESTATUS[0]}
 
         echo "rc=$PROBE_RC" | tee -a "$SUMMARY"
         echo "log=$LOG" | tee -a "$SUMMARY"
@@ -74,9 +74,9 @@ main() {
     {
         echo "=== RESULT FILES ==="
         echo "$SUMMARY"
-        echo "$OUT_DIR/xps-\${STAMP}-p05a-flat.log"
-        echo "$OUT_DIR/xps-\${STAMP}-p05b-recursive.log"
-        echo "$OUT_DIR/xps-\${STAMP}-p05c-irregular.log"
+        echo "$OUT_DIR/xps-${STAMP}-p05a-flat.log"
+        echo "$OUT_DIR/xps-${STAMP}-p05b-recursive.log"
+        echo "$OUT_DIR/xps-${STAMP}-p05c-irregular.log"
         echo
         echo "overall_rc=$RC"
     } | tee -a "$SUMMARY"
