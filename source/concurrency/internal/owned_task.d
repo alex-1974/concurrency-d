@@ -207,11 +207,23 @@ private final class OwnedNode(F, R)
  */
 package(concurrency) final class OwnedTaskExecutor
 {
+    private enum Lifecycle : ubyte
+    {
+        running,
+        draining,
+        stopped
+    }
+
     private SubmissionWorkerPool _pool;
     private Mutex _mutex;
+    private Condition _lifecycleChanged;
     private Object[] _retained;
     private size_t _maxRetained;
-    private bool _closed;
+
+    // _mutex serializes admission against shutdown. Exactly one caller
+    // performs the worker join; other closers wait for the same outcome.
+    private Lifecycle _lifecycle;
+    private Throwable _shutdownFailure;
 
     this(size_t workers, size_t ingressCapacity, size_t maxRetained = 4096)
     {
@@ -220,6 +232,8 @@ package(concurrency) final class OwnedTaskExecutor
 
         _pool = new SubmissionWorkerPool(workers, ingressCapacity);
         _mutex = new Mutex();
+        _lifecycleChanged = new Condition(_mutex);
+        _lifecycle = Lifecycle.running;
         _maxRetained = maxRetained;
     }
 
@@ -240,7 +254,7 @@ package(concurrency) final class OwnedTaskExecutor
 
         synchronized (_mutex)
         {
-            if (_closed)
+            if (_lifecycle != Lifecycle.running)
                 throw new Exception("executor is closed");
 
             if (_retained.length >= _maxRetained)
@@ -280,12 +294,76 @@ package(concurrency) final class OwnedTaskExecutor
         }
     }
 
+    /**
+     * Idempotent, thread-safe draining shutdown for external controller
+     * threads. The first caller linearizes RUNNING -> DRAINING against task
+     * admission and performs the only Thread.join sequence. Other callers
+     * wait for STOPPED and observe the same shutdown outcome.
+     *
+     * A task running on this executor must not call closeAndJoin(): joining
+     * its own worker would deadlock. Do not race destruction/GC collection
+     * of this executor with active methods.
+     */
     void closeAndJoin()
     {
         synchronized (_mutex)
-            _closed = true;
+        {
+            final switch (_lifecycle)
+            {
+                case Lifecycle.running:
+                    _lifecycle = Lifecycle.draining;
+                    break;
 
-        _pool.closeAndJoin();
+                case Lifecycle.draining:
+                    while (_lifecycle != Lifecycle.stopped)
+                        _lifecycleChanged.wait();
+
+                    if (_shutdownFailure !is null)
+                        throw _shutdownFailure;
+                    return;
+
+                case Lifecycle.stopped:
+                    if (_shutdownFailure !is null)
+                        throw _shutdownFailure;
+                    return;
+            }
+        }
+
+        // Joining with _mutex held would block other controller threads
+        // (and any final admission already linearized before shutdown).
+        Throwable failure;
+        try
+        {
+            _pool.closeAndJoin();
+        }
+        catch (Throwable error)
+        {
+            failure = error;
+        }
+
+        synchronized (_mutex)
+        {
+            _shutdownFailure = failure;
+            _lifecycle = Lifecycle.stopped;
+            _lifecycleChanged.notifyAll();
+        }
+
+        if (failure !is null)
+            throw failure;
+    }
+
+    /** Diagnostic for lifecycle tests, not yet part of the public API. */
+    bool isStopped()
+    {
+        synchronized (_mutex)
+            return _lifecycle == Lifecycle.stopped;
+    }
+
+    /** Returns false as soon as a shutdown has claimed the join. */
+    bool isAccepting()
+    {
+        synchronized (_mutex)
+            return _lifecycle == Lifecycle.running;
     }
 
     size_t acceptedCount()
