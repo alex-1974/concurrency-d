@@ -434,14 +434,31 @@ private void executeTask(
                     (id << 1) | 1,
                     records);
 
-            const available =
-                atomicLoad!(
-                    MemoryOrder.raw)(
-                        *outstanding);
+            /*
+             * Native AArch64 benefits strongly from keeping one continuation
+             * local after enough scheduler-visible work exists.
+             *
+             * Hosted and local x86_64 evidence does not support the same
+             * generic fast path, so retain enqueue-all there.
+             *
+             * This is compile-time specialization; there is no runtime
+             * architecture branch in the worker hot path.
+             */
+            version (AArch64)
+            {
+                const useDirect =
+                    atomicLoad!(
+                        MemoryOrder.raw)(
+                            *outstanding) >=
+                    cast(long) workerCount;
+            }
+            else
+            {
+                enum useDirect =
+                    false;
+            }
 
-            if (
-                available >=
-                cast(long) workerCount)
+            if (useDirect)
             {
                 /*
                  * Enough scheduler-visible work exists to keep one child as
@@ -1206,7 +1223,7 @@ private void benchmark(
 void main()
 {
     writeln(
-        "R0.3 P05b saturation-gated recursive continuation");
+        "R0.3 P05b architecture-specialized recursive continuation");
 
     writefln(
         "depth=%s totalTasks=%s work=%s "
