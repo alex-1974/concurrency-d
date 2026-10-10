@@ -20,18 +20,19 @@ enum size_t RecordCount =
 enum size_t Warmups = 3;
 enum size_t Samples = 11;
 
-struct TaskHeader;
-
-alias ExecuteFn =
-    ulong function(
-        shared(TaskHeader)*,
-        size_t)
-        @safe @nogc nothrow;
-
 struct TaskHeader
 {
+    alias ExecuteFn =
+        ulong function(
+            shared(TaskHeader)*,
+            size_t)
+            @safe @nogc nothrow;
+
     ExecuteFn execute;
 }
+
+alias ExecuteFn =
+    TaskHeader.ExecuteFn;
 
 struct TaskRef
 {
