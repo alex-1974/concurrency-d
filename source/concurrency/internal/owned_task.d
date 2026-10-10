@@ -207,11 +207,23 @@ private final class OwnedNode(F, R)
  */
 package(concurrency) final class OwnedTaskExecutor
 {
+    private enum Lifecycle : ubyte
+    {
+        running,
+        draining,
+        stopped
+    }
+
     private SubmissionWorkerPool _pool;
     private Mutex _mutex;
+    private Condition _lifecycleChanged;
     private Object[] _retained;
     private size_t _maxRetained;
-    private bool _closed;
+
+    // _mutex serializes admission against shutdown. Exactly one caller
+    // performs the worker join; other closers wait for the same outcome.
+    private Lifecycle _lifecycle;
+    private Throwable _shutdownFailure;
 
     this(size_t workers, size_t ingressCapacity, size_t maxRetained = 4096)
     {
@@ -220,6 +232,8 @@ package(concurrency) final class OwnedTaskExecutor
 
         _pool = new SubmissionWorkerPool(workers, ingressCapacity);
         _mutex = new Mutex();
+        _lifecycleChanged = new Condition(_mutex);
+        _lifecycle = Lifecycle.running;
         _maxRetained = maxRetained;
     }
 
@@ -240,7 +254,7 @@ package(concurrency) final class OwnedTaskExecutor
 
         synchronized (_mutex)
         {
-            if (_closed)
+            if (_lifecycle != Lifecycle.running)
                 throw new Exception("executor is closed");
 
             if (_retained.length >= _maxRetained)
@@ -280,12 +294,76 @@ package(concurrency) final class OwnedTaskExecutor
         }
     }
 
+    /**
+     * Idempotent, thread-safe draining shutdown for external controller
+     * threads. The first caller linearizes RUNNING -> DRAINING against task
+     * admission and performs the only Thread.join sequence. Other callers
+     * wait for STOPPED and observe the same shutdown outcome.
+     *
+     * A task running on this executor must not call closeAndJoin(): joining
+     * its own worker would deadlock. Do not race destruction/GC collection
+     * of this executor with active methods.
+     */
     void closeAndJoin()
     {
         synchronized (_mutex)
-            _closed = true;
+        {
+            final switch (_lifecycle)
+            {
+                case Lifecycle.running:
+                    _lifecycle = Lifecycle.draining;
+                    break;
 
-        _pool.closeAndJoin();
+                case Lifecycle.draining:
+                    while (_lifecycle != Lifecycle.stopped)
+                        _lifecycleChanged.wait();
+
+                    if (_shutdownFailure !is null)
+                        throw _shutdownFailure;
+                    return;
+
+                case Lifecycle.stopped:
+                    if (_shutdownFailure !is null)
+                        throw _shutdownFailure;
+                    return;
+            }
+        }
+
+        // Joining with _mutex held would block other controller threads
+        // (and any final admission already linearized before shutdown).
+        Throwable failure;
+        try
+        {
+            _pool.closeAndJoin();
+        }
+        catch (Throwable error)
+        {
+            failure = error;
+        }
+
+        synchronized (_mutex)
+        {
+            _shutdownFailure = failure;
+            _lifecycle = Lifecycle.stopped;
+            _lifecycleChanged.notifyAll();
+        }
+
+        if (failure !is null)
+            throw failure;
+    }
+
+    /** Diagnostic for lifecycle tests, not yet part of the public API. */
+    bool isStopped()
+    {
+        synchronized (_mutex)
+            return _lifecycle == Lifecycle.stopped;
+    }
+
+    /** Returns false as soon as a shutdown has claimed the join. */
+    bool isAccepting()
+    {
+        synchronized (_mutex)
+            return _lifecycle == Lifecycle.running;
     }
 
     size_t acceptedCount()
@@ -323,6 +401,77 @@ version (unittest)
         {
             return offset + 10;
         }
+    }
+
+    private struct GatedTask
+    {
+        shared bool* entered;
+        shared bool* release;
+
+        int opCall()
+        {
+            import core.atomic : MemoryOrder, atomicLoad, atomicStore;
+            atomicStore!(MemoryOrder.rel)(*entered, true);
+
+            while (!atomicLoad!(MemoryOrder.acq)(*release))
+                Thread.yield();
+
+            return 17;
+        }
+    }
+
+    private void waitForFlag(shared bool* flag)
+    {
+        import core.atomic : MemoryOrder, atomicLoad;
+        import core.time : MonoTime, dur;
+
+        const deadline = MonoTime.currTime + dur!"seconds"(10);
+
+        while (!atomicLoad!(MemoryOrder.acq)(*flag))
+        {
+            assert(MonoTime.currTime < deadline,
+                "timed out waiting for worker to enter task");
+            Thread.yield();
+        }
+    }
+
+    private Thread makeClosingThread(
+        OwnedTaskExecutor executor,
+        shared uint* started)
+    {
+        return new Thread({
+            import core.atomic : MemoryOrder, atomicFetchAdd;
+            atomicFetchAdd!(MemoryOrder.rel)(*started, 1u);
+            executor.closeAndJoin();
+        });
+    }
+
+    private Thread makeCompetingProducer(
+        OwnedTaskExecutor executor,
+        shared uint* admitted)
+    {
+        return new Thread({
+            import core.atomic : MemoryOrder, atomicFetchAdd;
+
+            foreach (_; 0 .. 256)
+            {
+                try
+                {
+                    auto handle = executor.trySubmit(&addTwo);
+
+                    if (handle !is null)
+                        atomicFetchAdd!(MemoryOrder.rel)(*admitted, 1u);
+                    else
+                        Thread.yield();
+                }
+                catch (Exception)
+                {
+                    // A concurrent shutdown rejects the entire
+                    // unaccepted operation; no completion is owed.
+                    break;
+                }
+            }
+        });
     }
 }
 
@@ -411,4 +560,112 @@ unittest
     executor.closeAndJoin();
     assert(executor.acceptedCount() == 1);
     assert(executor.completedCount() == 1);
+}
+
+unittest
+{
+    // A worker is executing while two more tasks remain queued.
+    // Three concurrent shutdown callers must perform one join sequence.
+    import core.atomic : MemoryOrder, atomicLoad, atomicStore;
+    import core.time : MonoTime, dur;
+
+    shared bool entered;
+    shared bool release;
+    shared uint closerStarted;
+
+    GatedTask gated;
+    gated.entered = &entered;
+    gated.release = &release;
+
+    auto executor = new OwnedTaskExecutor(1, 3, 8);
+    auto blocked = executor.submit(gated);
+    waitForFlag(&entered);
+
+    auto queuedValue = executor.submit(&addTwo);
+    auto queuedError = executor.submit(&failTask);
+
+    Thread[3] closers;
+    foreach (i; 0 .. closers.length)
+    {
+        closers[i] = makeClosingThread(executor, &closerStarted);
+        closers[i].start();
+    }
+
+    const deadline = MonoTime.currTime + dur!"seconds"(10);
+    while (executor.isAccepting())
+    {
+        assert(MonoTime.currTime < deadline,
+            "shutdown did not linearize");
+        Thread.yield();
+    }
+
+    // Post-close submission must fail before claiming a completion slot.
+    bool rejected;
+    try
+    {
+        executor.trySubmit(&addTwo);
+    }
+    catch (Exception)
+    {
+        rejected = true;
+    }
+    assert(rejected);
+    assert(!executor.isStopped());
+
+    atomicStore!(MemoryOrder.rel)(release, true);
+
+    foreach (thread; closers)
+        thread.join();
+
+    assert(atomicLoad!(MemoryOrder.acq)(closerStarted) == 3u);
+    assert(executor.isStopped());
+
+    // The same terminal results remain observable after shutdown.
+    assert(blocked.get() == 17);
+    assert(queuedValue.get() == 42);
+
+    bool capturedError;
+    try
+    {
+        queuedError.get();
+    }
+    catch (Exception error)
+    {
+        capturedError = error.msg == "expected task failure";
+    }
+    assert(capturedError);
+
+    assert(executor.acceptedCount() == 3);
+    assert(executor.completedCount() == 3);
+    executor.closeAndJoin(); // repeated calls must be harmless
+}
+
+unittest
+{
+    // Multiple producer threads race with shutdown. Every accepted record
+    // must finish exactly once; late submissions never reopen the executor.
+    import core.atomic : MemoryOrder, atomicLoad;
+    import core.time : MonoTime, dur;
+
+    auto executor = new OwnedTaskExecutor(4, 8, 2048);
+    shared uint admitted;
+
+    Thread[4] producers;
+    foreach (i; 0 .. producers.length)
+    {
+        producers[i] = makeCompetingProducer(executor, &admitted);
+        producers[i].start();
+    }
+
+    // The producers are deliberately not joined before the close, so
+    // admission and the RUNNING -> DRAINING transition can overlap.
+    executor.closeAndJoin();
+
+    foreach (thread; producers)
+        thread.join();
+
+    assert(executor.isStopped());
+    assert(executor.acceptedCount() ==
+        atomicLoad!(MemoryOrder.acq)(admitted));
+    assert(executor.completedCount() == executor.acceptedCount());
 }
