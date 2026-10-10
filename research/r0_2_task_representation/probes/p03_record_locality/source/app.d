@@ -57,7 +57,7 @@ struct ScopeRecord
     TaskHeader header;
     shared uint state;
     uint reserved;
-    shared(void)* scope;
+    shared(void)* scopeOwner;
     ulong payload;
 }
 
@@ -66,7 +66,7 @@ struct Speculative64Record
     TaskHeader header;
     shared uint state;
     uint flags;
-    shared(void)* scope;
+    shared(void)* scopeOwner;
     ulong resultSlot;
     ulong cancellation;
     ulong reserved0;
