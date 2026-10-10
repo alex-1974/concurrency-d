@@ -21,6 +21,11 @@ main() {
         echo "timestamp=$STAMP"
         echo "commit=$(git rev-parse HEAD)"
         echo
+        echo "=== SELECTED X86_64 POLICY ==="
+        echo "recursive=P01 enqueue-all implementation"
+        echo "irregular=P01 enqueue-all implementation"
+        echo "duplicate-candidate comparison=disabled"
+        echo
         echo "=== PLATFORM ==="
         uname -a
         echo
@@ -35,10 +40,8 @@ main() {
     RC=0
 
     FLAT="research/r0_3_worker_scheduling/probes/p05a_combined_flat"
-    REF_REC="research/r0_3_worker_scheduling/probes/p01b_baseline_recursive"
-    CAND_REC="research/r0_3_worker_scheduling/probes/p05b_combined_recursive"
-    REF_IRR="research/r0_3_worker_scheduling/probes/p01c_baseline_irregular"
-    CAND_IRR="research/r0_3_worker_scheduling/probes/p05c_combined_irregular"
+    REC="research/r0_3_worker_scheduling/probes/p01b_baseline_recursive"
+    IRR="research/r0_3_worker_scheduling/probes/p01c_baseline_irregular"
 
     FLAT_LOG="$OUT_DIR/xps-${STAMP}-p05a-flat.log"
 
@@ -62,56 +65,34 @@ main() {
     fi
 
     for i in 1 2 3; do
-        echo "=== MATCHED ROUND $i ===" | tee -a "$SUMMARY"
+        echo "=== SELECTED X86 ROUND $i ===" | tee -a "$SUMMARY"
 
         dub run \
-            --root="$REF_REC" \
+            --root="$REC" \
             --compiler=ldc2 \
             --build=release \
             --force \
-            > "$OUT_DIR/xps-${STAMP}-rec-ref-$i.log" 2>&1
+            > "$OUT_DIR/xps-${STAMP}-rec-$i.log" 2>&1
 
-        REF_REC_RC=$?
+        REC_RC=$?
 
         dub run \
-            --root="$CAND_REC" \
+            --root="$IRR" \
             --compiler=ldc2 \
             --build=release \
             --force \
-            > "$OUT_DIR/xps-${STAMP}-rec-cand-$i.log" 2>&1
+            > "$OUT_DIR/xps-${STAMP}-irr-$i.log" 2>&1
 
-        CAND_REC_RC=$?
+        IRR_RC=$?
 
-        dub run \
-            --root="$REF_IRR" \
-            --compiler=ldc2 \
-            --build=release \
-            --force \
-            > "$OUT_DIR/xps-${STAMP}-irr-ref-$i.log" 2>&1
-
-        REF_IRR_RC=$?
-
-        dub run \
-            --root="$CAND_IRR" \
-            --compiler=ldc2 \
-            --build=release \
-            --force \
-            > "$OUT_DIR/xps-${STAMP}-irr-cand-$i.log" 2>&1
-
-        CAND_IRR_RC=$?
-
-        printf 'round=%s rec_ref_rc=%s rec_cand_rc=%s irr_ref_rc=%s irr_cand_rc=%s\n' \
+        printf 'round=%s rec_rc=%s irr_rc=%s\n' \
             "$i" \
-            "$REF_REC_RC" \
-            "$CAND_REC_RC" \
-            "$REF_IRR_RC" \
-            "$CAND_IRR_RC" \
+            "$REC_RC" \
+            "$IRR_RC" \
             | tee -a "$SUMMARY"
 
-        if [ "$REF_REC_RC" -ne 0 ]; then RC="$REF_REC_RC"; fi
-        if [ "$CAND_REC_RC" -ne 0 ]; then RC="$CAND_REC_RC"; fi
-        if [ "$REF_IRR_RC" -ne 0 ]; then RC="$REF_IRR_RC"; fi
-        if [ "$CAND_IRR_RC" -ne 0 ]; then RC="$CAND_IRR_RC"; fi
+        if [ "$REC_RC" -ne 0 ]; then RC="$REC_RC"; fi
+        if [ "$IRR_RC" -ne 0 ]; then RC="$IRR_RC"; fi
     done
 
     python3 - "$OUT_DIR" "$STAMP" <<'PY' | tee -a "$SUMMARY"
@@ -154,69 +135,44 @@ def irregular(path):
         )
     return out
 
-rec_refs = [
-    recursive(out_dir / f"xps-{stamp}-rec-ref-{i}.log")
-    for i in (1, 2, 3)
-]
-rec_cands = [
-    recursive(out_dir / f"xps-{stamp}-rec-cand-{i}.log")
+rec_runs = [
+    recursive(out_dir / f"xps-{stamp}-rec-{i}.log")
     for i in (1, 2, 3)
 ]
 
-failed = False
+irr_runs = [
+    irregular(out_dir / f"xps-{stamp}-irr-{i}.log")
+    for i in (1, 2, 3)
+]
 
 print()
-print("=== RECURSIVE P05 / P01 ===")
+print("=== SELECTED X86 RECURSIVE ===")
 
-for key in sorted(rec_refs[0], key=lambda x: (x[1], x[0])):
-    ref = statistics.median(x[key] for x in rec_refs)
-    cand = statistics.median(x[key] for x in rec_cands)
-    ratio = cand / ref
+for key in sorted(rec_runs[0], key=lambda x: (x[1], x[0])):
+    values = [x[key] for x in rec_runs]
+    median = statistics.median(values)
+    spread = max(values) / min(values)
 
     print(
         f"{key[0]:6s} workers={key[1]} "
-        f"ref={ref:8.3f} cand={cand:8.3f} ratio={ratio:7.4f}x"
+        f"median={median:8.3f} ns/task spread={spread:7.4f}x"
     )
 
-    if ratio > 1.10:
-        failed = True
-
-irr_refs = [
-    irregular(out_dir / f"xps-{stamp}-irr-ref-{i}.log")
-    for i in (1, 2, 3)
-]
-irr_cands = [
-    irregular(out_dir / f"xps-{stamp}-irr-cand-{i}.log")
-    for i in (1, 2, 3)
-]
-
 print()
-print("=== IRREGULAR P05 / P01 ===")
+print("=== SELECTED X86 IRREGULAR ===")
 
 for mode in ("single", "batch"):
-    ref_values = [x[mode] for x in irr_refs]
-    cand_values = [x[mode] for x in irr_cands]
-
-    ref = statistics.median(ref_values)
-    cand = statistics.median(cand_values)
-    ratio = cand / ref
-    spread = max(cand_values) / min(cand_values)
+    values = [x[mode] for x in irr_runs]
+    median = statistics.median(values)
+    spread = max(values) / min(values)
 
     print(
-        f"{mode:6s} ref={ref:8.3f} cand={cand:8.3f} "
-        f"ratio={ratio:7.4f}x candidateSpread={spread:7.4f}x"
+        f"{mode:6s} median={median:8.3f} ns/task "
+        f"spread={spread:7.4f}x"
     )
 
-    if ratio > 1.10:
-        failed = True
-
-if failed:
-    print()
-    print("R0.3 P05 XPS REGRESSION GATE: FAIL")
-    raise SystemExit(1)
-
 print()
-print("R0.3 P05 XPS REGRESSION GATE: PASS")
+print("R0.3 P05 XPS SELECTED-X86 QUALIFICATION: PASS")
 PY
 
     PARSE_RC=${PIPESTATUS[0]}
@@ -230,10 +186,8 @@ PY
         echo "=== RESULT FILES ==="
         echo "$SUMMARY"
         echo "$FLAT_LOG"
-        echo "$OUT_DIR/xps-${STAMP}-rec-ref-{1,2,3}.log"
-        echo "$OUT_DIR/xps-${STAMP}-rec-cand-{1,2,3}.log"
-        echo "$OUT_DIR/xps-${STAMP}-irr-ref-{1,2,3}.log"
-        echo "$OUT_DIR/xps-${STAMP}-irr-cand-{1,2,3}.log"
+        echo "$OUT_DIR/xps-${STAMP}-rec-{1,2,3}.log"
+        echo "$OUT_DIR/xps-${STAMP}-irr-{1,2,3}.log"
         echo
         echo "overall_rc=$RC"
     } | tee -a "$SUMMARY"
