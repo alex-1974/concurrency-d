@@ -7,6 +7,9 @@ on:
     paths:
       - ".github/workflows/r0-1-containers-adoption.yml"
       - "research/r0_1_containers_adoption/**"
+      - "source/concurrency/internal/work_stealing_queue.d"
+      - "dub.sdl"
+      - "ROADMAP.md"
       - "research/r0_1_work_stealing_deque/probes/p14c_irregular_bursty/**"
       - "research/r0_1_work_stealing_deque/candidate/**"
   workflow_dispatch:
@@ -41,6 +44,12 @@ jobs:
         run: |
           "$DC" --version
           dub --version
+
+      - name: Root package test
+        shell: bash
+        run: |
+          dub test --compiler="$DC" --force
+          dub build --build=release --compiler="$DC" --force
 
       - name: A0 TaskRef contract
         shell: bash
@@ -90,6 +99,12 @@ jobs:
           uname -m
           lscpu
           test "$(uname -m)" = "aarch64"
+
+      - name: Root package test
+        shell: bash
+        run: |
+          dub test --compiler="$DC" --force
+          dub build --build=release --compiler="$DC" --force
 
       - name: A0 TaskRef contract
         shell: bash
