@@ -70,7 +70,7 @@ unittest
 
         foreach (i; 0 .. N)
         {
-            TaskRef task = prepareScalar(
+            TaskRef task = prepareScalar!int(
                 &records[i], &square, cast(int) i);
 
             for (;;)
@@ -102,7 +102,7 @@ unittest
 {
     shared ScalarTaskRecord!long record;
     auto pool = new SubmissionWorkerPool(2, 2);
-    TaskRef task = prepareScalar(&record, &twice, 21L);
+    TaskRef task = prepareScalar!long(&record, &twice, 21L);
     assert(pool.trySubmit(task) == SubmissionResult.accepted);
 
     pool.closeAndJoin();
