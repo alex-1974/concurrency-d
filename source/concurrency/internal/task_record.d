@@ -19,7 +19,7 @@ package(concurrency) struct TaskHeader
 {
     alias ExecuteFn =
         void function(shared(TaskHeader)*)
-        @safe @nogc nothrow;
+        @safe nothrow;
 
     ExecuteFn execute;
 }
@@ -40,7 +40,7 @@ static assert(TaskRef.sizeof == 8);
  * must remain alive until the synchronous worker batch has completed.
  */
 package(concurrency) void dispatchTask(TaskRef task)
-    @safe @nogc nothrow
+    @safe nothrow
 {
     assert(task.ptr !is null);
 
