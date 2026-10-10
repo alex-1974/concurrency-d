@@ -1,6 +1,6 @@
 # R0.3 P05 — Combined worker-scheduling qualification
 
-Status: CI PASS — LOCAL XPS PENDING
+Status: CI REQUALIFYING — LOCAL XPS RERUN PENDING
 
 ## Selected combined policy
 
@@ -117,18 +117,103 @@ P05 selection incorporates the negative results from earlier gates:
 
 These results remain part of the selected policy rationale.
 
+## First local XPS attempt — rejected benchmark methodology
+
+The first local XPS run was executed at:
+
+```text
+commit 78f1a0c3ae643de73bf86221a2988c0fb4449e02
+Intel Core i7-9750H
+LDC 1.41.0
+DMD frontend 2.111.0
+LLVM 19.1.7
+host CPU skylake
+```
+
+Correctness passed for every matched round.
+
+Recursive P05/P01 ratios were within the 1.10x gate:
+
+```text
+batch  1w 0.7673x
+single 1w 0.7517x
+batch  2w 1.0053x
+single 2w 1.0043x
+batch  4w 1.0096x
+single 4w 0.9772x
+```
+
+Irregular exposed the failure:
+
+```text
+single 1.0644x
+batch  1.1252x
+candidate batch spread 1.2576x
+```
+
+The run therefore correctly reported:
+
+```text
+R0.3 P05 XPS REGRESSION GATE: FAIL
+```
+
+### Root cause in the qualification design
+
+The selected x86_64 policy is enqueue-all, but the first P05 methodology
+benchmarked a separately compiled duplicate candidate executable.
+
+Even after the direct-continuation condition was compile-time false, the
+candidate retained a different function/module shape and instrumentation.
+
+That means the comparison was not a pure scheduling-policy comparison.
+
+This matters because prior scheduler research already showed compiler
+function-shape/code-layout sensitivity.
+
+A follow-up CI attempt preserved the exact P01 executeTask body inside the
+duplicate P05 executable. A hosted x86_64 run still reached 1.1012x in the
+four-worker recursive single-steal case.
+
+Therefore a separate duplicate binary is not an acceptable benchmark proxy for
+the selected x86_64 policy.
+
+### Corrected qualification rule
+
+For x86_64:
+
+```text
+selected P05 implementation = P01 enqueue-all implementation itself
+```
+
+Therefore local and hosted x86 qualification run the selected P01 executable
+directly.
+
+For AArch64:
+
+```text
+selected P05 implementation = saturation-gated direct continuation
+```
+
+Only AArch64 performs a P05-vs-P01 candidate comparison.
+
+This preserves semantic and code-shape fairness instead of relaxing the
+performance threshold.
+
 ## Remaining gate
 
 R0.3 requires local native-x86_64 qualification on the project XPS.
 
-The local gate must:
+The corrected local gate must:
 
 - use LDC 1.41.0;
 - record platform/toolchain identity;
 - run the combined flat workload;
-- compare P01 versus P05 recursive in balanced repeated order;
-- compare P01 versus P05 irregular in balanced repeated order;
+- run the selected x86 recursive implementation, which is P01 enqueue-all;
+- run the selected x86 irregular implementation, which is P01 enqueue-all;
+- repeat both selected workloads three times;
 - preserve exact correctness checks;
-- reject a material >1.10x regression.
+- report run-to-run spread.
 
-P05 becomes final PASS only after that evidence is recorded.
+No duplicate x86 candidate binary is used for performance comparison.
+
+P05 becomes final PASS only after that corrected evidence is recorded.
