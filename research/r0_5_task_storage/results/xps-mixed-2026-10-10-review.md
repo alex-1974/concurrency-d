@@ -2,24 +2,35 @@
 
 **Research evidence, not a production policy change.**
 
-Source: user-supplied XPS terminal capture, `Eingefügter Text(20261010-213048).txt`,
-SHA-256 `8caa2c2a0371c861857f0b769127fc3aa03459bb609960528017a515bcab6125`.
-It contains 120 data rows, all 60 two-policy pairs complete, and five
-rounds for each of 12 configurations. Normalized data is preserved in
-[xps-mixed-2026-10-10-raw.csv](./xps-mixed-2026-10-10-raw.csv).
+Source: user-supplied XPS terminal capture, `Eingefügter Text(20261010-213048).txt`.
+No cryptographic digest of that original terminal capture has been
+independently established; an earlier claimed SHA-256 was unverified and
+has been removed. The capture contains 120 data rows, all 60 two-policy
+pairs complete, and five rounds for each of 12 configurations.
+The normalized observations are in
+[xps-mixed-2026-10-10-raw.csv](./xps-mixed-2026-10-10-raw.csv);
+the [exact follow-up environment and source revision](./xps-mixed-2026-10-10-environment.md)
+were provided by the user after the run.
 
 ## Provenance and limitations
 
-- Local machine: Dell XPS (terminal prompt `xps-15`); LDC `ldc2`
-  optimized release, four worker threads, 30,000 tasks per subprocess.
+- Local machine: Dell XPS (terminal prompt `xps-15`), Intel
+  **Core i7-9750H** (6 physical cores, 12 logical threads, 12 MiB L3).
+  LDC **1.41.0** (based on DMD 2.111.0, LLVM 19.1.7), release build,
+  four worker threads, 30,000 tasks per subprocess.
+- OS string: `Linux-6.17.0-22-generic-x86_64-with-glibc2.43`.
+  The compiler reports host CPU `skylake`; this is not independent
+  confirmation of explicit code-generation CPU flags.
 - Independent producer counts: 1, 4, 8. Retention budgets:
   8, 64, 512, 4096. Both `freshGc` and `recycleTyped` measured five
   times each; policy order alternated each round.
 - Executed on the checked-out branch `perf/r05-owned-task-pipeline`.
-  **Exact local git SHA was not printed** in the supplied terminal log;
-  do not claim bitwise equivalence to any particular repository commit
-  without `git rev-parse HEAD`. Compiler flags and system power settings
-  were not included in the pasted evidence.
+  A subsequent `git rev-parse HEAD` **confirmed the exact local
+  source commit** `2dd09d85235fde72279545d0efbdffb47b7c51c9`.
+  The matrix harness uses `dub build --build=release --compiler=ldc2`.
+  CPU governor, power state, thermals and explicit CPU tuning flags
+  remain unobserved; `lscpu` reported a momentary 92% frequency scale,
+  which is not a controlled clock setting.
 - The initial `cd ~/Programmiersprachen/dlang/d-geospatial-workspace/libs/concurrency-d`
   failed. Git commands and the benchmark nevertheless succeeded from the
   already-active `~/Programmiersprachen/dlang/concurrency-d` repository.
@@ -101,9 +112,10 @@ remains draft and no release/API performance claims are justified.
    keeping the semantically identical paired policies, to distinguish
    common atomic contention from storage costs;
 3. record GC collection/pause information, allocated bytes across all
-   threads, RSS under sustained longer runs, and compiler/CPU governor
-   evidence (`environment.txt`, `ldc2 --version`,
-   `git rev-parse HEAD`);
+   threads, RSS under sustained longer runs, and controlled CPU-governor,
+   power, thermal and LDC codegen-flag evidence. Exact compiler, OS,
+   CPU model/topology and git commit are now captured in the
+   [environment record](./xps-mixed-2026-10-10-environment.md);
 4. qualify optional per-type spare lists only **after** profiling shows
    spare lookup is material. Type-indexed pools are not justified yet;
 5. evaluate latency p50/p95/p99 as well as throughput, not only one
