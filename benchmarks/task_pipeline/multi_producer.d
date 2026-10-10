@@ -250,7 +250,7 @@ private void runCase(
         cast(long) usedAfterCollect - cast(long) usedBefore;
 
     writefln(
-        "multi,mixed,%s,%s,%s,%s,%s,%.3f,%.1f,%s,%s,%s,%s,%s,%s",
+        "multi,mixed,%s,%s,%s,%s,%s,%.3f,%.1f,%s,%s,%s,%s,%s,%s,%s",
         policyName(policy), workers, producers, budget, tasks,
         cast(double) elapsedNs / 1_000_000.0,
         cast(double) tasks / seconds,
