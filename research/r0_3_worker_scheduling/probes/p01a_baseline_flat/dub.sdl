@@ -1,0 +1,7 @@
+name "r0-3-p01a-baseline-flat"
+description "R0.3 P01a worker-scheduling baseline: flat granularity"
+targetType "executable"
+
+dependency "containers-d" version="0.2.0"
+
+sourcePaths "source"
