@@ -74,8 +74,10 @@ jobs:
       - name: Selection contract
         shell: bash
         run: |
-          printf '%s
-'             'R0.3 P05 x86_64 selection:'             '  recursive = P01 enqueue-all implementation'             '  irregular = P01 enqueue-all implementation'             'No duplicate candidate binary is benchmarked on x86_64.'
+          echo "R0.3 P05 x86_64 selection"
+          echo "recursive = P01 enqueue-all implementation"
+          echo "irregular = P01 enqueue-all implementation"
+          echo "No duplicate candidate binary is benchmarked on x86_64."
 
   arm64:
     name: P05 / native ARM64 / LDC 1.41
