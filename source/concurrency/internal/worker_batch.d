@@ -128,7 +128,7 @@ private Thread makeWorker(
              i < tasks.length;
              i += workerCount)
         {
-            const task = tasks[i];
+            TaskRef task = tasks[i];
 
             if (!queues[workerIndex].tryPush(task))
             {
@@ -140,7 +140,7 @@ private Thread makeWorker(
         while (atomicLoad!(MemoryOrder.acq)(*completed)
             != tasks.length)
         {
-            const local = queues[workerIndex].pop();
+            auto local = queues[workerIndex].pop();
 
             if (local.found)
             {
@@ -162,7 +162,7 @@ private Thread makeWorker(
                 {
                     case BatchStealMode.single:
                     {
-                        const stolen = queues[victim].steal();
+                        auto stolen = queues[victim].steal();
 
                         if (!stolen.found)
                         {
