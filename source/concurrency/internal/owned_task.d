@@ -1029,3 +1029,48 @@ unittest
     assert(executor.spareCount() == 0);
     assert(executor.acceptedCount() == 128);
 }
+
+unittest
+{
+    // Regression: repeated full-ingress rejection must not allocate
+    // throwaway ResultCells/TaskHandles/OwnedNodes on the producer thread.
+    // One gated worker holds a task while the single ingress slot stays full.
+    import core.atomic : MemoryOrder, atomicStore;
+    import core.memory : GC;
+
+    shared bool entered;
+    shared bool release;
+
+    GatedTask gated;
+    gated.entered = &entered;
+    gated.release = &release;
+
+    foreach (policy; [OwnedRecordPolicy.freshGc,
+                       OwnedRecordPolicy.recycleTyped])
+    {
+        atomicStore!(MemoryOrder.rel)(entered, false);
+        atomicStore!(MemoryOrder.rel)(release, false);
+
+        auto executor = new OwnedTaskExecutor(1, 1, 4, policy);
+        auto running = executor.submit(gated);
+        waitForFlag(&entered);
+
+        auto waiting = executor.submit(&addTwo);
+        const before = GC.allocatedInCurrentThread();
+
+        foreach (_; 0 .. 300)
+            assert(executor.trySubmit(&addTwo) is null);
+
+        const after = GC.allocatedInCurrentThread();
+        assert(after == before,
+            "full-ingress rejection unexpectedly allocated GC memory");
+
+        atomicStore!(MemoryOrder.rel)(release, true);
+        assert(running.get() == 17);
+        assert(waiting.get() == 42);
+        executor.closeAndJoin();
+
+        assert(executor.acceptedCount() == 2);
+        assert(executor.completedCount() == 2);
+    }
+}
