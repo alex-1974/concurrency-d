@@ -86,3 +86,12 @@ jobs:
             --root=research/r0_2_task_representation/probes/p01_representation_capability \
             --compiler="$DC" \
             --force
+
+      - name: P02 dispatch kernel
+        shell: bash
+        run: |
+          dub run \
+            --root=research/r0_2_task_representation/probes/p02_dispatch_kernel \
+            --compiler="$DC" \
+            --build=release \
+            --force
