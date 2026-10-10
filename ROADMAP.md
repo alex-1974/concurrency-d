@@ -4,14 +4,28 @@
 
 Research and benchmark the primitive mechanisms before freezing a public API.
 
-### R0.1 Work-stealing deque
+### R0.1 Work-stealing deque — qualified
 
-Compare:
+Completed research established the bounded single-owner / multi-thief local
+worker queue contract, batch-steal behavior, overflow separation, safety
+boundary, scheduler-neighborhood performance, and native x86_64/AArch64
+evidence.
 
-- Taskflow-style bounded Chase-Lev queue;
-- cached-top variant;
-- steal-one versus batch-steal;
-- overflow/injection strategies.
+The reusable primitive was promoted to `containers-d`. The selected
+production consumer dependency is:
+
+```d
+containers.WorkStealingDeque!(T, Capacity)
+```
+
+from `containers-d 0.2.0`.
+
+`concurrency-d` retains scheduler policy, TaskRef/TaskRecord lifetime,
+victim selection, batch-use policy, overflow execution policy, parking/wake,
+and executor coordination.
+
+The original R0.1 implementation and P09-P16 evidence remain retained research
+references; production work must not duplicate the deque mechanics locally.
 
 ### R0.2 Task representation
 
