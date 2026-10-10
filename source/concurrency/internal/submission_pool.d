@@ -9,6 +9,10 @@
  * This is a synchronous-lifetime prototype: the caller retains every
  * admitted TaskRecord until closeAndJoin() has returned. A public owned-task
  * API and general failure propagation are separate M0 work.
+ *
+ * This module additionally hosts the portable R0.4 P01 condition-variable
+ * baseline. The predicate is the scheduler-owned generation and work state,
+ * not a notification treated as a durable token.
  */
 module concurrency.internal.submission_pool;
 
@@ -27,6 +31,9 @@ import core.atomic :
 
 import core.sync.mutex :
     Mutex;
+
+import core.sync.condition :
+    Condition;
 
 import core.thread :
     Thread;
@@ -52,11 +59,14 @@ private alias LocalQueue =
 private final class TaskInbox
 {
     private Mutex _mutex;
+    private Condition _changed;
     private TaskRef[] _slots;
     private size_t _head;
     private size_t _used;
     private size_t _accepted;
     private size_t _completed;
+    private size_t _generation;
+    private size_t _parkCount;
     private bool _closed;
 
     this(size_t capacity)
@@ -65,6 +75,7 @@ private final class TaskInbox
             throw new Exception("ingress capacity must be positive");
 
         _mutex = new Mutex();
+        _changed = new Condition(_mutex);
         _slots = new TaskRef[capacity];
     }
 
@@ -87,6 +98,8 @@ private final class TaskInbox
             _slots[tail] = task;
             ++_used;
             ++_accepted;
+            ++_generation;
+            _changed.notify();
             return SubmissionResult.accepted;
         }
     }
@@ -116,6 +129,14 @@ private final class TaskInbox
         {
             assert(_completed < _accepted);
             ++_completed;
+
+            // The final completion releases all workers waiting for the
+            // shutdown predicate. Earlier completions introduce no work.
+            if (_closed && _completed == _accepted)
+            {
+                ++_generation;
+                _changed.notifyAll();
+            }
         }
     }
 
@@ -124,6 +145,61 @@ private final class TaskInbox
         synchronized (_mutex)
         {
             _closed = true;
+            ++_generation;
+            _changed.notifyAll();
+        }
+    }
+
+    /**
+     * Capture the wake generation BEFORE trying local pop, inbox drain and
+     * cross-worker steals. Publication can then race with search safely.
+     */
+    size_t wakeGeneration()
+    {
+        synchronized (_mutex)
+        {
+            return _generation;
+        }
+    }
+
+    /**
+     * Announces tasks moved into a worker-owned local deque. That move is
+     * outside the inbox lock; without a new generation idle thieves might
+     * miss an opportunity to steal the new work.
+     */
+    void announceLocalWork()
+    {
+        synchronized (_mutex)
+        {
+            ++_generation;
+            _changed.notify();
+        }
+    }
+
+    /**
+     * Atomically compare the observed generation, validate the inbox and
+     * release the mutex while sleeping. Any producer that publishes during
+     * the search-to-park window changes the generation under this same lock.
+     */
+    void parkUnlessChanged(size_t observed)
+    {
+        synchronized (_mutex)
+        {
+            while (_generation == observed &&
+                   _used == 0 &&
+                   !(_closed && _completed == _accepted))
+            {
+                ++_parkCount;
+                _changed.wait();
+            }
+        }
+    }
+
+    size_t parkCount()
+    {
+        synchronized (_mutex)
+        {
+            return _parkCount;
         }
     }
 
@@ -165,7 +241,9 @@ private final class TaskInbox
  * the pool owes one execution, but it never owns the TaskRecord storage.
  * Keep every admitted record alive until closeAndJoin completes.
  *
- * Worker threads yield while idle; condition-variable parking is issue #10.
+ * Idle workers park on a condition variable using an epoch-style wake
+ * generation checked under the same mutex as publication. This is the
+ * portable R0.4 P01 baseline, not an optimized spin/yield/futex policy.
  */
 package(concurrency) final class SubmissionWorkerPool
 {
@@ -240,6 +318,12 @@ package(concurrency) final class SubmissionWorkerPool
         return _inbox.completedCount();
     }
 
+    /** Diagnostic only, used by race-oriented parking tests. */
+    size_t parkCount()
+    {
+        return _inbox.parkCount();
+    }
+
     private void executeOne(TaskRef task)
     {
         dispatchTask(task);
@@ -257,6 +341,9 @@ package(concurrency) final class SubmissionWorkerPool
 
         for (;;)
         {
+            // The ticket must precede the entire empty-work search.
+            const observed = _inbox.wakeGeneration();
+
             auto local = _queues[self].pop();
             if (local.found)
             {
@@ -269,12 +356,22 @@ package(concurrency) final class SubmissionWorkerPool
             {
                 // Publish newly claimed work only into this worker's
                 // owner deque, permitting other workers to steal it.
+                bool enqueued;
                 foreach (i; 1 .. taken)
                 {
                     TaskRef task = batch[i];
-                    if (!_queues[self].tryPush(task))
+                    if (_queues[self].tryPush(task))
+                    {
+                        enqueued = true;
+                    }
+                    else
+                    {
                         executeOne(task);
+                    }
                 }
+
+                if (enqueued)
+                    _inbox.announceLocalWork();
 
                 executeOne(batch[0]);
                 continue;
@@ -306,7 +403,9 @@ package(concurrency) final class SubmissionWorkerPool
             if (_inbox.isDrained())
                 break;
 
-            Thread.yield();
+            // Condition.wait releases _mutex atomically. If any
+            // publication/close happened since observed, this won't sleep.
+            _inbox.parkUnlessChanged(observed);
         }
     }
 }
