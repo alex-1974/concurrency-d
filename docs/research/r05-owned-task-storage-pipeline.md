@@ -105,6 +105,31 @@ Repeat the optimized LDC runs on a controlled XPS before a policy
 selection; include run-to-run variation, CPU/power state and allocation
 count in the decision.
 
+## Admission-pressure correction
+
+The first hosted paired matrix (GitHub Actions #38086354231) exposed
+allocation waste common to **both** policies: `trySubmit` previously
+allocated the result cell, TaskHandle and candidate node **before**
+discovering that an inbox slot was full. That made low-budget comparisons
+partly a benchmark of discarded allocations rather than accepted work.
+
+The internal ingress now exposes a mutex-protected advisory capacity check.
+The owned executor holds its own admission mutex across this check and
+publication: no second owned producer can fill the slot meanwhile; workers
+can only remove entries. A full inbox or retention budget returns before
+allocating any per-submission GC objects. Successful admission retains the
+same completion and lifetime semantics. The trade-off is that successful
+allocation occurs while the producer-side admission mutex is held, so
+contention and GC pauses require measurement rather than assumed speedup.
+
+A gated single-worker negative regression performs 300 known-full
+`trySubmit` attempts per policy and requires no additional producer-thread
+GC allocated bytes. This is a deliberate baseline correction applied
+identically to `freshGc` and `recycleTyped`.
+
+The initial matrix results are preserved in the GitHub Actions history;
+use the **post-correction** exact-head matrix for storage-policy decisions.
+
 ## Correctness and scope
 
 - A node is moved to spares only after the post-dispatch marker is visible
