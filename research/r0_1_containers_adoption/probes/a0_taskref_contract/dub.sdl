@@ -1,0 +1,7 @@
+name "r0-1-adoption-a0-taskref-contract"
+description "R0.1 containers-d adoption: TaskRef transport contract"
+targetType "executable"
+
+dependency "containers-d" version="0.2.0"
+
+sourcePaths "source"
