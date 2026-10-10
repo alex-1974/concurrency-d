@@ -594,3 +594,97 @@ unittest
     assert(count == pool.acceptedCount());
     assert(count == pool.completedCount());
 }
+
+version (unittest)
+{
+    private void waitForPark(SubmissionWorkerPool pool, size_t threshold)
+    {
+        // Diagnostic synchronization point rather than sleep-based timing.
+        // Bounded so an idle-path regression reports a failed test.
+        foreach (_; 0 .. 200_000)
+        {
+            if (pool.parkCount() >= threshold)
+                return;
+
+            Thread.yield();
+        }
+
+        assert(0, "a worker did not reach the parking protocol");
+    }
+
+    private void waitForExecution(shared CountingRecord* record)
+    {
+        foreach (_; 0 .. 200_000)
+        {
+            if (atomicLoad!(MemoryOrder.acq)(record.executions) == 1u)
+                return;
+
+            Thread.yield();
+        }
+
+        assert(0, "isolated task was not executed after wakeup");
+    }
+}
+
+unittest
+{
+    // Producer publishes while workers are idle. Repeated idle->work->idle
+    // transitions exercise the generation/notification protocol.
+    enum size_t Count = 48;
+    auto records = new shared CountingRecord[Count];
+    auto tasks = new TaskRef[Count];
+    prepareRecords(records[], tasks);
+
+    auto pool = new SubmissionWorkerPool(2, 2);
+    waitForPark(pool, 1);
+
+    foreach (i; 0 .. Count)
+    {
+        const oldParks = pool.parkCount();
+
+        assert(pool.trySubmit(tasks[i]) == SubmissionResult.accepted);
+        waitForExecution(&records[i]);
+        waitForPark(pool, oldParks + 1);
+    }
+
+    pool.closeAndJoin();
+
+    assert(pool.completedCount() == Count);
+    foreach (i; 0 .. Count)
+    {
+        assert(atomicLoad!(MemoryOrder.acq)(
+            records[i].executions) == 1u);
+    }
+}
+
+unittest
+{
+    // All workers initially idle; close must broadcast and join them.
+    auto pool = new SubmissionWorkerPool(4, 2);
+    waitForPark(pool, 1);
+
+    pool.closeAndJoin();
+    assert(pool.acceptedCount() == 0);
+    assert(pool.completedCount() == 0);
+}
+
+unittest
+{
+    // Publication before the park check cannot be missed, because the
+    // generation is changed under the same mutex as Condition.wait.
+    auto inbox = new TaskInbox(2);
+    shared CountingRecord record;
+    TaskRef task = TaskRef(&record.header);
+
+    const observed = inbox.wakeGeneration();
+    assert(inbox.trySubmit(task) == SubmissionResult.accepted);
+
+    // An incorrect generation protocol could block this test forever.
+    inbox.parkUnlessChanged(observed);
+
+    TaskRef[1] received;
+    assert(inbox.takeBatch(received[]) == 1);
+    inbox.completeOne();
+    inbox.close();
+    assert(inbox.isDrained());
+}
