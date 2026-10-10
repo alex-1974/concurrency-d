@@ -331,3 +331,71 @@ The combined worker-scheduling policy is ready for P06.
 ```text
 R0.3 P05 COMBINED WORKER SCHEDULER: PASS
 ```
+
+
+## Corrected local XPS qualification
+
+The corrected selected-implementation XPS gate passed on:
+
+```text
+Intel Core i7-9750H
+Linux x86_64
+LDC 1.41.0
+D frontend 2.111.0
+LLVM 19.1.7
+Host CPU: skylake
+DUB 1.40.0
+```
+
+Run commit:
+
+```text
+191eaacf4badee3dd6c162ded192dc499c223e6b
+```
+
+The selected x86_64 policy is the P01 enqueue-all implementation itself.
+No duplicate candidate executable is used.
+
+All three repeated recursive and irregular runs passed correctness.
+
+Selected x86_64 medians/spreads:
+
+```text
+recursive:
+  batch  1w 65.293 ns/task spread 1.0843x
+  single 1w 62.837         spread 1.0292x
+  batch  2w 55.071         spread 1.2237x
+  single 2w 55.431         spread 1.2765x
+  batch  4w 55.746         spread 1.2605x
+  single 4w 56.607         spread 1.2479x
+
+irregular:
+  single 51.868 ns/task spread 1.1405x
+  batch  51.899         spread 1.1355x
+```
+
+The local runner reported:
+
+```text
+R0.3 P05 XPS SELECTED-X86 QUALIFICATION: PASS
+overall_rc=0
+```
+
+The spread is retained as environmental/runtime evidence; it is not a
+candidate-vs-baseline regression because the selected x86 implementation is
+the baseline implementation itself.
+
+## Final P05 result
+
+P05 passes on all required environments:
+
+- DMD 2.111 correctness;
+- LDC 1.41 hosted x86_64 selected implementation;
+- local project XPS / LDC 1.41;
+- native AArch64 / LDC 1.41 matched continuation comparison.
+
+Result:
+
+```text
+R0.3 P05 COMBINED SCHEDULER: PASS
+```
