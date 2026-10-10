@@ -133,7 +133,7 @@ struct Distribution
 private TaskRef makeTask(
     ulong id,
     shared TaskRecord* records)
-    @safe @nogc nothrow
+    @trusted @nogc nothrow
 {
     return TaskRef(
         &records[
@@ -316,12 +316,12 @@ private void executeOverflowInline(
 
         stats.spawned += 2;
 
-        const left =
+        auto left =
             makeTask(
                 id << 1,
                 records);
 
-        const right =
+        auto right =
             makeTask(
                 (id << 1) | 1,
                 records);
@@ -384,7 +384,8 @@ private void executeTask(
     Queue[] queues,
     ref WorkerStats stats,
     shared long* outstanding,
-    shared ulong* completed)
+    shared ulong* completed,
+    shared TaskRecord* records)
 {
     const id =
         taskId(task);
@@ -412,12 +413,12 @@ private void executeTask(
 
         stats.spawned += 2;
 
-        const left =
+        auto left =
             makeTask(
                 id << 1,
                 records);
 
-        const right =
+        auto right =
             makeTask(
                 (id << 1) | 1,
                 records);
@@ -519,7 +520,7 @@ private Thread makeWorker(
                     *outstanding,
                     cast(long) 1);
 
-            const root =
+            auto root =
                 makeTask(
                     1,
                     records);
@@ -555,7 +556,8 @@ private Thread makeWorker(
                     queues,
                     stats,
                     outstanding,
-                    completed);
+                    completed,
+                    records);
 
                 continue;
             }
@@ -606,7 +608,8 @@ private Thread makeWorker(
                                 queues,
                                 stats,
                                 outstanding,
-                                completed);
+                                completed,
+                                records);
 
                             foundWork = true;
                             break;
