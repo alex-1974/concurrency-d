@@ -150,7 +150,7 @@ struct Distribution
     double p90;
 }
 
-private shared TaskRecord* taskRecord(
+private shared(TaskRecord*) taskRecord(
     TaskRef task)
     @trusted @nogc nothrow
 {
