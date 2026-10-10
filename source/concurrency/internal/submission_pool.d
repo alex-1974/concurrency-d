@@ -252,12 +252,21 @@ package(concurrency) final class SubmissionWorkerPool
     private Thread[] _workers;
     private size_t _started;
 
-    this(size_t workerCount, size_t ingressCapacity)
+    // Optional internal completion hook. Called by the claiming worker only
+    // after dispatch and inbox accounting no longer need the TaskRef target.
+    // It must not throw or retain the borrowed TaskRef past this invocation.
+    private void function(TaskRef) nothrow _afterExecution;
+
+    this(
+        size_t workerCount,
+        size_t ingressCapacity,
+        void function(TaskRef) nothrow afterExecution = null)
     {
         if (workerCount == 0)
             throw new Exception("workerCount must be positive");
 
         _inbox = new TaskInbox(ingressCapacity);
+        _afterExecution = afterExecution;
         _queues = new LocalQueue[workerCount];
         _workers = new Thread[workerCount];
 
@@ -328,6 +337,13 @@ package(concurrency) final class SubmissionWorkerPool
     {
         dispatchTask(task);
         _inbox.completeOne();
+
+        // Returning from the record's execute thunk alone is not a
+        // lifetime-safe reclamation marker: the worker could still hold
+        // and dereference the record. Only mark after completion accounting
+        // has finished and the task's record is no longer accessed here.
+        if (_afterExecution !is null)
+            _afterExecution(task);
     }
 
     private void workerLoop(size_t self)
