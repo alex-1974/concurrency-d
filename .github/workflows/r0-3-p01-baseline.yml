@@ -1,0 +1,119 @@
+name: R0.3 P01 scheduling baseline
+
+on:
+  push:
+    branches:
+      - research/r0-3-worker-scheduling
+    paths:
+      - ".github/workflows/r0-3-p01-baseline.yml"
+      - "research/r0_3_worker_scheduling/probes/p01a_baseline_flat/**"
+      - "research/r0_3_worker_scheduling/probes/p01b_baseline_recursive/**"
+      - "research/r0_3_worker_scheduling/probes/p01c_baseline_irregular/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  baseline:
+    name: P01 / ${{ matrix.compiler }}
+    runs-on: ubuntu-24.04
+
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler:
+          - dmd-2.111.0
+          - ldc-1.41.0
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Install D
+        uses: dlang-community/setup-dlang@v2
+        with:
+          compiler: ${{ matrix.compiler }}
+          dub: 1.40.0
+
+      - name: Toolchain
+        shell: bash
+        run: |
+          "$DC" --version
+          dub --version
+
+      - name: P01a flat baseline
+        shell: bash
+        run: |
+          dub run \
+            --root=research/r0_3_worker_scheduling/probes/p01a_baseline_flat \
+            --compiler="$DC" \
+            --build=release \
+            --force
+
+      - name: P01b recursive baseline
+        shell: bash
+        run: |
+          dub run \
+            --root=research/r0_3_worker_scheduling/probes/p01b_baseline_recursive \
+            --compiler="$DC" \
+            --build=release \
+            --force
+
+      - name: P01c irregular baseline
+        shell: bash
+        run: |
+          dub run \
+            --root=research/r0_3_worker_scheduling/probes/p01c_baseline_irregular \
+            --compiler="$DC" \
+            --build=release \
+            --force
+
+  native-arm64:
+    name: P01 / native ARM64 / LDC 1.41
+    runs-on: ubuntu-24.04-arm
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Install LDC
+        uses: dlang-community/setup-dlang@v2
+        with:
+          compiler: ldc-1.41.0
+
+      - name: Platform evidence
+        shell: bash
+        run: |
+          "$DC" --version
+          dub --version
+          uname -m
+          lscpu
+          test "$(uname -m)" = "aarch64"
+
+      - name: P01a flat baseline
+        shell: bash
+        run: |
+          dub run \
+            --root=research/r0_3_worker_scheduling/probes/p01a_baseline_flat \
+            --compiler="$DC" \
+            --build=release \
+            --force
+
+      - name: P01b recursive baseline
+        shell: bash
+        run: |
+          dub run \
+            --root=research/r0_3_worker_scheduling/probes/p01b_baseline_recursive \
+            --compiler="$DC" \
+            --build=release \
+            --force
+
+      - name: P01c irregular baseline
+        shell: bash
+        run: |
+          dub run \
+            --root=research/r0_3_worker_scheduling/probes/p01c_baseline_irregular \
+            --compiler="$DC" \
+            --build=release \
+            --force
