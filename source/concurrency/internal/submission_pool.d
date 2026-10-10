@@ -104,6 +104,18 @@ private final class TaskInbox
         }
     }
 
+    /**
+     * An advisory non-reserving capacity check. The owned executor holds
+     * its submission mutex while querying and publishing, so another
+     * owned producer cannot fill the inbox in between. A worker may only
+     * remove slots, making a positive result remain valid for that path.
+     */
+    bool hasCapacity()
+    {
+        synchronized (_mutex)
+            return !_closed && _used < _slots.length;
+    }
+
     size_t takeBatch(scope TaskRef[] output)
     {
         synchronized (_mutex)
@@ -304,6 +316,12 @@ package(concurrency) final class SubmissionWorkerPool
     SubmissionResult trySubmit(TaskRef task)
     {
         return _inbox.trySubmit(task);
+    }
+
+    /** Optional fast rejection before constructing a costly owned record. */
+    bool hasIngressCapacity()
+    {
+        return _inbox.hasCapacity();
     }
 
     /** Blocks until all admitted tasks have completed and all workers exit. */
