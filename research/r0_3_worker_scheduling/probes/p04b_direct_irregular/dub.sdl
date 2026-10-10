@@ -1,0 +1,7 @@
+name "r0-3-p04b-direct-irregular"
+description "R0.3 P04b direct-one irregular continuation"
+targetType "executable"
+
+dependency "containers-d" version="0.2.0"
+
+sourcePaths "source"
