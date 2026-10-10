@@ -1,6 +1,6 @@
 # R0.2 — Task Representation Qualification Plan
 
-Status: ACTIVE RESEARCH
+Status: PASS — R0.2 CLOSED
 
 ## Goal
 
@@ -254,3 +254,35 @@ R0.2 passes when one internal task representation is selected with:
 - DMD/LDC qualification;
 - native AArch64 coverage;
 - clearly deferred ownership/allocation questions.
+
+
+## Final selected contract
+
+R0.2 closed with:
+
+```text
+TaskRef
+    8-byte non-owning shared(TaskHeader)*
+
+TaskHeader
+    8-byte execute target
+    initialized before publication
+    read through the qualified shared metadata path
+```
+
+Structured stack-resident records are permitted only under join-before-return
+ownership.
+
+Allocator/pool design remains deferred to R0.5.
+
+TaskScope, cancellation, typed results and the public Task API remain deferred
+to R1.
+
+The complete decision is recorded in:
+
+```text
+results/p06-task-representation-decision.md
+```
+
+R0.3 worker-scheduling research must treat this as the internal baseline unless
+new contradictory evidence appears.
