@@ -6,13 +6,15 @@ Status: internal proof only; **not** the public `Executor.submit` or
 `TaskHandle!T` contract.
 
 The existing 8-byte non-owning `TaskRef` and 8-byte `TaskHeader` remain
-unchanged. A concrete `ScalarTaskRecord!T` carries a
+unchanged. Concrete `ScalarTaskRecord!T` and `VoidTaskRecord!Arg` share
+the same transport. A `ScalarTaskRecord!T` carries a
 compile-time-typed function pointer, one scalar argument, scalar result
 storage and an atomic completion indicator. Its matching thunk retrieves the
 record at the narrow type-erasure boundary, calculates, stores the result
 and signals completion with release ordering.
 
-This first slice deliberately admits only `int`, `long`, `ulong` and
+This first slice deliberately admits only `int`, `long`, `ulong` results,
+`void` operations using an atomically publishable argument type, and
 `@safe @nogc nothrow` one-argument function pointers. The scalar result is
 read only after the pool has joined or the release/acquire completion flag
 reports finished. A small ingress capacity verifies that `full` retries
@@ -24,7 +26,7 @@ publication using the same shared-header transport already qualified in R0.2.
 
 Next steps for issue #11, not implemented by this prototype:
 
-- general `void` and non-scalar `T` results;
+- arbitrary non-scalar `T` results and wider callable/argument shapes;
 - owned callable/capture storage, including GC visibility and D move rules;
 - catch and propagate user exceptions without killing a worker or losing
   completion accounting;
