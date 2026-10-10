@@ -65,7 +65,7 @@ private void executeOne(
     TaskRef task,
     ref WorkerCounters counters,
     shared size_t* completed)
-    @safe @nogc nothrow
+    @safe nothrow
 {
     dispatchTask(task);
     ++counters.executed;
