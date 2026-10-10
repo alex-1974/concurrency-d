@@ -918,3 +918,106 @@ unittest
         atomicLoad!(MemoryOrder.acq)(admitted));
     assert(executor.completedCount() == executor.acceptedCount());
 }
+
+version (unittest)
+{
+    private struct WideCapturedTask
+    {
+        string text;
+        ubyte[256] payload;
+        int tag;
+
+        int opCall()
+        {
+            return tag + cast(int) text.length + payload[0];
+        }
+    }
+}
+
+unittest
+{
+    // An old TaskHandle retains its original result even after its concrete
+    // node has been rearmed repeatedly for new work.
+    enum size_t N = 1024;
+    foreach (workers; [1, 4])
+    {
+        auto executor = new OwnedTaskExecutor(
+            workers, 3, 8, OwnedRecordPolicy.recycleTyped);
+
+        auto first = executor.submit(&addTwo);
+        assert(first.get() == 42);
+
+        foreach (i; 0 .. N)
+        {
+            auto current = executor.submit(&addTwo);
+            if (i % 19 == 0)
+                assert(current.get() == 42);
+        }
+
+        executor.closeAndJoin();
+
+        assert(first.get() == 42);
+        assert(executor.acceptedCount() == N + 1);
+        assert(executor.completedCount() == N + 1);
+        assert(executor.reusedNodeCount() > 0);
+        assert(executor.freshNodeCount() <= 32);
+        assert(executor.retainedCount() == 0);
+        assert(executor.spareCount() == 0);
+    }
+}
+
+unittest
+{
+    // Different concrete callable layouts may occupy the same reuse cache,
+    // but must never be confused or overwrite previously observed handles.
+    import core.memory : GC;
+
+    auto executor = new OwnedTaskExecutor(
+        2, 2, 4, OwnedRecordPolicy.recycleTyped);
+
+    auto original = executor.submit(&addTwo);
+    assert(original.get() == 42);
+
+    WideCapturedTask large;
+    large.text = "payload-owned-by-task-record";
+    large.tag = 7;
+    large.payload[0] = 3;
+
+    auto firstWide = executor.submit(large);
+    const expected = firstWide.get();
+    assert(expected == 7 + large.text.length + 3);
+
+    foreach (i; 0 .. 128)
+    {
+        large.tag = cast(int) i;
+        auto next = executor.submit(large);
+        if (i % 9 == 0)
+            assert(next.get() == cast(int) i + large.text.length + 3);
+    }
+
+    executor.closeAndJoin();
+    GC.collect();
+
+    assert(original.get() == 42);
+    assert(firstWide.get() == expected);
+    assert(executor.completedCount() == 130);
+    assert(executor.reusedNodeCount() > 0);
+}
+
+unittest
+{
+    // Zero-spare GC policy preserves existing semantics without node reuse.
+    auto executor = new OwnedTaskExecutor(
+        2, 2, 4, OwnedRecordPolicy.freshGc);
+
+    foreach (_; 0 .. 128)
+    {
+        auto h = executor.submit(&addTwo);
+        assert(h.get() == 42);
+    }
+
+    executor.closeAndJoin();
+    assert(executor.reusedNodeCount() == 0);
+    assert(executor.spareCount() == 0);
+    assert(executor.acceptedCount() == 128);
+}
