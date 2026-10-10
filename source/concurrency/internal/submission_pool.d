@@ -187,10 +187,7 @@ package(concurrency) final class SubmissionWorkerPool
         {
             foreach (index; 0 .. workerCount)
             {
-                const workerIndex = index;
-                _workers[index] = new Thread({
-                    workerLoop(workerIndex);
-                });
+                _workers[index] = makeWorker(index);
                 _workers[index].start();
                 ++_started;
             }
@@ -206,6 +203,15 @@ package(concurrency) final class SubmissionWorkerPool
 
             throw failure;
         }
+    }
+
+    // Separate invocation frame per worker is necessary: each deque must
+    // have exactly one owner. Never capture a reused foreach slot here.
+    private Thread makeWorker(size_t workerIndex)
+    {
+        return new Thread({
+            workerLoop(workerIndex);
+        });
     }
 
     SubmissionResult trySubmit(TaskRef task)
