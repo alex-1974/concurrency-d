@@ -296,13 +296,14 @@ other currently qualified targets:
 Generic direct-one and generic saturation/headroom thresholds are retained as
 negative or architecture-specific evidence.
 
-### P05 — CI PASS / LOCAL XPS PENDING
+### P05 — CI REQUALIFYING / LOCAL XPS RERUN PENDING
 
-Combined policy passes:
+The first local XPS run correctly rejected a separately compiled duplicate
+x86 candidate. The selected x86 policy is now qualified through the unchanged
+P01 enqueue-all executable itself, avoiding a code-layout confound.
 
-- DMD 2.111 correctness;
-- LDC 1.41 hosted x86_64 regression gate;
-- native AArch64 / LDC 1.41 regression gate.
+Native AArch64 continues to qualify the saturation-gated continuation
+candidate against P01.
 
 The local XPS runner is:
 
@@ -310,7 +311,8 @@ The local XPS runner is:
 research/r0_3_worker_scheduling/tools/run_p05_xps.sh
 ```
 
-P05 becomes complete only after local XPS evidence is recorded.
+P05 becomes complete only after the corrected selected-implementation CI and
+local XPS evidence are recorded.
 
 ### P06 — PENDING
 
