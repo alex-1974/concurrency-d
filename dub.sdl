@@ -4,3 +4,17 @@ targetType "library"
 sourcePaths "source"
 
 dependency "containers-d" version="0.2.0"
+
+// The default package remains a library. The opt-in benchmark is a separate
+// executable configuration, not part of the public task API.
+configuration "library" {
+    targetType "library"
+}
+
+configuration "parking-benchmark" {
+    targetType "executable"
+    mainSourceFile "benchmarks/parking/main.d"
+    sourcePaths "source" "benchmarks/parking"
+    importPaths "source" "benchmarks/parking"
+    targetName "concurrency-parking-benchmark"
+}
