@@ -6,14 +6,14 @@ on:
       - develop
     paths:
       - "dub.sdl"
-      - "source/concurrency/internal/work_stealing_queue.d"
+      - "source/concurrency/internal/**"
       - ".github/workflows/work-stealing-consumer.yml"
   push:
     branches:
       - develop
     paths:
       - "dub.sdl"
-      - "source/concurrency/internal/work_stealing_queue.d"
+      - "source/concurrency/internal/**"
       - ".github/workflows/work-stealing-consumer.yml"
   workflow_dispatch:
 
