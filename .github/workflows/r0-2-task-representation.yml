@@ -83,6 +83,15 @@ jobs:
             --compiler="$DC" \
             --force
 
+      - name: P03 TaskRecord locality
+        shell: bash
+        run: |
+          dub run \
+            --root=research/r0_2_task_representation/probes/p03_record_locality \
+            --compiler="$DC" \
+            --build=release \
+            --force
+
   p01-arm64:
     name: P01 / native ARM64 / LDC 1.41
     runs-on: ubuntu-24.04-arm
@@ -146,4 +155,13 @@ jobs:
           dub run \
             --root=research/r0_2_task_representation/probes/p02e_safe_shared_dispatch \
             --compiler="$DC" \
+            --force
+
+      - name: P03 TaskRecord locality
+        shell: bash
+        run: |
+          dub run \
+            --root=research/r0_2_task_representation/probes/p03_record_locality \
+            --compiler="$DC" \
+            --build=release \
             --force
