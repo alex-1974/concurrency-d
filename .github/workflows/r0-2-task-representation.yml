@@ -57,6 +57,15 @@ jobs:
             --build=release \
             --force
 
+      - name: P02b queue plus dispatch
+        shell: bash
+        run: |
+          dub run \
+            --root=research/r0_2_task_representation/probes/p02b_queue_dispatch \
+            --compiler="$DC" \
+            --build=release \
+            --force
+
   p01-arm64:
     name: P01 / native ARM64 / LDC 1.41
     runs-on: ubuntu-24.04-arm
