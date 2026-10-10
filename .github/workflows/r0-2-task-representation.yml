@@ -92,6 +92,26 @@ jobs:
             --build=release \
             --force
 
+      - name: P04 structured lifetime
+        shell: bash
+        run: |
+          dub run \
+            --root=research/r0_2_task_representation/probes/p04_structured_lifetime \
+            --compiler="$DC" \
+            --force
+
+      - name: P04 reject direct stack escape
+        shell: bash
+        run: |
+          NEG=research/r0_2_task_representation/probes/p04_structured_lifetime/negative/stack_escape.d
+
+          if "$DC" -preview=dip1000 -c "$NEG" -of=/tmp/r0_2_p04_stack_escape.o; then
+            echo "ERROR: direct stack TaskRef escape compiled"
+            false
+          else
+            echo "R0.2 P04 negative PASS: direct stack TaskRef escape rejected"
+          fi
+
   p01-arm64:
     name: P01 / native ARM64 / LDC 1.41
     runs-on: ubuntu-24.04-arm
@@ -165,3 +185,23 @@ jobs:
             --compiler="$DC" \
             --build=release \
             --force
+
+      - name: P04 structured lifetime
+        shell: bash
+        run: |
+          dub run \
+            --root=research/r0_2_task_representation/probes/p04_structured_lifetime \
+            --compiler="$DC" \
+            --force
+
+      - name: P04 reject direct stack escape
+        shell: bash
+        run: |
+          NEG=research/r0_2_task_representation/probes/p04_structured_lifetime/negative/stack_escape.d
+
+          if "$DC" -preview=dip1000 -c "$NEG" -of=/tmp/r0_2_p04_stack_escape.o; then
+            echo "ERROR: direct stack TaskRef escape compiled"
+            false
+          else
+            echo "R0.2 P04 negative PASS: direct stack TaskRef escape rejected"
+          fi
