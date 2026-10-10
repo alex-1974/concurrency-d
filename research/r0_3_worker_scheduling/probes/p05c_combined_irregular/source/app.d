@@ -704,14 +704,26 @@ private void executeTask(
             stats.spawned +=
                 children;
 
-            const available =
-                atomicLoad!(
-                    MemoryOrder.raw)(
-                        *outstanding);
+            /*
+             * See the recursive probe for the architecture rationale.
+             * AArch64 keeps a direct continuation once enough work is
+             * scheduler-visible; x86_64 retains enqueue-all.
+             */
+            version (AArch64)
+            {
+                const useDirect =
+                    atomicLoad!(
+                        MemoryOrder.raw)(
+                            *outstanding) >=
+                    cast(long) Workers;
+            }
+            else
+            {
+                enum useDirect =
+                    false;
+            }
 
-            if (
-                available >=
-                cast(long) Workers)
+            if (useDirect)
             {
                 direct =
                     makeTask(
@@ -1435,7 +1447,7 @@ void main()
         graph.expected;
 
     writeln(
-        "R0.3 P05c saturation-gated irregular continuation");
+        "R0.3 P05c architecture-specialized irregular continuation");
 
     writefln(
         "workers=%s maxDepth=%s tasks=%s spawned=%s "
