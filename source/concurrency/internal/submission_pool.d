@@ -338,6 +338,34 @@ version (unittest)
             tasks[i] = TaskRef(&records[i].header);
         }
     }
+
+    // Give each producer its own invocation frame. Capturing an enclosing
+    // foreach iteration variable in a long-lived thread closure can alias a
+    // reused loop activation and cause duplicate task submissions.
+    private Thread makeProducer(
+        SubmissionWorkerPool pool,
+        TaskRef[] tasks,
+        size_t producerIndex,
+        size_t producerCount)
+    {
+        return new Thread({
+            for (size_t i = producerIndex;
+                 i < tasks.length;
+                 i += producerCount)
+            {
+                for (;;)
+                {
+                    const result = pool.trySubmit(tasks[i]);
+
+                    if (result == SubmissionResult.accepted)
+                        break;
+
+                    assert(result == SubmissionResult.full);
+                    Thread.yield();
+                }
+            }
+        });
+    }
 }
 
 unittest
@@ -386,24 +414,11 @@ unittest
 
         foreach (producerIndex; 0 .. ProducerCount)
         {
-            const index = producerIndex;
-            producers[producerIndex] = new Thread({
-                for (size_t i = index;
-                     i < TaskCount;
-                     i += ProducerCount)
-                {
-                    for (;;)
-                    {
-                        const result = pool.trySubmit(tasks[i]);
-
-                        if (result == SubmissionResult.accepted)
-                            break;
-
-                        assert(result == SubmissionResult.full);
-                        Thread.yield();
-                    }
-                }
-            });
+            producers[producerIndex] = makeProducer(
+                pool,
+                tasks,
+                producerIndex,
+                ProducerCount);
             producers[producerIndex].start();
         }
 
