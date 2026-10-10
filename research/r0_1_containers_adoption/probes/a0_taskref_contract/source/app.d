@@ -35,7 +35,7 @@ private void qualifyTaskRef()
         records[i].id =
             cast(ulong) i + 1;
 
-        const task =
+        auto task =
             TaskRef(
                 &records[i]);
 
