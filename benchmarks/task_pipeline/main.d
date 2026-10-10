@@ -67,8 +67,10 @@ private struct VoidWork
     }
 }
 
-private enum string policyName(OwnedRecordPolicy policy) =
-    policy == OwnedRecordPolicy.freshGc ? "gc" : "recycle";
+private string policyName(OwnedRecordPolicy policy)
+{
+    return policy == OwnedRecordPolicy.freshGc ? "gc" : "recycle";
+}
 
 private void runCase(F)(
     string scenario,
@@ -149,7 +151,7 @@ private void runCase(F)(
     writefln(
         "pipeline,%s,%s,%s,%s,%s,%s,%.3f,%.1f,%s,%s,%s,%s,%s",
         scenario,
-        policyName!policy,
+        policyName(policy),
         workers,
         budget,
         tasks,
