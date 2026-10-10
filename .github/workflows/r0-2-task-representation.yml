@@ -75,6 +75,14 @@ jobs:
             --build=release \
             --force
 
+      - name: P02e safe shared dispatch
+        shell: bash
+        run: |
+          dub run \
+            --root=research/r0_2_task_representation/probes/p02e_safe_shared_dispatch \
+            --compiler="$DC" \
+            --force
+
   p01-arm64:
     name: P01 / native ARM64 / LDC 1.41
     runs-on: ubuntu-24.04-arm
@@ -130,4 +138,12 @@ jobs:
             --root=research/r0_2_task_representation/probes/p02d_8byte_queue_dispatch \
             --compiler="$DC" \
             --build=release \
+            --force
+
+      - name: P02e safe shared dispatch
+        shell: bash
+        run: |
+          dub run \
+            --root=research/r0_2_task_representation/probes/p02e_safe_shared_dispatch \
+            --compiler="$DC" \
             --force
