@@ -1,0 +1,7 @@
+name "r0-3-p05b-combined-recursive"
+description "R0.3 P05b combined scheduler policy: recursive"
+targetType "executable"
+
+dependency "containers-d" version="0.2.0"
+
+sourcePaths "source"
