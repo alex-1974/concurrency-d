@@ -34,7 +34,9 @@ enforce arbitrary cross-thread borrow safety.
 
 ## Not implemented by this slice
 
-- Arbitrary external producer submission and admission: issue #9.
+- External producer submission: an additional, bounded internal prototype is
+  now implemented in `concurrency.internal.submission_pool` (issue #9).
+  This does **not** provide public independently owned task semantics.
 - R0.4 parking/wake (workers currently yield when idle): issue #10.
 - Typed user tasks and results: issue #11.
 - Startup failure cleanup, errors and lifecycle/shutdown: issue #12.
@@ -55,3 +57,33 @@ task, small batches and queues larger than the bounded capacity.
 No performance claim should be inferred from successful tests. Keep the
 existing R0.2/R0.3 native benchmark evidence available for later
 end-to-end qualification.
+
+## M0 external submission prototype (issue #9)
+
+`SubmissionWorkerPool` starts worker threads and owns a bounded `TaskInbox`.
+Producer threads call `trySubmit(TaskRef)` concurrently. They **never** call
+`tryPush` on a worker-owned Chase-Lev deque. The inbox serializes admission
+under a single mutex and returns precisely:
+
+- `accepted`: the pool owes one execution, but the caller still owns the record;
+- `full`: no queue entry or execution obligation was created, so retry later;
+- `closed`: nothing is admitted after the close transition.
+
+Worker threads dequeue small inbox batches and may publish further entries only
+to their own local deque; other workers steal from those deques. Completion
+accounting is distinct from queue removal and is updated after dispatch.
+The owning thread calls `closeAndJoin`, which rejects further submissions and
+joins the worker team after all *accepted* tasks have completed. This call must
+not race with another `closeAndJoin` on the same instance. Callers must keep
+the admitted record storage alive throughout execution and join.
+
+Current baseline deliberately uses mutex bookkeeping (including completion),
+GC-backed control structures and yielding idle workers; it does **not** claim
+an allocation-free or lock-free hot path. Issue #10 introduces correct
+blocking parking. Typed caller-owned/owned-transfer semantics and broader
+lifecycle policy remain #11/#12, respectively.
+
+Regression tests cover deterministic capacity rejection, close rejection,
+concurrent producers, accepted/completed equality, execution exactly once,
+and a concurrent producer-versus-close race. The current phase makes no
+performance claims and does not promise a public API.
