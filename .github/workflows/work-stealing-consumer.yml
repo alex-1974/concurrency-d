@@ -1,0 +1,88 @@
+name: Work-stealing consumer gate
+
+on:
+  pull_request:
+    branches:
+      - develop
+    paths:
+      - "dub.sdl"
+      - "source/concurrency/internal/work_stealing_queue.d"
+      - ".github/workflows/work-stealing-consumer.yml"
+  push:
+    branches:
+      - develop
+    paths:
+      - "dub.sdl"
+      - "source/concurrency/internal/work_stealing_queue.d"
+      - ".github/workflows/work-stealing-consumer.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  baseline:
+    name: Consumer / ${{ matrix.compiler }}
+    runs-on: ubuntu-24.04
+
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler:
+          - dmd-2.111.0
+          - ldc-1.41.0
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Install D
+        uses: dlang-community/setup-dlang@v2
+        with:
+          compiler: ${{ matrix.compiler }}
+          dub: 1.40.0
+
+      - name: Versions
+        shell: bash
+        run: |
+          "$DC" --version
+          dub --version
+
+      - name: Unit tests
+        shell: bash
+        run: dub test --compiler="$DC" --force
+
+      - name: Release build
+        shell: bash
+        run: dub build --build=release --compiler="$DC" --force
+
+  native-arm64:
+    name: Consumer / native ARM64 / LDC 1.41
+    runs-on: ubuntu-24.04-arm
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Install LDC
+        uses: dlang-community/setup-dlang@v2
+        with:
+          compiler: ldc-1.41.0
+
+      - name: Platform evidence
+        shell: bash
+        run: |
+          "$DC" --version
+          dub --version
+          uname -a
+          uname -m
+          lscpu
+          test "$(uname -m)" = "aarch64"
+
+      - name: Unit tests
+        shell: bash
+        run: dub test --compiler="$DC" --force
+
+      - name: Release build
+        shell: bash
+        run: dub build --build=release --compiler="$DC" --force
