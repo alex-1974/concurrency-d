@@ -1,0 +1,183 @@
+name: R0.3 P05 combined scheduler
+
+on:
+  push:
+    branches:
+      - research/r0-3-worker-scheduling
+    paths:
+      - ".github/workflows/r0-3-p05-combined.yml"
+      - "research/r0_3_worker_scheduling/probes/p01b_baseline_recursive/**"
+      - "research/r0_3_worker_scheduling/probes/p01c_baseline_irregular/**"
+      - "research/r0_3_worker_scheduling/probes/p05a_combined_flat/**"
+      - "research/r0_3_worker_scheduling/probes/p05b_combined_recursive/**"
+      - "research/r0_3_worker_scheduling/probes/p05c_combined_irregular/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  dmd-x86:
+    name: P05 / DMD 2.111 / selected x86 policy
+    runs-on: ubuntu-24.04
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: dlang-community/setup-dlang@v2
+        with:
+          compiler: dmd-2.111.0
+          dub: 1.40.0
+
+      - name: Flat combined
+        shell: bash
+        run: |
+          dub run --root=research/r0_3_worker_scheduling/probes/p05a_combined_flat --compiler="$DC" --build=release --force
+
+      - name: Recursive selected x86 implementation
+        shell: bash
+        run: |
+          dub run --root=research/r0_3_worker_scheduling/probes/p01b_baseline_recursive --compiler="$DC" --build=release --force
+
+      - name: Irregular selected x86 implementation
+        shell: bash
+        run: |
+          dub run --root=research/r0_3_worker_scheduling/probes/p01c_baseline_irregular --compiler="$DC" --build=release --force
+
+  ldc-x86:
+    name: P05 / LDC 1.41 / selected x86 policy
+    runs-on: ubuntu-24.04
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: dlang-community/setup-dlang@v2
+        with:
+          compiler: ldc-1.41.0
+          dub: 1.40.0
+
+      - name: Flat combined
+        shell: bash
+        run: |
+          dub run --root=research/r0_3_worker_scheduling/probes/p05a_combined_flat --compiler="$DC" --build=release --force
+
+      - name: Recursive selected x86 implementation
+        shell: bash
+        run: |
+          dub run --root=research/r0_3_worker_scheduling/probes/p01b_baseline_recursive --compiler="$DC" --build=release --force
+
+      - name: Irregular selected x86 implementation
+        shell: bash
+        run: |
+          dub run --root=research/r0_3_worker_scheduling/probes/p01c_baseline_irregular --compiler="$DC" --build=release --force
+
+      - name: Selection contract
+        shell: bash
+        run: |
+          echo "R0.3 P05 x86_64 selection"
+          echo "recursive = P01 enqueue-all implementation"
+          echo "irregular = P01 enqueue-all implementation"
+          echo "No duplicate candidate binary is benchmarked on x86_64."
+
+  arm64:
+    name: P05 / native ARM64 / LDC 1.41
+    runs-on: ubuntu-24.04-arm
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: dlang-community/setup-dlang@v2
+        with:
+          compiler: ldc-1.41.0
+
+      - name: Platform evidence
+        shell: bash
+        run: |
+          "$DC" --version
+          dub --version
+          uname -m
+          lscpu
+          test "$(uname -m)" = "aarch64"
+
+      - name: Flat combined
+        shell: bash
+        run: |
+          dub run --root=research/r0_3_worker_scheduling/probes/p05a_combined_flat --compiler="$DC" --build=release --force
+
+      - name: Balanced matched continuation comparison
+        shell: bash
+        run: |
+          REF_REC=research/r0_3_worker_scheduling/probes/p01b_baseline_recursive
+          CAND_REC=research/r0_3_worker_scheduling/probes/p05b_combined_recursive
+          REF_IRR=research/r0_3_worker_scheduling/probes/p01c_baseline_irregular
+          CAND_IRR=research/r0_3_worker_scheduling/probes/p05c_combined_irregular
+
+          dub run --root="$REF_REC"  --compiler="$DC" --build=release --force > /tmp/rec-ref-1.txt
+          dub run --root="$CAND_REC" --compiler="$DC" --build=release --force > /tmp/rec-cand-2.txt
+          dub run --root="$CAND_REC" --compiler="$DC" --build=release --force > /tmp/rec-cand-1.txt
+          dub run --root="$REF_REC"  --compiler="$DC" --build=release --force > /tmp/rec-ref-2.txt
+
+          dub run --root="$REF_IRR"  --compiler="$DC" --build=release --force > /tmp/irr-ref-1.txt
+          dub run --root="$CAND_IRR" --compiler="$DC" --build=release --force > /tmp/irr-cand-2.txt
+          dub run --root="$CAND_IRR" --compiler="$DC" --build=release --force > /tmp/irr-cand-1.txt
+          dub run --root="$REF_IRR"  --compiler="$DC" --build=release --force > /tmp/irr-ref-2.txt
+
+          cat /tmp/rec-ref-1.txt
+          cat /tmp/rec-cand-2.txt
+          cat /tmp/rec-cand-1.txt
+          cat /tmp/rec-ref-2.txt
+          cat /tmp/irr-ref-1.txt
+          cat /tmp/irr-cand-2.txt
+          cat /tmp/irr-cand-1.txt
+          cat /tmp/irr-ref-2.txt
+
+          python3 - <<'PY'
+          import re
+          from pathlib import Path
+
+          def rec(path):
+              text=Path(path).read_text()
+              out={}
+              rx=re.compile(r'^(single|batch)\s+workers=(\d+)\s+median=\s*([0-9.]+) ns/task',re.M)
+              for mode,workers,value in rx.findall(text):
+                  out[(mode,int(workers))]=float(value)
+              if len(out)!=6:
+                  raise SystemExit(f"{path}: expected 6 recursive medians, got {len(out)}")
+              return out
+
+          def irr(path):
+              text=Path(path).read_text()
+              out={}
+              rx=re.compile(r'^(single|batch)\s+median=\s*([0-9.]+) ns/task',re.M)
+              for mode,value in rx.findall(text):
+                  out[mode]=float(value)
+              if len(out)!=2:
+                  raise SystemExit(f"{path}: expected 2 irregular medians, got {len(out)}")
+              return out
+
+          refs=[rec("/tmp/rec-ref-1.txt"),rec("/tmp/rec-ref-2.txt")]
+          cands=[rec("/tmp/rec-cand-1.txt"),rec("/tmp/rec-cand-2.txt")]
+
+          print("P05 AArch64 recursive continuation / P01 baseline")
+          for key in sorted(refs[0],key=lambda x:(x[1],x[0])):
+              ref=sum(x[key] for x in refs)/2.0
+              cand=sum(x[key] for x in cands)/2.0
+              ratio=cand/ref
+              print(f"{key[0]:6s} workers={key[1]} ref={ref:8.3f} cand={cand:8.3f} ratio={ratio:7.4f}x")
+              if ratio>1.10:
+                  raise SystemExit(f"recursive regression {key}: {ratio:.4f}x > 1.10x")
+
+          refs=[irr("/tmp/irr-ref-1.txt"),irr("/tmp/irr-ref-2.txt")]
+          cands=[irr("/tmp/irr-cand-1.txt"),irr("/tmp/irr-cand-2.txt")]
+
+          print("P05 AArch64 irregular continuation / P01 baseline")
+          for mode in ("single","batch"):
+              ref=sum(x[mode] for x in refs)/2.0
+              cand=sum(x[mode] for x in cands)/2.0
+              ratio=cand/ref
+              print(f"{mode:6s} ref={ref:8.3f} cand={cand:8.3f} ratio={ratio:7.4f}x")
+              if ratio>1.10:
+                  raise SystemExit(f"irregular regression {mode}: {ratio:.4f}x > 1.10x")
+
+          print("R0.3 P05 native ARM64 regression gate PASS")
+          PY

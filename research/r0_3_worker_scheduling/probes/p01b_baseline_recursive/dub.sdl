@@ -1,0 +1,7 @@
+name "r0-3-p01b-baseline-recursive"
+description "R0.3 P01b worker-scheduling baseline: recursive fork/join"
+targetType "executable"
+
+dependency "containers-d" version="0.2.0"
+
+sourcePaths "source"

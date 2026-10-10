@@ -1,0 +1,183 @@
+name: R0.3 P04 saturation continuation
+
+on:
+  push:
+    branches:
+      - research/r0-3-worker-scheduling
+    paths:
+      - ".github/workflows/r0-3-p04-saturation.yml"
+      - "research/r0_3_worker_scheduling/probes/p01b_baseline_recursive/**"
+      - "research/r0_3_worker_scheduling/probes/p01c_baseline_irregular/**"
+      - "research/r0_3_worker_scheduling/probes/p04c_saturation_recursive/**"
+      - "research/r0_3_worker_scheduling/probes/p04d_saturation_irregular/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  dmd-correctness:
+    name: P04 saturation / DMD 2.111
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dlang-community/setup-dlang@v2
+        with:
+          compiler: dmd-2.111.0
+          dub: 1.40.0
+      - name: Recursive saturation
+        shell: bash
+        run: |
+          dub run --root=research/r0_3_worker_scheduling/probes/p04c_saturation_recursive --compiler="$DC" --build=release --force
+      - name: Irregular saturation
+        shell: bash
+        run: |
+          dub run --root=research/r0_3_worker_scheduling/probes/p04d_saturation_irregular --compiler="$DC" --build=release --force
+
+  ldc-x86:
+    name: P04 saturation / LDC 1.41 / hosted x86_64
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dlang-community/setup-dlang@v2
+        with:
+          compiler: ldc-1.41.0
+          dub: 1.40.0
+      - name: Balanced comparison
+        shell: bash
+        run: |
+          REF_REC=research/r0_3_worker_scheduling/probes/p01b_baseline_recursive
+          CAND_REC=research/r0_3_worker_scheduling/probes/p04c_saturation_recursive
+          REF_IRR=research/r0_3_worker_scheduling/probes/p01c_baseline_irregular
+          CAND_IRR=research/r0_3_worker_scheduling/probes/p04d_saturation_irregular
+
+          dub run --root="$REF_REC"  --compiler="$DC" --build=release --force > /tmp/rec-ref-1.txt
+          dub run --root="$CAND_REC" --compiler="$DC" --build=release --force > /tmp/rec-cand-2.txt
+          dub run --root="$CAND_REC" --compiler="$DC" --build=release --force > /tmp/rec-cand-1.txt
+          dub run --root="$REF_REC"  --compiler="$DC" --build=release --force > /tmp/rec-ref-2.txt
+
+          dub run --root="$REF_IRR"  --compiler="$DC" --build=release --force > /tmp/irr-ref-1.txt
+          dub run --root="$CAND_IRR" --compiler="$DC" --build=release --force > /tmp/irr-cand-2.txt
+          dub run --root="$CAND_IRR" --compiler="$DC" --build=release --force > /tmp/irr-cand-1.txt
+          dub run --root="$REF_IRR"  --compiler="$DC" --build=release --force > /tmp/irr-ref-2.txt
+
+          cat /tmp/rec-ref-1.txt
+          cat /tmp/rec-cand-2.txt
+          cat /tmp/rec-cand-1.txt
+          cat /tmp/rec-ref-2.txt
+          cat /tmp/irr-ref-1.txt
+          cat /tmp/irr-cand-2.txt
+          cat /tmp/irr-cand-1.txt
+          cat /tmp/irr-ref-2.txt
+
+          python3 - <<'PY'
+          import re
+          from pathlib import Path
+
+          def rec(path):
+              text = Path(path).read_text()
+              out = {}
+              rx = re.compile(r'^(single|batch)\s+workers=(\d+)\s+median=\s*([0-9.]+) ns/task', re.M)
+              for mode, workers, value in rx.findall(text):
+                  out[(mode, int(workers))] = float(value)
+              if len(out) != 6:
+                  raise SystemExit(f"{path}: expected 6 medians, got {len(out)}")
+              return out
+
+          def irr(path):
+              text = Path(path).read_text()
+              out = {}
+              rx = re.compile(r'^(single|batch)\s+median=\s*([0-9.]+) ns/task', re.M)
+              for mode, value in rx.findall(text):
+                  out[mode] = float(value)
+              if len(out) != 2:
+                  raise SystemExit(f"{path}: expected 2 medians, got {len(out)}")
+              return out
+
+          rr=[rec("/tmp/rec-ref-1.txt"),rec("/tmp/rec-ref-2.txt")]
+          rc=[rec("/tmp/rec-cand-1.txt"),rec("/tmp/rec-cand-2.txt")]
+          print("P04 saturation recursive / enqueue-all")
+          for key in sorted(rr[0], key=lambda x:(x[1],x[0])):
+              ref=sum(x[key] for x in rr)/2.0
+              cand=sum(x[key] for x in rc)/2.0
+              print(f"{key[0]:6s} workers={key[1]} ref={ref:8.3f} cand={cand:8.3f} ratio={cand/ref:7.4f}x")
+
+          ir=[irr("/tmp/irr-ref-1.txt"),irr("/tmp/irr-ref-2.txt")]
+          ic=[irr("/tmp/irr-cand-1.txt"),irr("/tmp/irr-cand-2.txt")]
+          print("P04 saturation irregular / enqueue-all")
+          for mode in ("single","batch"):
+              ref=sum(x[mode] for x in ir)/2.0
+              cand=sum(x[mode] for x in ic)/2.0
+              print(f"{mode:6s} ref={ref:8.3f} cand={cand:8.3f} ratio={cand/ref:7.4f}x")
+          PY
+
+  native-arm64:
+    name: P04 saturation / native ARM64 / LDC 1.41
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dlang-community/setup-dlang@v2
+        with:
+          compiler: ldc-1.41.0
+      - name: Platform evidence
+        shell: bash
+        run: |
+          "$DC" --version
+          uname -m
+          lscpu
+          test "$(uname -m)" = "aarch64"
+      - name: Balanced comparison
+        shell: bash
+        run: |
+          REF_REC=research/r0_3_worker_scheduling/probes/p01b_baseline_recursive
+          CAND_REC=research/r0_3_worker_scheduling/probes/p04c_saturation_recursive
+          REF_IRR=research/r0_3_worker_scheduling/probes/p01c_baseline_irregular
+          CAND_IRR=research/r0_3_worker_scheduling/probes/p04d_saturation_irregular
+
+          dub run --root="$REF_REC"  --compiler="$DC" --build=release --force > /tmp/rec-ref-1.txt
+          dub run --root="$CAND_REC" --compiler="$DC" --build=release --force > /tmp/rec-cand-2.txt
+          dub run --root="$CAND_REC" --compiler="$DC" --build=release --force > /tmp/rec-cand-1.txt
+          dub run --root="$REF_REC"  --compiler="$DC" --build=release --force > /tmp/rec-ref-2.txt
+
+          dub run --root="$REF_IRR"  --compiler="$DC" --build=release --force > /tmp/irr-ref-1.txt
+          dub run --root="$CAND_IRR" --compiler="$DC" --build=release --force > /tmp/irr-cand-2.txt
+          dub run --root="$CAND_IRR" --compiler="$DC" --build=release --force > /tmp/irr-cand-1.txt
+          dub run --root="$REF_IRR"  --compiler="$DC" --build=release --force > /tmp/irr-ref-2.txt
+
+          cat /tmp/rec-ref-1.txt
+          cat /tmp/rec-cand-2.txt
+          cat /tmp/rec-cand-1.txt
+          cat /tmp/rec-ref-2.txt
+          cat /tmp/irr-ref-1.txt
+          cat /tmp/irr-cand-2.txt
+          cat /tmp/irr-cand-1.txt
+          cat /tmp/irr-ref-2.txt
+
+          python3 - <<'PY'
+          import re
+          from pathlib import Path
+          def rec(path):
+              text=Path(path).read_text(); out={}
+              rx=re.compile(r'^(single|batch)\s+workers=(\d+)\s+median=\s*([0-9.]+) ns/task',re.M)
+              for mode,workers,value in rx.findall(text): out[(mode,int(workers))]=float(value)
+              if len(out)!=6: raise SystemExit(f"{path}: expected 6 medians, got {len(out)}")
+              return out
+          def irr(path):
+              text=Path(path).read_text(); out={}
+              rx=re.compile(r'^(single|batch)\s+median=\s*([0-9.]+) ns/task',re.M)
+              for mode,value in rx.findall(text): out[mode]=float(value)
+              if len(out)!=2: raise SystemExit(f"{path}: expected 2 medians, got {len(out)}")
+              return out
+          rr=[rec("/tmp/rec-ref-1.txt"),rec("/tmp/rec-ref-2.txt")]
+          rc=[rec("/tmp/rec-cand-1.txt"),rec("/tmp/rec-cand-2.txt")]
+          print("P04 saturation recursive / enqueue-all")
+          for key in sorted(rr[0],key=lambda x:(x[1],x[0])):
+              ref=sum(x[key] for x in rr)/2.0; cand=sum(x[key] for x in rc)/2.0
+              print(f"{key[0]:6s} workers={key[1]} ref={ref:8.3f} cand={cand:8.3f} ratio={cand/ref:7.4f}x")
+          ir=[irr("/tmp/irr-ref-1.txt"),irr("/tmp/irr-ref-2.txt")]
+          ic=[irr("/tmp/irr-cand-1.txt"),irr("/tmp/irr-cand-2.txt")]
+          print("P04 saturation irregular / enqueue-all")
+          for mode in ("single","batch"):
+              ref=sum(x[mode] for x in ir)/2.0; cand=sum(x[mode] for x in ic)/2.0
+              print(f"{mode:6s} ref={ref:8.3f} cand={cand:8.3f} ratio={cand/ref:7.4f}x")
+          PY

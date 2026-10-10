@@ -1,0 +1,7 @@
+name "r0-3-p05c-combined-irregular"
+description "R0.3 P05c combined scheduler policy: irregular"
+targetType "executable"
+
+dependency "containers-d" version="0.2.0"
+
+sourcePaths "source"

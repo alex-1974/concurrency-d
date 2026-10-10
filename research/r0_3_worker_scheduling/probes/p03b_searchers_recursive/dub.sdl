@@ -1,0 +1,7 @@
+name "r0-3-p03b-searchers-recursive"
+description "R0.3 P03b searching-worker comparison: recursive"
+targetType "executable"
+
+dependency "containers-d" version="0.2.0"
+
+sourcePaths "source" "../../common/source"

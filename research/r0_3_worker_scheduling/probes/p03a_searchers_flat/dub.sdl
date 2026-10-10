@@ -1,0 +1,7 @@
+name "r0-3-p03a-searchers-flat"
+description "R0.3 P03a searching-worker comparison: flat"
+targetType "executable"
+
+dependency "containers-d" version="0.2.0"
+
+sourcePaths "source" "../../common/source"

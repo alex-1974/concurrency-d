@@ -1,0 +1,262 @@
+name: R0.3 P04 direct continuation
+
+on:
+  push:
+    branches:
+      - research/r0-3-worker-scheduling
+    paths:
+      - ".github/workflows/r0-3-p04-direct-continuation.yml"
+      - "research/r0_3_worker_scheduling/probes/p01b_baseline_recursive/**"
+      - "research/r0_3_worker_scheduling/probes/p01c_baseline_irregular/**"
+      - "research/r0_3_worker_scheduling/probes/p04a_direct_recursive/**"
+      - "research/r0_3_worker_scheduling/probes/p04b_direct_irregular/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  dmd-correctness:
+    name: P04 / DMD 2.111 correctness
+    runs-on: ubuntu-24.04
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: dlang-community/setup-dlang@v2
+        with:
+          compiler: dmd-2.111.0
+          dub: 1.40.0
+
+      - name: Recursive reference
+        shell: bash
+        run: |
+          dub run \
+            --root=research/r0_3_worker_scheduling/probes/p01b_baseline_recursive \
+            --compiler="$DC" \
+            --build=release \
+            --force
+
+      - name: Recursive direct-one
+        shell: bash
+        run: |
+          dub run \
+            --root=research/r0_3_worker_scheduling/probes/p04a_direct_recursive \
+            --compiler="$DC" \
+            --build=release \
+            --force
+
+      - name: Irregular reference
+        shell: bash
+        run: |
+          dub run \
+            --root=research/r0_3_worker_scheduling/probes/p01c_baseline_irregular \
+            --compiler="$DC" \
+            --build=release \
+            --force
+
+      - name: Irregular direct-one
+        shell: bash
+        run: |
+          dub run \
+            --root=research/r0_3_worker_scheduling/probes/p04b_direct_irregular \
+            --compiler="$DC" \
+            --build=release \
+            --force
+
+  ldc-x86:
+    name: P04 / LDC 1.41 / hosted x86_64
+    runs-on: ubuntu-24.04
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: dlang-community/setup-dlang@v2
+        with:
+          compiler: ldc-1.41.0
+          dub: 1.40.0
+
+      - name: Balanced comparison
+        shell: bash
+        run: |
+          REF_REC=research/r0_3_worker_scheduling/probes/p01b_baseline_recursive
+          CAND_REC=research/r0_3_worker_scheduling/probes/p04a_direct_recursive
+          REF_IRR=research/r0_3_worker_scheduling/probes/p01c_baseline_irregular
+          CAND_IRR=research/r0_3_worker_scheduling/probes/p04b_direct_irregular
+
+          dub run --root="$REF_REC"  --compiler="$DC" --build=release --force > /tmp/rec-ref-1.txt
+          dub run --root="$CAND_REC" --compiler="$DC" --build=release --force > /tmp/rec-cand-2.txt
+          dub run --root="$CAND_REC" --compiler="$DC" --build=release --force > /tmp/rec-cand-1.txt
+          dub run --root="$REF_REC"  --compiler="$DC" --build=release --force > /tmp/rec-ref-2.txt
+
+          dub run --root="$REF_IRR"  --compiler="$DC" --build=release --force > /tmp/irr-ref-1.txt
+          dub run --root="$CAND_IRR" --compiler="$DC" --build=release --force > /tmp/irr-cand-2.txt
+          dub run --root="$CAND_IRR" --compiler="$DC" --build=release --force > /tmp/irr-cand-1.txt
+          dub run --root="$REF_IRR"  --compiler="$DC" --build=release --force > /tmp/irr-ref-2.txt
+
+          cat /tmp/rec-ref-1.txt
+          cat /tmp/rec-cand-2.txt
+          cat /tmp/rec-cand-1.txt
+          cat /tmp/rec-ref-2.txt
+          cat /tmp/irr-ref-1.txt
+          cat /tmp/irr-cand-2.txt
+          cat /tmp/irr-cand-1.txt
+          cat /tmp/irr-ref-2.txt
+
+          python3 - <<'PY'
+          import re
+          from pathlib import Path
+
+          def recursive(path):
+              text = Path(path).read_text()
+              out = {}
+              rx = re.compile(
+                  r'^(single|batch)\s+workers=(\d+)\s+'
+                  r'median=\s*([0-9.]+) ns/task',
+                  re.M,
+              )
+              for mode, workers, value in rx.findall(text):
+                  out[(mode, int(workers))] = float(value)
+              if len(out) != 6:
+                  raise SystemExit(f"{path}: expected 6 recursive medians, got {len(out)}")
+              return out
+
+          def irregular(path):
+              text = Path(path).read_text()
+              out = {}
+              rx = re.compile(
+                  r'^(single|batch)\s+median=\s*([0-9.]+) ns/task',
+                  re.M,
+              )
+              for mode, value in rx.findall(text):
+                  out[mode] = float(value)
+              if len(out) != 2:
+                  raise SystemExit(f"{path}: expected 2 irregular medians, got {len(out)}")
+              return out
+
+          rr = [recursive("/tmp/rec-ref-1.txt"), recursive("/tmp/rec-ref-2.txt")]
+          rc = [recursive("/tmp/rec-cand-1.txt"), recursive("/tmp/rec-cand-2.txt")]
+
+          print("P04 recursive direct-one / enqueue-all")
+          for key in sorted(rr[0], key=lambda x: (x[1], x[0])):
+              ref = sum(x[key] for x in rr) / 2.0
+              cand = sum(x[key] for x in rc) / 2.0
+              print(
+                  f"{key[0]:6s} workers={key[1]} "
+                  f"ref={ref:8.3f} cand={cand:8.3f} ratio={cand/ref:7.4f}x"
+              )
+
+          ir = [irregular("/tmp/irr-ref-1.txt"), irregular("/tmp/irr-ref-2.txt")]
+          ic = [irregular("/tmp/irr-cand-1.txt"), irregular("/tmp/irr-cand-2.txt")]
+
+          print("P04 irregular direct-one / enqueue-all")
+          for mode in ("single", "batch"):
+              ref = sum(x[mode] for x in ir) / 2.0
+              cand = sum(x[mode] for x in ic) / 2.0
+              print(
+                  f"{mode:6s} ref={ref:8.3f} cand={cand:8.3f} "
+                  f"ratio={cand/ref:7.4f}x"
+              )
+          PY
+
+  native-arm64:
+    name: P04 / native ARM64 / LDC 1.41
+    runs-on: ubuntu-24.04-arm
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: dlang-community/setup-dlang@v2
+        with:
+          compiler: ldc-1.41.0
+
+      - name: Platform evidence
+        shell: bash
+        run: |
+          "$DC" --version
+          uname -m
+          lscpu
+          test "$(uname -m)" = "aarch64"
+
+      - name: Balanced comparison
+        shell: bash
+        run: |
+          REF_REC=research/r0_3_worker_scheduling/probes/p01b_baseline_recursive
+          CAND_REC=research/r0_3_worker_scheduling/probes/p04a_direct_recursive
+          REF_IRR=research/r0_3_worker_scheduling/probes/p01c_baseline_irregular
+          CAND_IRR=research/r0_3_worker_scheduling/probes/p04b_direct_irregular
+
+          dub run --root="$REF_REC"  --compiler="$DC" --build=release --force > /tmp/rec-ref-1.txt
+          dub run --root="$CAND_REC" --compiler="$DC" --build=release --force > /tmp/rec-cand-2.txt
+          dub run --root="$CAND_REC" --compiler="$DC" --build=release --force > /tmp/rec-cand-1.txt
+          dub run --root="$REF_REC"  --compiler="$DC" --build=release --force > /tmp/rec-ref-2.txt
+
+          dub run --root="$REF_IRR"  --compiler="$DC" --build=release --force > /tmp/irr-ref-1.txt
+          dub run --root="$CAND_IRR" --compiler="$DC" --build=release --force > /tmp/irr-cand-2.txt
+          dub run --root="$CAND_IRR" --compiler="$DC" --build=release --force > /tmp/irr-cand-1.txt
+          dub run --root="$REF_IRR"  --compiler="$DC" --build=release --force > /tmp/irr-ref-2.txt
+
+          cat /tmp/rec-ref-1.txt
+          cat /tmp/rec-cand-2.txt
+          cat /tmp/rec-cand-1.txt
+          cat /tmp/rec-ref-2.txt
+          cat /tmp/irr-ref-1.txt
+          cat /tmp/irr-cand-2.txt
+          cat /tmp/irr-cand-1.txt
+          cat /tmp/irr-ref-2.txt
+
+          python3 - <<'PY'
+          import re
+          from pathlib import Path
+
+          def recursive(path):
+              text = Path(path).read_text()
+              out = {}
+              rx = re.compile(
+                  r'^(single|batch)\s+workers=(\d+)\s+'
+                  r'median=\s*([0-9.]+) ns/task',
+                  re.M,
+              )
+              for mode, workers, value in rx.findall(text):
+                  out[(mode, int(workers))] = float(value)
+              if len(out) != 6:
+                  raise SystemExit(f"{path}: expected 6 recursive medians, got {len(out)}")
+              return out
+
+          def irregular(path):
+              text = Path(path).read_text()
+              out = {}
+              rx = re.compile(
+                  r'^(single|batch)\s+median=\s*([0-9.]+) ns/task',
+                  re.M,
+              )
+              for mode, value in rx.findall(text):
+                  out[mode] = float(value)
+              if len(out) != 2:
+                  raise SystemExit(f"{path}: expected 2 irregular medians, got {len(out)}")
+              return out
+
+          rr = [recursive("/tmp/rec-ref-1.txt"), recursive("/tmp/rec-ref-2.txt")]
+          rc = [recursive("/tmp/rec-cand-1.txt"), recursive("/tmp/rec-cand-2.txt")]
+
+          print("P04 recursive direct-one / enqueue-all")
+          for key in sorted(rr[0], key=lambda x: (x[1], x[0])):
+              ref = sum(x[key] for x in rr) / 2.0
+              cand = sum(x[key] for x in rc) / 2.0
+              print(
+                  f"{key[0]:6s} workers={key[1]} "
+                  f"ref={ref:8.3f} cand={cand:8.3f} ratio={cand/ref:7.4f}x"
+              )
+
+          ir = [irregular("/tmp/irr-ref-1.txt"), irregular("/tmp/irr-ref-2.txt")]
+          ic = [irregular("/tmp/irr-cand-1.txt"), irregular("/tmp/irr-cand-2.txt")]
+
+          print("P04 irregular direct-one / enqueue-all")
+          for mode in ("single", "batch"):
+              ref = sum(x[mode] for x in ir) / 2.0
+              cand = sum(x[mode] for x in ic) / 2.0
+              print(
+                  f"{mode:6s} ref={ref:8.3f} cand={cand:8.3f} "
+                  f"ratio={cand/ref:7.4f}x"
+              )
+          PY

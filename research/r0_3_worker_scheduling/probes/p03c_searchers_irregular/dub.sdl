@@ -1,0 +1,7 @@
+name "r0-3-p03c-searchers-irregular"
+description "R0.3 P03c searching-worker comparison: irregular"
+targetType "executable"
+
+dependency "containers-d" version="0.2.0"
+
+sourcePaths "source" "../../common/source"

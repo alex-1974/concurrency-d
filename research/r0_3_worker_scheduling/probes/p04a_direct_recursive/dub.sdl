@@ -1,0 +1,7 @@
+name "r0-3-p04a-direct-recursive"
+description "R0.3 P04a direct-one recursive continuation"
+targetType "executable"
+
+dependency "containers-d" version="0.2.0"
+
+sourcePaths "source"

@@ -1,0 +1,167 @@
+name: R0.3 P04 headroom continuation
+
+on:
+  push:
+    branches:
+      - research/r0-3-worker-scheduling
+    paths:
+      - ".github/workflows/r0-3-p04-headroom.yml"
+      - "research/r0_3_worker_scheduling/probes/p01b_baseline_recursive/**"
+      - "research/r0_3_worker_scheduling/probes/p01c_baseline_irregular/**"
+      - "research/r0_3_worker_scheduling/probes/p04e_headroom_recursive/**"
+      - "research/r0_3_worker_scheduling/probes/p04f_headroom_irregular/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  dmd:
+    name: P04 headroom / DMD 2.111
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dlang-community/setup-dlang@v2
+        with:
+          compiler: dmd-2.111.0
+          dub: 1.40.0
+      - name: Recursive correctness
+        shell: bash
+        run: |
+          dub run --root=research/r0_3_worker_scheduling/probes/p04e_headroom_recursive --compiler="$DC" --build=release --force
+      - name: Irregular correctness
+        shell: bash
+        run: |
+          dub run --root=research/r0_3_worker_scheduling/probes/p04f_headroom_irregular --compiler="$DC" --build=release --force
+
+  ldc-x86:
+    name: P04 headroom / LDC 1.41 / hosted x86_64
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dlang-community/setup-dlang@v2
+        with:
+          compiler: ldc-1.41.0
+          dub: 1.40.0
+      - name: Repeated balanced comparison
+        shell: bash
+        run: |
+          REF_REC=research/r0_3_worker_scheduling/probes/p01b_baseline_recursive
+          CAND_REC=research/r0_3_worker_scheduling/probes/p04e_headroom_recursive
+          REF_IRR=research/r0_3_worker_scheduling/probes/p01c_baseline_irregular
+          CAND_IRR=research/r0_3_worker_scheduling/probes/p04f_headroom_irregular
+
+          for i in 1 2 3; do
+            dub run --root="$REF_REC"  --compiler="$DC" --build=release --force > "/tmp/rec-ref-$i.txt"
+            dub run --root="$CAND_REC" --compiler="$DC" --build=release --force > "/tmp/rec-cand-$i.txt"
+            dub run --root="$REF_IRR"  --compiler="$DC" --build=release --force > "/tmp/irr-ref-$i.txt"
+            dub run --root="$CAND_IRR" --compiler="$DC" --build=release --force > "/tmp/irr-cand-$i.txt"
+          done
+
+          cat /tmp/rec-ref-*.txt
+          cat /tmp/rec-cand-*.txt
+          cat /tmp/irr-ref-*.txt
+          cat /tmp/irr-cand-*.txt
+
+          python3 - <<'PY'
+          import re, statistics
+          from pathlib import Path
+
+          def rec(path):
+              text=Path(path).read_text(); out={}
+              rx=re.compile(r'^(single|batch)\s+workers=(\d+)\s+median=\s*([0-9.]+) ns/task',re.M)
+              for mode,workers,value in rx.findall(text): out[(mode,int(workers))]=float(value)
+              if len(out)!=6: raise SystemExit(f"{path}: expected 6 recursive medians, got {len(out)}")
+              return out
+
+          def irr(path):
+              text=Path(path).read_text(); out={}
+              rx=re.compile(r'^(single|batch)\s+median=\s*([0-9.]+) ns/task',re.M)
+              for mode,value in rx.findall(text): out[mode]=float(value)
+              if len(out)!=2: raise SystemExit(f"{path}: expected 2 irregular medians, got {len(out)}")
+              return out
+
+          rr=[rec(f"/tmp/rec-ref-{i}.txt") for i in (1,2,3)]
+          rc=[rec(f"/tmp/rec-cand-{i}.txt") for i in (1,2,3)]
+          print("P04 headroom recursive / enqueue-all")
+          for key in sorted(rr[0],key=lambda x:(x[1],x[0])):
+              refs=[x[key] for x in rr]; cands=[x[key] for x in rc]
+              ref=statistics.median(refs); cand=statistics.median(cands); ratio=cand/ref
+              print(f"{key[0]:6s} workers={key[1]} ref={ref:8.3f} cand={cand:8.3f} ratio={ratio:7.4f}x")
+              if ratio>1.10: raise SystemExit(f"recursive regression {key}: {ratio:.4f}x > 1.10x")
+
+          ir=[irr(f"/tmp/irr-ref-{i}.txt") for i in (1,2,3)]
+          ic=[irr(f"/tmp/irr-cand-{i}.txt") for i in (1,2,3)]
+          print("P04 headroom irregular / enqueue-all")
+          for mode in ("single","batch"):
+              refs=[x[mode] for x in ir]; cands=[x[mode] for x in ic]
+              ref=statistics.median(refs); cand=statistics.median(cands); ratio=cand/ref
+              spread=max(cands)/min(cands)
+              print(f"{mode:6s} ref={ref:8.3f} cand={cand:8.3f} ratio={ratio:7.4f}x candidateSpread={spread:7.4f}x")
+              if ratio>1.10: raise SystemExit(f"irregular regression {mode}: {ratio:.4f}x > 1.10x")
+              if spread>1.20: raise SystemExit(f"irregular instability {mode}: spread {spread:.4f}x > 1.20x")
+          print("R0.3 P04 headroom hosted x86_64 gate PASS")
+          PY
+
+  arm64:
+    name: P04 headroom / native ARM64 / LDC 1.41
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dlang-community/setup-dlang@v2
+        with:
+          compiler: ldc-1.41.0
+      - name: Platform evidence
+        shell: bash
+        run: |
+          "$DC" --version
+          uname -m
+          lscpu
+          test "$(uname -m)" = "aarch64"
+      - name: Balanced comparison
+        shell: bash
+        run: |
+          REF_REC=research/r0_3_worker_scheduling/probes/p01b_baseline_recursive
+          CAND_REC=research/r0_3_worker_scheduling/probes/p04e_headroom_recursive
+          REF_IRR=research/r0_3_worker_scheduling/probes/p01c_baseline_irregular
+          CAND_IRR=research/r0_3_worker_scheduling/probes/p04f_headroom_irregular
+
+          dub run --root="$REF_REC"  --compiler="$DC" --build=release --force > /tmp/rec-ref-1.txt
+          dub run --root="$CAND_REC" --compiler="$DC" --build=release --force > /tmp/rec-cand-1.txt
+          dub run --root="$CAND_REC" --compiler="$DC" --build=release --force > /tmp/rec-cand-2.txt
+          dub run --root="$REF_REC"  --compiler="$DC" --build=release --force > /tmp/rec-ref-2.txt
+
+          dub run --root="$REF_IRR"  --compiler="$DC" --build=release --force > /tmp/irr-ref-1.txt
+          dub run --root="$CAND_IRR" --compiler="$DC" --build=release --force > /tmp/irr-cand-1.txt
+          dub run --root="$CAND_IRR" --compiler="$DC" --build=release --force > /tmp/irr-cand-2.txt
+          dub run --root="$REF_IRR"  --compiler="$DC" --build=release --force > /tmp/irr-ref-2.txt
+
+          python3 - <<'PY'
+          import re, statistics
+          from pathlib import Path
+          def rec(path):
+              text=Path(path).read_text(); out={}
+              rx=re.compile(r'^(single|batch)\s+workers=(\d+)\s+median=\s*([0-9.]+) ns/task',re.M)
+              for mode,workers,value in rx.findall(text): out[(mode,int(workers))]=float(value)
+              return out
+          def irr(path):
+              text=Path(path).read_text(); out={}
+              rx=re.compile(r'^(single|batch)\s+median=\s*([0-9.]+) ns/task',re.M)
+              for mode,value in rx.findall(text): out[mode]=float(value)
+              return out
+          rr=[rec("/tmp/rec-ref-1.txt"),rec("/tmp/rec-ref-2.txt")]
+          rc=[rec("/tmp/rec-cand-1.txt"),rec("/tmp/rec-cand-2.txt")]
+          print("P04 headroom recursive / enqueue-all")
+          for key in sorted(rr[0],key=lambda x:(x[1],x[0])):
+              ref=statistics.mean(x[key] for x in rr); cand=statistics.mean(x[key] for x in rc); ratio=cand/ref
+              print(f"{key[0]:6s} workers={key[1]} ref={ref:8.3f} cand={cand:8.3f} ratio={ratio:7.4f}x")
+              if ratio>1.10: raise SystemExit(f"recursive regression {key}: {ratio:.4f}x > 1.10x")
+          ir=[irr("/tmp/irr-ref-1.txt"),irr("/tmp/irr-ref-2.txt")]
+          ic=[irr("/tmp/irr-cand-1.txt"),irr("/tmp/irr-cand-2.txt")]
+          print("P04 headroom irregular / enqueue-all")
+          for mode in ("single","batch"):
+              ref=statistics.mean(x[mode] for x in ir); cand=statistics.mean(x[mode] for x in ic); ratio=cand/ref
+              print(f"{mode:6s} ref={ref:8.3f} cand={cand:8.3f} ratio={ratio:7.4f}x")
+              if ratio>1.10: raise SystemExit(f"irregular regression {mode}: {ratio:.4f}x > 1.10x")
+          print("R0.3 P04 headroom native ARM64 gate PASS")
+          PY
