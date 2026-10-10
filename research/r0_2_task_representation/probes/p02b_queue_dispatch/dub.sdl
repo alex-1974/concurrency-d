@@ -1,0 +1,7 @@
+name "r0-2-p02b-queue-dispatch"
+description "R0.2 P02b queue plus dispatch representation comparison"
+targetType "executable"
+
+dependency "containers-d" version="0.2.0"
+
+sourcePaths "source"

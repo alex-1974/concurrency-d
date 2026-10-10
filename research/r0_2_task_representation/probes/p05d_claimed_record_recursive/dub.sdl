@@ -1,0 +1,7 @@
+name "r0-2-p05d-claimed-record-recursive"
+description "R0.2 P05d claimed-record recursive dispatch diagnostic"
+targetType "executable"
+
+dependency "containers-d" version="0.2.0"
+
+sourcePaths "source"

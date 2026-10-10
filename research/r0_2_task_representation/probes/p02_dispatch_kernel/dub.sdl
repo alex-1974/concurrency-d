@@ -1,0 +1,5 @@
+name "r0-2-p02-dispatch-kernel"
+description "R0.2 P02 task dispatch kernel comparison"
+targetType "executable"
+
+sourcePaths "source"

@@ -1,0 +1,7 @@
+name "r0-2-p02d-8byte-queue-dispatch"
+description "R0.2 P02d 8-byte queue plus dispatch comparison"
+targetType "executable"
+
+dependency "containers-d" version="0.2.0"
+
+sourcePaths "source"

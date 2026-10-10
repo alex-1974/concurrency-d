@@ -1,0 +1,5 @@
+name "r0-2-p03-record-locality"
+description "R0.2 P03 task-record header and cache-locality probe"
+targetType "executable"
+
+sourcePaths "source"

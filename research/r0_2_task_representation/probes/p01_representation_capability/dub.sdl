@@ -1,0 +1,7 @@
+name "r0-2-p01-representation-capability"
+description "R0.2 P01 task-reference representation capability and layout"
+targetType "executable"
+
+dependency "containers-d" version="0.2.0"
+
+sourcePaths "source"

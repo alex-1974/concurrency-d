@@ -1,0 +1,7 @@
+name "r0-2-p05b-taskref-recursive"
+description "R0.2 P05b TaskRef recursive scheduler-neighborhood workload"
+targetType "executable"
+
+dependency "containers-d" version="0.2.0"
+
+sourcePaths "source"

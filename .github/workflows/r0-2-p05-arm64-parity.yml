@@ -1,0 +1,166 @@
+name: R0.2 P05 ARM64 parity
+
+on:
+  push:
+    branches:
+      - research/r0-2-task-representation
+    paths:
+      - ".github/workflows/r0-2-p05-arm64-parity.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  parity:
+    name: P05 matched native ARM64 parity
+    runs-on: ubuntu-24.04-arm
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Install LDC
+        uses: dlang-community/setup-dlang@v2
+        with:
+          compiler: ldc-1.41.0
+
+      - name: Platform evidence
+        shell: bash
+        run: |
+          "$DC" --version
+          uname -m
+          lscpu
+          test "$(uname -m)" = "aarch64"
+
+      - name: Materialize retained R0.1 reference
+        shell: bash
+        run: |
+          git fetch origin research/r0-1-work-stealing-deque
+          git worktree add --detach /tmp/r0-1-reference FETCH_HEAD
+          git -C /tmp/r0-1-reference rev-parse HEAD
+
+      - name: Balanced flat reference and TaskRef
+        shell: bash
+        run: |
+          REF=/tmp/r0-1-reference/research/r0_1_work_stealing_deque/probes/p14a_flat_granularity_scaling
+          CAND=research/r0_2_task_representation/probes/p05a_taskref_flat
+
+          dub run --root="$REF" --compiler="$DC" --build=release --force > /tmp/flat-ref-1.txt
+          dub run --root="$CAND" --compiler="$DC" --build=release --force > /tmp/flat-cand-2.txt
+          dub run --root="$CAND" --compiler="$DC" --build=release --force > /tmp/flat-cand-1.txt
+          dub run --root="$REF" --compiler="$DC" --build=release --force > /tmp/flat-ref-2.txt
+
+          python3 - <<'PY'
+          import re
+          from pathlib import Path
+
+          def parse(path):
+              text = Path(path).read_text()
+              out = {}
+              pattern = re.compile(
+                  r'^(single|batch)\s+workers=(\d+)\s+work=\s*(\d+)\s+'
+                  r'median=\s*([0-9.]+) ns/task',
+                  re.M,
+              )
+              for mode, workers, work, value in pattern.findall(text):
+                  out[(mode, int(workers), int(work))] = float(value)
+              if len(out) != 18:
+                  raise SystemExit(f"{path}: expected 18 flat medians, got {len(out)}")
+              return out
+
+          refs = [parse("/tmp/flat-ref-1.txt"), parse("/tmp/flat-ref-2.txt")]
+          cands = [parse("/tmp/flat-cand-1.txt"), parse("/tmp/flat-cand-2.txt")]
+
+          print("P05a matched ARM64 ratios (TaskRef / R0.1 value-handle)")
+          for key in sorted(refs[0], key=lambda x: (x[2], x[1], x[0])):
+              ref = sum(x[key] for x in refs) / 2.0
+              cand = sum(x[key] for x in cands) / 2.0
+              print(
+                  f"{key[0]:6s} workers={key[1]} work={key[2]:2d} "
+                  f"ref={ref:8.3f} cand={cand:8.3f} ratio={cand/ref:7.4f}x"
+              )
+          PY
+
+      - name: Balanced recursive reference and TaskRef
+        shell: bash
+        run: |
+          REF=/tmp/r0-1-reference/research/r0_1_work_stealing_deque/probes/p14g_recursive_cold_overflow
+          CAND=research/r0_2_task_representation/probes/p05b_taskref_recursive
+
+          dub run --root="$REF" --compiler="$DC" --build=release --force > /tmp/rec-ref-1.txt
+          dub run --root="$CAND" --compiler="$DC" --build=release --force > /tmp/rec-cand-2.txt
+          dub run --root="$CAND" --compiler="$DC" --build=release --force > /tmp/rec-cand-1.txt
+          dub run --root="$REF" --compiler="$DC" --build=release --force > /tmp/rec-ref-2.txt
+
+          python3 - <<'PY'
+          import re
+          from pathlib import Path
+
+          def parse(path):
+              text = Path(path).read_text()
+              out = {}
+              pattern = re.compile(
+                  r'^(single|batch)\s+workers=(\d+)\s+'
+                  r'median=\s*([0-9.]+) ns/task',
+                  re.M,
+              )
+              for mode, workers, value in pattern.findall(text):
+                  out[(mode, int(workers))] = float(value)
+              if len(out) != 6:
+                  raise SystemExit(f"{path}: expected 6 recursive medians, got {len(out)}")
+              return out
+
+          refs = [parse("/tmp/rec-ref-1.txt"), parse("/tmp/rec-ref-2.txt")]
+          cands = [parse("/tmp/rec-cand-1.txt"), parse("/tmp/rec-cand-2.txt")]
+
+          print("P05b matched ARM64 ratios (TaskRef / R0.1 value-handle)")
+          for key in sorted(refs[0], key=lambda x: (x[1], x[0])):
+              ref = sum(x[key] for x in refs) / 2.0
+              cand = sum(x[key] for x in cands) / 2.0
+              print(
+                  f"{key[0]:6s} workers={key[1]} "
+                  f"ref={ref:8.3f} cand={cand:8.3f} ratio={cand/ref:7.4f}x"
+              )
+          PY
+
+      - name: Balanced irregular reference and TaskRef
+        shell: bash
+        run: |
+          REF=/tmp/r0-1-reference/research/r0_1_work_stealing_deque/probes/p14c_irregular_bursty
+          CAND=research/r0_2_task_representation/probes/p05c_taskref_irregular
+
+          dub run --root="$REF" --compiler="$DC" --build=release --force > /tmp/irr-ref-1.txt
+          dub run --root="$CAND" --compiler="$DC" --build=release --force > /tmp/irr-cand-2.txt
+          dub run --root="$CAND" --compiler="$DC" --build=release --force > /tmp/irr-cand-1.txt
+          dub run --root="$REF" --compiler="$DC" --build=release --force > /tmp/irr-ref-2.txt
+
+          python3 - <<'PY'
+          import re
+          from pathlib import Path
+
+          def parse(path):
+              text = Path(path).read_text()
+              out = {}
+              pattern = re.compile(
+                  r'^(single|batch)\s+median=\s*([0-9.]+) ns/task',
+                  re.M,
+              )
+              for mode, value in pattern.findall(text):
+                  out[mode] = float(value)
+              if len(out) != 2:
+                  raise SystemExit(f"{path}: expected 2 irregular medians, got {len(out)}")
+              return out
+
+          refs = [parse("/tmp/irr-ref-1.txt"), parse("/tmp/irr-ref-2.txt")]
+          cands = [parse("/tmp/irr-cand-1.txt"), parse("/tmp/irr-cand-2.txt")]
+
+          print("P05c matched ARM64 ratios (TaskRef / R0.1 value-handle)")
+          for mode in ("single", "batch"):
+              ref = sum(x[mode] for x in refs) / 2.0
+              cand = sum(x[mode] for x in cands) / 2.0
+              print(
+                  f"{mode:6s} ref={ref:8.3f} cand={cand:8.3f} "
+                  f"ratio={cand/ref:7.4f}x"
+              )
+          PY

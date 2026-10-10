@@ -1,0 +1,5 @@
+name "r0-2-p02e-safe-shared-dispatch"
+description "R0.2 P02e safe shared task metadata dispatch"
+targetType "executable"
+
+sourcePaths "source"

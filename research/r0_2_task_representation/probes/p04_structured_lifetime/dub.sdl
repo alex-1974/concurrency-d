@@ -1,0 +1,7 @@
+name "r0-2-p04-structured-lifetime"
+description "R0.2 P04 structured stack-resident task lifetime"
+targetType "executable"
+
+dependency "containers-d" version="0.2.0"
+
+sourcePaths "source"
