@@ -1,0 +1,7 @@
+name "r0-1-adoption-a1-distributed-production"
+description "R0.1 containers-d adoption: distributed-production scheduler harness"
+targetType "executable"
+
+dependency "containers-d" version="0.2.0"
+
+sourcePaths "source"
