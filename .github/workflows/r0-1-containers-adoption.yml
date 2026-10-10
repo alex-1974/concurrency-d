@@ -80,7 +80,6 @@ jobs:
         uses: dlang-community/setup-dlang@v2
         with:
           compiler: ldc-1.41.0
-          dub: 1.40.0
 
       - name: Platform evidence
         shell: bash
