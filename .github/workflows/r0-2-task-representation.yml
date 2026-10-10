@@ -1,0 +1,79 @@
+name: R0.2 task representation
+
+on:
+  push:
+    branches:
+      - research/r0-2-task-representation
+    paths:
+      - ".github/workflows/r0-2-task-representation.yml"
+      - "research/r0_2_task_representation/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  p01:
+    name: P01 / ${{ matrix.compiler }}
+    runs-on: ubuntu-24.04
+
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler:
+          - dmd-2.111.0
+          - ldc-1.41.0
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Install D
+        uses: dlang-community/setup-dlang@v2
+        with:
+          compiler: ${{ matrix.compiler }}
+          dub: 1.40.0
+
+      - name: Toolchain
+        shell: bash
+        run: |
+          "$DC" --version
+          dub --version
+
+      - name: P01 representation capability
+        shell: bash
+        run: |
+          dub run \
+            --root=research/r0_2_task_representation/probes/p01_representation_capability \
+            --compiler="$DC" \
+            --force
+
+  p01-arm64:
+    name: P01 / native ARM64 / LDC 1.41
+    runs-on: ubuntu-24.04-arm
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Install LDC
+        uses: dlang-community/setup-dlang@v2
+        with:
+          compiler: ldc-1.41.0
+
+      - name: Platform evidence
+        shell: bash
+        run: |
+          "$DC" --version
+          dub --version
+          uname -m
+          lscpu
+          test "$(uname -m)" = "aarch64"
+
+      - name: P01 representation capability
+        shell: bash
+        run: |
+          dub run \
+            --root=research/r0_2_task_representation/probes/p01_representation_capability \
+            --compiler="$DC" \
+            --force
