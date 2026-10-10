@@ -8,6 +8,7 @@ on:
       - "dub.sdl"
       - "source/concurrency/internal/**"
       - "benchmarks/parking/**"
+      - "benchmarks/task_pipeline/**"
       - ".github/workflows/work-stealing-consumer.yml"
   push:
     branches:
@@ -16,6 +17,7 @@ on:
       - "dub.sdl"
       - "source/concurrency/internal/**"
       - "benchmarks/parking/**"
+      - "benchmarks/task_pipeline/**"
       - ".github/workflows/work-stealing-consumer.yml"
   workflow_dispatch:
 
@@ -62,6 +64,10 @@ jobs:
         shell: bash
         run: dub run --config=parking-benchmark --build=release --compiler="$DC" --force -- 2 64
 
+      - name: R0.5 paired storage diagnostic (not a performance gate)
+        shell: bash
+        run: dub run --config=task-pipeline-benchmark --build=release --compiler="$DC" --force -- 2 768 1 scalar
+
   native-arm64:
     name: Consumer / native ARM64 / LDC 1.41
     runs-on: ubuntu-24.04-arm
@@ -96,3 +102,7 @@ jobs:
       - name: Portable parking smoke and metrics (not a fixed performance gate)
         shell: bash
         run: dub run --config=parking-benchmark --build=release --compiler="$DC" --force -- 2 64
+
+      - name: R0.5 paired storage diagnostic (not a performance gate)
+        shell: bash
+        run: dub run --config=task-pipeline-benchmark --build=release --compiler="$DC" --force -- 2 768 1 scalar
