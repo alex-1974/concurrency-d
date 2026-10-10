@@ -1,0 +1,135 @@
+name: R0.3 P03 bounded searchers
+
+on:
+  push:
+    branches:
+      - research/r0-3-worker-scheduling
+    paths:
+      - ".github/workflows/r0-3-p03-searchers.yml"
+      - "research/r0_3_worker_scheduling/common/source/searcher_policy.d"
+      - "research/r0_3_worker_scheduling/probes/p03a_searchers_flat/**"
+      - "research/r0_3_worker_scheduling/probes/p03b_searchers_recursive/**"
+      - "research/r0_3_worker_scheduling/probes/p03c_searchers_irregular/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  compare:
+    name: P03 / ${{ matrix.compiler }}
+    runs-on: ubuntu-24.04
+
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler:
+          - dmd-2.111.0
+          - ldc-1.41.0
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Install D
+        uses: dlang-community/setup-dlang@v2
+        with:
+          compiler: ${{ matrix.compiler }}
+          dub: 1.40.0
+
+      - name: Toolchain
+        shell: bash
+        run: |
+          "$DC" --version
+          dub --version
+
+      - name: Searcher policy unittests
+        shell: bash
+        run: |
+          dub test \
+            --root=research/r0_3_worker_scheduling/probes/p03a_searchers_flat \
+            --compiler="$DC" \
+            --force
+
+      - name: P03a flat searchers
+        shell: bash
+        run: |
+          dub run \
+            --root=research/r0_3_worker_scheduling/probes/p03a_searchers_flat \
+            --compiler="$DC" \
+            --build=release \
+            --force
+
+      - name: P03b recursive searchers
+        shell: bash
+        run: |
+          dub run \
+            --root=research/r0_3_worker_scheduling/probes/p03b_searchers_recursive \
+            --compiler="$DC" \
+            --build=release \
+            --force
+
+      - name: P03c irregular searchers
+        shell: bash
+        run: |
+          dub run \
+            --root=research/r0_3_worker_scheduling/probes/p03c_searchers_irregular \
+            --compiler="$DC" \
+            --build=release \
+            --force
+
+  native-arm64:
+    name: P03 / native ARM64 / LDC 1.41
+    runs-on: ubuntu-24.04-arm
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Install LDC
+        uses: dlang-community/setup-dlang@v2
+        with:
+          compiler: ldc-1.41.0
+
+      - name: Platform evidence
+        shell: bash
+        run: |
+          "$DC" --version
+          uname -m
+          lscpu
+          test "$(uname -m)" = "aarch64"
+
+      - name: Searcher policy unittests
+        shell: bash
+        run: |
+          dub test \
+            --root=research/r0_3_worker_scheduling/probes/p03a_searchers_flat \
+            --compiler="$DC" \
+            --force
+
+      - name: P03a flat searchers
+        shell: bash
+        run: |
+          dub run \
+            --root=research/r0_3_worker_scheduling/probes/p03a_searchers_flat \
+            --compiler="$DC" \
+            --build=release \
+            --force
+
+      - name: P03b recursive searchers
+        shell: bash
+        run: |
+          dub run \
+            --root=research/r0_3_worker_scheduling/probes/p03b_searchers_recursive \
+            --compiler="$DC" \
+            --build=release \
+            --force
+
+      - name: P03c irregular searchers
+        shell: bash
+        run: |
+          dub run \
+            --root=research/r0_3_worker_scheduling/probes/p03c_searchers_irregular \
+            --compiler="$DC" \
+            --build=release \
+            --force
