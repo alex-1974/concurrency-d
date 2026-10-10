@@ -69,3 +69,45 @@ Known pragmatic limitation: completion bookkeeping uses the ingress
 mutex per finished task. This favors simple correctness in P01;
 throughput tuning can replace it only after an equivalent baseline
 is measured.
+
+## Reproducible P01 measurement program
+
+The optional `parking-benchmark` DUB configuration compiles
+`benchmarks/parking/main.d` together with the internal executor. The
+normal `dub test` and library consumers retain their library configuration.
+
+Run on the local XPS (and repeat at least three times under comparable
+CPU/power conditions):
+
+```bash
+dub run --config=parking-benchmark --compiler=ldc2 --build=release --force -- 4 512
+```
+
+The first CLI argument is worker count and the second is isolated sample
+count (defaults 2/128). A sample uses a 2 ms no-work gap, then measures
+`MonoTime` from immediately before successful ingress publication
+to the first instruction in the task thunk that reads the monotonic clock.
+Task start timestamps are published through a release/acquire atomic
+pair. The program separately measures process CPU time over a 300 ms idle
+interval and reports `idle_cpu_cores` (CPU-seconds / wall-seconds),
+plus wake-latency p50/p95/p99/max and park-count diagnostics.
+
+**Interpretation:**
+
+- These are **publication-to-thunk-start** timings, not only kernel
+  condition-variable wait/wake costs.
+- The idle process CPU metric covers the whole process, including the
+  controller thread; it is not a per-worker or platform energy measure.
+- Timer calls, ingress mutex traffic, scheduler dispatch and cross-thread
+  cache coherence are part of the measured path.
+- The 2 ms delay exercises isolated wakes; burst throughput, variable work
+  durations and worker saturation require separate workloads.
+- Hosted CI runs a short **smoke + diagnostic** sample but does **not**
+  qualify an absolute latency threshold. Results depend strongly on OS
+  scheduler noise, CPU topology, frequency, thermal/power state and compiler.
+- Local XPS repeated optimized LDC measurements and native ARM64 results
+  should be recorded before any platform policy selection; do not compare
+  dissimilar hardware as if they were the same performance baseline.
+
+This keeps the original P01 correctness baseline and produces useful
+measurements without making shared-host timing a CI correctness gate.
