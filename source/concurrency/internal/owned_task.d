@@ -187,6 +187,17 @@ private final class OwnedNode(F, R)
         atomicStore!(MemoryOrder.raw)(_record.prefix.returned, 0u);
     }
 
+    // Only call after the previous dispatch's post-return release marker
+    // became visible to the producer with acquire ordering. The previous
+    // TaskHandle owns its distinct ResultCell and remains independently valid.
+    void rearm(F callable, ResultCell!R cell)
+    {
+        _record.callable = callable;
+        _record.cell = cell;
+        _record.prefix.header.execute = &execute;
+        atomicStore!(MemoryOrder.raw)(_record.prefix.returned, 0u);
+    }
+
     TaskRef reference()
     {
         return TaskRef(cast(shared(TaskHeader)*) &_record.prefix.header);
@@ -242,6 +253,12 @@ private final class OwnedNode(F, R)
  * retaining all accepted nodes until join is deliberate and explicitly
  * bounded; a future pool should reclaim completed nodes incrementally.
  */
+package(concurrency) enum OwnedRecordPolicy
+{
+    freshGc,
+    recycleTyped
+}
+
 package(concurrency) final class OwnedTaskExecutor
 {
     private enum Lifecycle : ubyte
@@ -255,14 +272,22 @@ package(concurrency) final class OwnedTaskExecutor
     private Mutex _mutex;
     private Condition _lifecycleChanged;
     private RetainedTask[] _retained;
+    private RetainedTask[] _spare;
     private size_t _maxRetained;
+    private OwnedRecordPolicy _recordPolicy;
+    private size_t _freshNodes;
+    private size_t _reusedNodes;
 
     // _mutex serializes admission against shutdown. Exactly one caller
     // performs the worker join; other closers wait for the same outcome.
     private Lifecycle _lifecycle;
     private Throwable _shutdownFailure;
 
-    this(size_t workers, size_t ingressCapacity, size_t maxRetained = 4096)
+    this(
+        size_t workers,
+        size_t ingressCapacity,
+        size_t maxRetained = 4096,
+        OwnedRecordPolicy policy = OwnedRecordPolicy.freshGc)
     {
         if (maxRetained == 0)
             throw new Exception("maxRetained must be positive");
@@ -273,6 +298,7 @@ package(concurrency) final class OwnedTaskExecutor
         _lifecycleChanged = new Condition(_mutex);
         _lifecycle = Lifecycle.running;
         _maxRetained = maxRetained;
+        _recordPolicy = policy;
     }
 
     /**
@@ -306,15 +332,41 @@ package(concurrency) final class OwnedTaskExecutor
                     return TaskHandle!R.init;
             }
 
-            // All owned producers serialize on _mutex. Only workers can
-            // remove ingress slots, so a positive capacity check remains
-            // valid until publication. Backpressure needs no allocations.
+            // Admission is serialized by this executor's mutex. Since
+            // workers can only remove inbox entries, a positive capacity
+            // check stays valid until trySubmit below. Avoid allocating
+            // the ResultCell and handle on every unsuccessful retry.
             if (!_pool.hasIngressCapacity())
                 return TaskHandle!R.init;
 
             auto cell = new ResultCell!R();
             handle = new TaskHandle!R(cell);
-            auto node = new OwnedNode!(F, R)(callable, cell);
+            OwnedNode!(F, R) node;
+            if (_recordPolicy == OwnedRecordPolicy.recycleTyped)
+            {
+                // Exact type-match is essential: a node can be rearmed only
+                // for the identical concrete F/R layout. Different closure
+                // shapes use independent nodes and cannot alias old handles.
+                foreach (i; 0 .. _spare.length)
+                {
+                    node = cast(OwnedNode!(F, R)) _spare[i].node;
+                    if (node !is null)
+                    {
+                        _spare[i] = _spare[$ - 1];
+                        _spare[$ - 1] = RetainedTask.init;
+                        _spare.length = _spare.length - 1;
+                        node.rearm(callable, cell);
+                        ++_reusedNodes;
+                        break;
+                    }
+                }
+            }
+
+            if (node is null)
+            {
+                node = new OwnedNode!(F, R)(callable, cell);
+                ++_freshNodes;
+            }
 
             // Install the strong GC root before any worker can claim the
             // record. If admission fails, clear the tail GC slot too.
@@ -325,6 +377,12 @@ package(concurrency) final class OwnedTaskExecutor
             {
                 _retained[$ - 1] = RetainedTask.init;
                 _retained.length = _retained.length - 1;
+
+                if (_recordPolicy == OwnedRecordPolicy.recycleTyped &&
+                    _spare.length < _maxRetained)
+                {
+                    _spare ~= RetainedTask(node, node.returnedFlag());
+                }
 
                 if (status == SubmissionResult.closed)
                     throw new Exception("executor is closed");
@@ -355,6 +413,14 @@ package(concurrency) final class OwnedTaskExecutor
                 continue;
             }
 
+            if (_recordPolicy == OwnedRecordPolicy.recycleTyped &&
+                _spare.length < _maxRetained)
+            {
+                // Keep a strong root in the typed spare cache. The old
+                // consumer handle continues to own its own result cell.
+                _spare ~= _retained[i];
+            }
+
             _retained[i] = _retained[$ - 1];
             _retained[$ - 1] = RetainedTask.init;
             _retained.length = _retained.length - 1;
@@ -379,6 +445,27 @@ package(concurrency) final class OwnedTaskExecutor
     {
         synchronized (_mutex)
             return _retained.length;
+    }
+
+    /** Number of concrete node allocations made by the executor. */
+    size_t freshNodeCount()
+    {
+        synchronized (_mutex)
+            return _freshNodes;
+    }
+
+    /** Number of times a previously completed typed node was rearmed. */
+    size_t reusedNodeCount()
+    {
+        synchronized (_mutex)
+            return _reusedNodes;
+    }
+
+    /** Strongly retained spare nodes, distinct from in-flight records. */
+    size_t spareCount()
+    {
+        synchronized (_mutex)
+            return _spare.length;
     }
 
     /** Retry while ingress or the in-flight record budget is full. */
@@ -451,6 +538,9 @@ package(concurrency) final class OwnedTaskExecutor
                 foreach (ref entry; _retained)
                     entry = RetainedTask.init;
                 _retained.length = 0;
+                foreach (ref entry; _spare)
+                    entry = RetainedTask.init;
+                _spare.length = 0;
             }
 
             _shutdownFailure = failure;
@@ -837,39 +927,150 @@ unittest
     assert(executor.completedCount() == executor.acceptedCount());
 }
 
+version (unittest)
+{
+    private struct WideCapturedTask
+    {
+        string text;
+        ubyte[256] payload;
+        int tag;
+
+        int opCall()
+        {
+            return tag + cast(int) text.length + payload[0];
+        }
+    }
+}
+
 unittest
 {
-    // A gated worker cannot consume the sole waiting ingress slot.
-    // Rejected attempts must not allocate temporary result cells, handles
-    // or records merely to learn that the queue is already full.
+    // An old TaskHandle retains its original result even after its concrete
+    // node has been rearmed repeatedly for new work.
+    enum size_t N = 1024;
+    foreach (workers; [1, 4])
+    {
+        auto executor = new OwnedTaskExecutor(
+            workers, 3, 8, OwnedRecordPolicy.recycleTyped);
+
+        auto first = executor.submit(&addTwo);
+        assert(first.get() == 42);
+
+        foreach (i; 0 .. N)
+        {
+            auto current = executor.submit(&addTwo);
+            if (i % 19 == 0)
+                assert(current.get() == 42);
+        }
+
+        executor.closeAndJoin();
+
+        assert(first.get() == 42);
+        assert(executor.acceptedCount() == N + 1);
+        assert(executor.completedCount() == N + 1);
+        assert(executor.reusedNodeCount() > 0);
+        assert(executor.freshNodeCount() <= 32);
+        assert(executor.retainedCount() == 0);
+        assert(executor.spareCount() == 0);
+    }
+}
+
+unittest
+{
+    // Different concrete callable layouts may occupy the same reuse cache,
+    // but must never be confused or overwrite previously observed handles.
+    import core.memory : GC;
+
+    auto executor = new OwnedTaskExecutor(
+        2, 2, 4, OwnedRecordPolicy.recycleTyped);
+
+    auto original = executor.submit(&addTwo);
+    assert(original.get() == 42);
+
+    WideCapturedTask large;
+    large.text = "payload-owned-by-task-record";
+    large.tag = 7;
+    large.payload[0] = 3;
+
+    auto firstWide = executor.submit(large);
+    const expected = firstWide.get();
+    assert(expected == 7 + large.text.length + 3);
+
+    foreach (i; 0 .. 128)
+    {
+        large.tag = cast(int) i;
+        auto next = executor.submit(large);
+        if (i % 9 == 0)
+            assert(next.get() == cast(int) i + large.text.length + 3);
+    }
+
+    executor.closeAndJoin();
+    GC.collect();
+
+    assert(original.get() == 42);
+    assert(firstWide.get() == expected);
+    assert(executor.completedCount() == 130);
+    assert(executor.reusedNodeCount() > 0);
+}
+
+unittest
+{
+    // Zero-spare GC policy preserves existing semantics without node reuse.
+    auto executor = new OwnedTaskExecutor(
+        2, 2, 4, OwnedRecordPolicy.freshGc);
+
+    foreach (_; 0 .. 128)
+    {
+        auto h = executor.submit(&addTwo);
+        assert(h.get() == 42);
+    }
+
+    executor.closeAndJoin();
+    assert(executor.reusedNodeCount() == 0);
+    assert(executor.spareCount() == 0);
+    assert(executor.acceptedCount() == 128);
+}
+
+unittest
+{
+    // Regression: repeated full-ingress rejection must not allocate
+    // throwaway ResultCells/TaskHandles/OwnedNodes on the producer thread.
+    // One gated worker holds a task while the single ingress slot stays full.
     import core.atomic : MemoryOrder, atomicStore;
     import core.memory : GC;
 
     shared bool entered;
     shared bool release;
+
     GatedTask gated;
     gated.entered = &entered;
     gated.release = &release;
 
-    auto executor = new OwnedTaskExecutor(1, 1, 4);
-    auto running = executor.submit(gated);
-    waitForFlag(&entered);
+    foreach (policy; [OwnedRecordPolicy.freshGc,
+                       OwnedRecordPolicy.recycleTyped])
+    {
+        atomicStore!(MemoryOrder.rel)(entered, false);
+        atomicStore!(MemoryOrder.rel)(release, false);
 
-    auto queued = executor.submit(&addTwo);
-    const before = GC.allocatedInCurrentThread();
+        auto executor = new OwnedTaskExecutor(1, 1, 4, policy);
+        auto running = executor.submit(gated);
+        waitForFlag(&entered);
 
-    foreach (_; 0 .. 300)
-        assert(executor.trySubmit(&addTwo) is null);
+        auto waiting = executor.submit(&addTwo);
+        const before = GC.allocatedInCurrentThread();
 
-    const after = GC.allocatedInCurrentThread();
-    assert(after == before,
-        "full queue rejection allocated on the producer thread");
+        foreach (_; 0 .. 300)
+            assert(executor.trySubmit(&addTwo) is null);
 
-    atomicStore!(MemoryOrder.rel)(release, true);
-    assert(running.get() == 17);
-    assert(queued.get() == 42);
-    executor.closeAndJoin();
+        const after = GC.allocatedInCurrentThread();
+        assert(after == before,
+            "full-ingress rejection unexpectedly allocated GC memory");
 
-    assert(executor.acceptedCount() == 2);
-    assert(executor.completedCount() == 2);
+        atomicStore!(MemoryOrder.rel)(release, true);
+        assert(running.get() == 17);
+        assert(waiting.get() == 42);
+        executor.closeAndJoin();
+
+        assert(executor.acceptedCount() == 2);
+        assert(executor.completedCount() == 2);
+    }
 }

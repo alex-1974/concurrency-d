@@ -105,9 +105,10 @@ private final class TaskInbox
     }
 
     /**
-     * Advisory full-inbox check, called while OwnedTaskExecutor's producer
-     * admission mutex is held. Worker threads only remove entries; another
-     * owned producer cannot add an entry before that owner's trySubmit.
+     * An advisory non-reserving capacity check. The owned executor holds
+     * its submission mutex while querying and publishing, so another
+     * owned producer cannot fill the inbox in between. A worker may only
+     * remove slots, making a positive result remain valid for that path.
      */
     bool hasCapacity()
     {
@@ -317,7 +318,7 @@ package(concurrency) final class SubmissionWorkerPool
         return _inbox.trySubmit(task);
     }
 
-    /** Reject known-full inboxes before creating owned task records. */
+    /** Optional fast rejection before constructing a costly owned record. */
     bool hasIngressCapacity()
     {
         return _inbox.hasCapacity();

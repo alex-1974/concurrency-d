@@ -1,0 +1,83 @@
+name: R0.5 owned-task storage qualification
+
+on:
+  pull_request:
+    branches:
+      - develop
+    paths:
+      - "source/concurrency/internal/**"
+      - "benchmarks/task_pipeline/**"
+      - "tools/research/r05_pipeline_matrix.py"
+      - "tools/research/r05_mixed_producer_matrix.py"
+      - ".github/workflows/r05-storage-qualification.yml"
+      - "dub.sdl"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  storage-matrix:
+    name: R0.5 paired LDC / ${{ matrix.label }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: x86-64
+            runner: ubuntu-24.04
+          - label: arm64
+            runner: ubuntu-24.04-arm
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Install LDC
+        uses: dlang-community/setup-dlang@v2
+        with:
+          compiler: ldc-1.41.0
+
+      - name: Platform and compiler evidence
+        shell: bash
+        run: |
+          "$DC" --version
+          dub --version
+          uname -a
+          uname -m
+          lscpu
+
+      - name: Paired storage comparison (diagnostic, not a speed gate)
+        shell: bash
+        run: |
+          python3 tools/research/r05_pipeline_matrix.py \
+            --compiler="$DC" \
+            --workers=4 \
+            --tasks=6000 \
+            --rounds=3 \
+            --scenarios scalar wide void \
+            --budgets 8 64 512 4096 \
+            --output="evidence/r05-ci/${{ matrix.label }}"
+
+      - name: Mixed callable multi-producer comparison (diagnostic only)
+        shell: bash
+        run: |
+          python3 tools/research/r05_mixed_producer_matrix.py \
+            --compiler="$DC" \
+            --workers=4 \
+            --tasks=3000 \
+            --rounds=2 \
+            --producers 1 4 \
+            --budgets 8 512 \
+            --output="evidence/r05-ci/${{ matrix.label }}/mixed"
+
+      - name: Upload raw evidence and medians
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: r05-storage-${{ matrix.label }}-${{ github.run_id }}
+          path: evidence/r05-ci/${{ matrix.label }}/
+          retention-days: 30
+          if-no-files-found: warn

@@ -18,3 +18,19 @@ configuration "parking-benchmark" {
     importPaths "source" "benchmarks/parking"
     targetName "concurrency-parking-benchmark"
 }
+
+configuration "task-pipeline-benchmark" {
+    targetType "executable"
+    mainSourceFile "benchmarks/task_pipeline/main.d"
+    sourcePaths "source" "benchmarks/task_pipeline"
+    importPaths "source" "benchmarks/task_pipeline"
+    targetName "concurrency-task-pipeline-benchmark"
+}
+
+configuration "task-pipeline-mixed-benchmark" {
+    targetType "executable"
+    mainSourceFile "benchmarks/task_pipeline/multi_producer.d"
+    sourcePaths "source" "benchmarks/task_pipeline"
+    importPaths "source" "benchmarks/task_pipeline"
+    targetName "concurrency-task-pipeline-mixed"
+}
