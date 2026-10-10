@@ -1,6 +1,6 @@
 # R0.3 — Worker Scheduling Qualification Plan
 
-Status: ACTIVE RESEARCH
+Status: PASS — R0.3 CLOSED
 
 ## Goal
 
@@ -296,27 +296,27 @@ other currently qualified targets:
 Generic direct-one and generic saturation/headroom thresholds are retained as
 negative or architecture-specific evidence.
 
-### P05 — CI REQUALIFYING / LOCAL XPS RERUN PENDING
+### P05 — PASS
 
-The first local XPS run correctly rejected a separately compiled duplicate
-x86 candidate. The selected x86 policy is now qualified through the unchanged
-P01 enqueue-all executable itself, avoiding a code-layout confound.
+The corrected selected-implementation qualification passed on:
 
-Native AArch64 continues to qualify the saturation-gated continuation
-candidate against P01.
+- DMD 2.111 / x86_64;
+- LDC 1.41 / hosted x86_64;
+- local XPS / LDC 1.41;
+- native AArch64 / LDC 1.41.
 
-The local XPS runner is:
+The first local duplicate-binary attempt remains retained negative benchmark
+methodology evidence.
+
+### P06 — PASS
+
+Final selected worker policy is recorded in:
 
 ```text
-research/r0_3_worker_scheduling/tools/run_p05_xps.sh
+results/p06-worker-scheduling-decision.md
 ```
 
-P05 becomes complete only after the corrected selected-implementation CI and
-local XPS evidence are recorded.
-
-### P06 — PENDING
-
-Final worker-scheduling decision follows the local XPS P05 gate.
+R0.3 is closed.
 
 ## Exit criterion
 
@@ -331,3 +331,31 @@ R0.3 passes when one worker-scheduling policy is selected with:
 - local XPS qualification;
 - native AArch64 qualification;
 - clearly deferred parking/allocation/public-API questions.
+
+
+## Final selected contract
+
+```text
+victim selection:
+    deterministic round-robin
+
+searching workers:
+    all idle workers may search before parking exists
+
+continuation:
+    AArch64:
+        saturation-gated direct-one
+        outstanding >= worker count
+    x86_64 and other currently qualified targets:
+        enqueue-all
+
+steal width:
+    single and batch remain explicit scheduler choices
+
+overflow:
+    P12 execute-inline fallback
+```
+
+R0.4 parking/wake research must start from this contract and must not reopen
+queue ownership, TaskRef layout or worker scheduling policy without new
+contradictory evidence.
