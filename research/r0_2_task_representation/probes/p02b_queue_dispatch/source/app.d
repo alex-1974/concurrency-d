@@ -349,7 +349,7 @@ private ulong runPointerOnly(
 
         foreach (_task; 0 .. Capacity)
         {
-            const taken =
+            auto taken =
                 queue.pop();
 
             if (!taken.found)
@@ -388,7 +388,7 @@ private ulong runPointerExecute(
 
         foreach (_task; 0 .. Capacity)
         {
-            const taken =
+            auto taken =
                 queue.pop();
 
             if (!taken.found)
@@ -427,7 +427,7 @@ private ulong runRecordTag(
 
         foreach (_task; 0 .. Capacity)
         {
-            const taken =
+            auto taken =
                 queue.pop();
 
             if (!taken.found)
