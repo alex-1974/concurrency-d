@@ -250,6 +250,72 @@ R0.3 does not freeze:
 - parking primitive;
 - allocator or task pool.
 
+## Qualification progress
+
+### P01 — PASS
+
+Baseline scheduler-neighborhood harness qualified on:
+
+- DMD 2.111;
+- LDC 1.41 hosted x86_64;
+- native AArch64 / Neoverse-N2.
+
+### P02 — PASS
+
+Victim-selection decision:
+
+```text
+deterministic round-robin
+```
+
+Random and sticky-success remain retained alternatives/negative evidence.
+
+### P03 — PASS
+
+Searching-worker decision for the pre-parking scheduler:
+
+```text
+all idle workers may search
+```
+
+One/bounded active searchers reduce failed-steal traffic but do not provide a
+robust throughput improvement without parking.
+
+### P04 — PASS
+
+Continuation policy is architecture-specialized at compile time:
+
+```text
+AArch64:
+    saturation-gated direct-one
+
+other currently qualified targets:
+    enqueue-all
+```
+
+Generic direct-one and generic saturation/headroom thresholds are retained as
+negative or architecture-specific evidence.
+
+### P05 — CI PASS / LOCAL XPS PENDING
+
+Combined policy passes:
+
+- DMD 2.111 correctness;
+- LDC 1.41 hosted x86_64 regression gate;
+- native AArch64 / LDC 1.41 regression gate.
+
+The local XPS runner is:
+
+```text
+research/r0_3_worker_scheduling/tools/run_p05_xps.sh
+```
+
+P05 becomes complete only after local XPS evidence is recorded.
+
+### P06 — PENDING
+
+Final worker-scheduling decision follows the local XPS P05 gate.
+
 ## Exit criterion
 
 R0.3 passes when one worker-scheduling policy is selected with:
