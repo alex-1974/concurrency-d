@@ -1,0 +1,168 @@
+name: R0.1 containers-d adoption
+
+on:
+  push:
+    branches:
+      - research/r0-1-containers-adoption
+    paths:
+      - ".github/workflows/r0-1-containers-adoption.yml"
+      - "research/r0_1_containers_adoption/**"
+      - "research/r0_1_work_stealing_deque/probes/p14c_irregular_bursty/**"
+      - "research/r0_1_work_stealing_deque/candidate/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  baseline:
+    name: Baseline / ${{ matrix.compiler }}
+    runs-on: ubuntu-24.04
+
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler:
+          - dmd-2.111.0
+          - ldc-1.41.0
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Install D
+        uses: dlang-community/setup-dlang@v2
+        with:
+          compiler: ${{ matrix.compiler }}
+          dub: 1.40.0
+
+      - name: Versions
+        shell: bash
+        run: |
+          "$DC" --version
+          dub --version
+
+      - name: A0 TaskRef contract
+        shell: bash
+        run: |
+          dub run \
+            --root=research/r0_1_containers_adoption/probes/a0_taskref_contract \
+            --compiler="$DC" \
+            --force
+
+      - name: A1 distributed production
+        shell: bash
+        run: |
+          dub run \
+            --root=research/r0_1_containers_adoption/probes/a1_distributed_production \
+            --compiler="$DC" \
+            --build=release \
+            --force
+
+      - name: A2 irregular end-to-end
+        shell: bash
+        run: |
+          dub run \
+            --root=research/r0_1_containers_adoption/probes/a2_irregular_bursty \
+            --compiler="$DC" \
+            --build=release \
+            --force
+
+  native-arm64:
+    name: Native ARM64 / LDC 1.41
+    runs-on: ubuntu-24.04-arm
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Install LDC
+        uses: dlang-community/setup-dlang@v2
+        with:
+          compiler: ldc-1.41.0
+          dub: 1.40.0
+
+      - name: Platform evidence
+        shell: bash
+        run: |
+          "$DC" --version
+          dub --version
+          uname -a
+          uname -m
+          lscpu
+          test "$(uname -m)" = "aarch64"
+
+      - name: A0 TaskRef contract
+        shell: bash
+        run: |
+          dub run \
+            --root=research/r0_1_containers_adoption/probes/a0_taskref_contract \
+            --compiler="$DC" \
+            --force
+
+      - name: A1 distributed production
+        shell: bash
+        run: |
+          dub run \
+            --root=research/r0_1_containers_adoption/probes/a1_distributed_production \
+            --compiler="$DC" \
+            --build=release \
+            --force
+
+      - name: Balanced A2 vs retained R0.1 reference
+        shell: bash
+        run: |
+          REF=research/r0_1_work_stealing_deque/probes/p14c_irregular_bursty
+          CAND=research/r0_1_containers_adoption/probes/a2_irregular_bursty
+
+          dub run --root="$REF" --compiler="$DC" --build=release --force > /tmp/ref-first.txt
+          dub run --root="$CAND" --compiler="$DC" --build=release --force > /tmp/cand-second.txt
+          dub run --root="$CAND" --compiler="$DC" --build=release --force > /tmp/cand-first.txt
+          dub run --root="$REF" --compiler="$DC" --build=release --force > /tmp/ref-second.txt
+
+          cat /tmp/ref-first.txt
+          cat /tmp/cand-second.txt
+          cat /tmp/cand-first.txt
+          cat /tmp/ref-second.txt
+
+          python3 - <<'PY'
+          import re
+          from pathlib import Path
+
+          def medians(path):
+              text = Path(path).read_text()
+              result = {}
+              for mode in ("single", "batch"):
+                  m = re.search(rf"^{mode}\s+median=\s*([0-9.]+) ns/task", text, re.M)
+                  if not m:
+                      raise SystemExit(f"missing {mode} median in {path}")
+                  result[mode] = float(m.group(1))
+              return result
+
+          refs = [
+              medians("/tmp/ref-first.txt"),
+              medians("/tmp/ref-second.txt"),
+          ]
+          cands = [
+              medians("/tmp/cand-first.txt"),
+              medians("/tmp/cand-second.txt"),
+          ]
+
+          for mode in ("single", "batch"):
+              ref = sum(x[mode] for x in refs) / len(refs)
+              cand = sum(x[mode] for x in cands) / len(cands)
+              ratio = cand / ref
+
+              print(
+                  f"{mode}: reference={ref:.3f} ns/task "
+                  f"candidate={cand:.3f} ns/task ratio={ratio:.4f}x"
+              )
+
+              if ratio > 1.10:
+                  raise SystemExit(
+                      f"material containers-d adoption regression for {mode}: "
+                      f"{ratio:.4f}x > 1.10x"
+                  )
+
+          print("R0.1 containers-d adoption performance gate PASS")
+          PY
