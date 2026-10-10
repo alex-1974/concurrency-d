@@ -121,6 +121,15 @@ jobs:
             --build=release \
             --force
 
+      - name: P05b TaskRef recursive scheduler
+        shell: bash
+        run: |
+          dub run \
+            --root=research/r0_2_task_representation/probes/p05b_taskref_recursive \
+            --compiler="$DC" \
+            --build=release \
+            --force
+
   p01-arm64:
     name: P01 / native ARM64 / LDC 1.41
     runs-on: ubuntu-24.04-arm
@@ -220,6 +229,15 @@ jobs:
         run: |
           dub run \
             --root=research/r0_2_task_representation/probes/p05a_taskref_flat \
+            --compiler="$DC" \
+            --build=release \
+            --force
+
+      - name: P05b TaskRef recursive scheduler
+        shell: bash
+        run: |
+          dub run \
+            --root=research/r0_2_task_representation/probes/p05b_taskref_recursive \
             --compiler="$DC" \
             --build=release \
             --force
