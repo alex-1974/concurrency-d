@@ -162,7 +162,7 @@ private shared TaskRecord* taskRecord(
 private TaskRef makeTask(
     uint index,
     shared TaskRecord* records)
-    @safe @nogc nothrow
+    @trusted @nogc nothrow
 {
     return TaskRef(
         &records[index]
@@ -617,7 +617,7 @@ private void executeTask(
 
         foreach (child; 0 .. children)
         {
-            const next =
+            auto next =
                 makeTask(
                     taskChildIndex(
                         task,
@@ -739,7 +739,8 @@ private Thread makeWorker(
                     queues,
                     stats,
                     outstanding,
-                    completed);
+                    completed,
+                    records);
 
                 continue;
             }
@@ -790,7 +791,8 @@ private Thread makeWorker(
                             queues,
                             stats,
                             outstanding,
-                            completed);
+                            completed,
+                            records);
 
                         foundWork = true;
                         break;
