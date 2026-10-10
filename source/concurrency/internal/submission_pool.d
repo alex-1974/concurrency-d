@@ -104,6 +104,17 @@ private final class TaskInbox
         }
     }
 
+    /**
+     * Advisory full-inbox check, called while OwnedTaskExecutor's producer
+     * admission mutex is held. Worker threads only remove entries; another
+     * owned producer cannot add an entry before that owner's trySubmit.
+     */
+    bool hasCapacity()
+    {
+        synchronized (_mutex)
+            return !_closed && _used < _slots.length;
+    }
+
     size_t takeBatch(scope TaskRef[] output)
     {
         synchronized (_mutex)
@@ -304,6 +315,12 @@ package(concurrency) final class SubmissionWorkerPool
     SubmissionResult trySubmit(TaskRef task)
     {
         return _inbox.trySubmit(task);
+    }
+
+    /** Reject known-full inboxes before creating owned task records. */
+    bool hasIngressCapacity()
+    {
+        return _inbox.hasCapacity();
     }
 
     /** Blocks until all admitted tasks have completed and all workers exit. */
