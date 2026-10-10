@@ -670,7 +670,8 @@ private Thread makeWorker(
                                     queues,
                                     stats,
                                     outstanding,
-                                    completed);
+                                    completed,
+                                    records);
                             }
 
                             foundWork = true;
