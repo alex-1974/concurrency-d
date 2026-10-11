@@ -38,6 +38,18 @@ import core.sync.condition :
 import core.thread :
     Thread;
 
+/**
+ * R0.5 research-only notification selection. The baseline always calls
+ * notify after publishing, even if there are no actual Condition waiters.
+ * waiterAware skips only calls with no registered waiter. It never delays
+ * publication and never changes the generation predicate.
+ */
+package(concurrency) enum NotificationPolicy
+{
+    always,
+    waiterAware
+}
+
 package(concurrency) enum SubmissionResult
 {
     accepted,
@@ -90,6 +102,10 @@ package(concurrency) struct InboxParkingStats
 {
     ulong ingressNotifications;
     ulong localNotifications;
+    ulong ingressNotifyCalls;
+    ulong ingressNotifySkipped;
+    ulong localNotifyCalls;
+    ulong localNotifySkipped;
     ulong closeBroadcasts;
     ulong drainBroadcasts;
     ulong claimedBatches;
@@ -114,17 +130,23 @@ private final class TaskInbox
     private size_t _completed;
     private size_t _generation;
     private size_t _parkCount;
+    private size_t _sleepers; // guarded by _mutex; only maintained in waiterAware
     private bool _closed;
+    private NotificationPolicy _notificationPolicy;
 
     private bool _parkingProfile;
     private InboxParkingStats _parkingCounters;
 
-    this(size_t capacity, bool parkingProfile = false)
+    this(
+        size_t capacity,
+        bool parkingProfile = false,
+        NotificationPolicy notificationPolicy = NotificationPolicy.always)
     {
         if (capacity == 0)
             throw new Exception("ingress capacity must be positive");
 
         _parkingProfile = parkingProfile;
+        _notificationPolicy = notificationPolicy;
         _mutex = new Mutex();
         _changed = new Condition(_mutex);
         _slots = new TaskRef[capacity];
@@ -156,7 +178,21 @@ private final class TaskInbox
                 if (_used > _parkingCounters.peakQueued)
                     _parkingCounters.peakQueued = _used;
             }
-            _changed.notify();
+            // _sleepers is changed under this exact mutex around
+            // Condition.wait. With zero sleepers no thread can need
+            // an actual notification: a future parker must observe
+            // the changed generation and/or nonempty inbox.
+            if (_notificationPolicy == NotificationPolicy.always ||
+                _sleepers != 0)
+            {
+                if (_parkingProfile)
+                    ++_parkingCounters.ingressNotifyCalls;
+                _changed.notify();
+            }
+            else if (_parkingProfile)
+            {
+                ++_parkingCounters.ingressNotifySkipped;
+            }
             return SubmissionResult.accepted;
         }
     }
@@ -252,7 +288,17 @@ private final class TaskInbox
             ++_generation;
             if (_parkingProfile)
                 ++_parkingCounters.localNotifications;
-            _changed.notify();
+            if (_notificationPolicy == NotificationPolicy.always ||
+                _sleepers != 0)
+            {
+                if (_parkingProfile)
+                    ++_parkingCounters.localNotifyCalls;
+                _changed.notify();
+            }
+            else if (_parkingProfile)
+            {
+                ++_parkingCounters.localNotifySkipped;
+            }
         }
     }
 
@@ -279,7 +325,14 @@ private final class TaskInbox
 
                 // wait() may return spuriously. Counting returns is not
                 // the same as counting useful work-producing notifications.
+                if (_notificationPolicy == NotificationPolicy.waiterAware)
+                    ++_sleepers;
                 _changed.wait();
+                if (_notificationPolicy == NotificationPolicy.waiterAware)
+                {
+                    assert(_sleepers != 0);
+                    --_sleepers;
+                }
                 if (_parkingProfile)
                 {
                     ++stats.waitReturns;
@@ -394,13 +447,15 @@ package(concurrency) final class SubmissionWorkerPool
         size_t workerCount,
         size_t ingressCapacity,
         void function(TaskRef) nothrow afterExecution = null,
-        bool parkingProfile = false)
+        bool parkingProfile = false,
+        NotificationPolicy notificationPolicy = NotificationPolicy.always)
     {
         if (workerCount == 0)
             throw new Exception("workerCount must be positive");
 
         _parkingProfile = parkingProfile;
-        _inbox = new TaskInbox(ingressCapacity, parkingProfile);
+        _inbox = new TaskInbox(
+            ingressCapacity, parkingProfile, notificationPolicy);
         _afterExecution = afterExecution;
         _queues = new LocalQueue[workerCount];
         _workers = new Thread[workerCount];
