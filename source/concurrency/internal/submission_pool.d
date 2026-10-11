@@ -79,6 +79,14 @@ package(concurrency) struct WorkerParkingStats
     ulong skippedParks;
     ulong executions;
 
+    // R0.5 opt-in research only: per-worker work source attribution.
+    // This records counts, not task identity or causal task ownership.
+    ulong ingressBatches;
+    ulong ingressClaimedTasks;
+    ulong ownerLocalExecutions;
+    ulong directIngressExecutions;
+    ulong stealExecutions;
+
     // A wait can return with its predicate still blocking; such a
     // return is retried immediately under the same inbox mutex.
     ulong waitReturnsStillBlocked;
@@ -550,6 +558,11 @@ package(concurrency) final class SubmissionWorkerPool
             total.waitReturns += entry.waitReturns;
             total.skippedParks += entry.skippedParks;
             total.executions += entry.executions;
+            total.ingressBatches += entry.ingressBatches;
+            total.ingressClaimedTasks += entry.ingressClaimedTasks;
+            total.ownerLocalExecutions += entry.ownerLocalExecutions;
+            total.directIngressExecutions += entry.directIngressExecutions;
+            total.stealExecutions += entry.stealExecutions;
             total.waitReturnsStillBlocked += entry.waitReturnsStillBlocked;
             total.waitExitsInboxPending += entry.waitExitsInboxPending;
             total.waitExitsGenerationOnly += entry.waitExitsGenerationOnly;
@@ -625,7 +638,10 @@ package(concurrency) final class SubmissionWorkerPool
                 }
                 executeOne(local.value);
                 if (_parkingProfile)
+                {
                     ++counters.executions;
+                    ++counters.ownerLocalExecutions;
+                }
                 continue;
             }
 
@@ -639,6 +655,11 @@ package(concurrency) final class SubmissionWorkerPool
             const taken = _inbox.takeBatch(batch[]);
             if (taken != 0)
             {
+                if (_parkingProfile)
+                {
+                    ++counters.ingressBatches;
+                    counters.ingressClaimedTasks += taken;
+                }
                 if (_parkingProfile && pendingWakeClassification)
                 {
                     ++counters.wokeToInbox;
@@ -658,7 +679,10 @@ package(concurrency) final class SubmissionWorkerPool
                     {
                         executeOne(task);
                         if (_parkingProfile)
+                        {
                             ++counters.executions;
+                            ++counters.directIngressExecutions;
+                        }
                     }
                 }
 
@@ -667,7 +691,10 @@ package(concurrency) final class SubmissionWorkerPool
 
                 executeOne(batch[0]);
                 if (_parkingProfile)
+                {
                     ++counters.executions;
+                    ++counters.directIngressExecutions;
+                }
                 continue;
             }
 
@@ -699,6 +726,7 @@ package(concurrency) final class SubmissionWorkerPool
                 if (_parkingProfile)
                 {
                     ++counters.stealSuccesses;
+                    ++counters.stealExecutions;
                     ++counters.executions;
                 }
                 foundWork = true;
