@@ -799,7 +799,16 @@ package(concurrency) final class SubmissionWorkerPool
                 ++counters.ingressMisses;
             bool foundWork;
 
-            foreach (_; 0 .. _queues.length - 1)
+            // R0.5 qualified mechanism A/B: the original N-1 slot
+            // iterations can include self and therefore miss a foreign
+            // queue entirely. A full N-slot sweep visits exactly N-1
+            // non-self queues. This opt-in variant changes no dequeue,
+            // memory-model or wakeup operation.
+            version (R05FullVictimSweep)
+                const victimSlots = _queues.length;
+            else
+                const victimSlots = _queues.length - 1;
+            foreach (_; 0 .. victimSlots)
             {
                 const victim = nextVictim;
                 nextVictim = (nextVictim + 1) % _queues.length;
