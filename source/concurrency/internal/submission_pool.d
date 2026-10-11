@@ -1076,3 +1076,32 @@ unittest
     assert(stats.wokeToSteal == 0);
     assert(stats.wokeToLocal == 0);
 }
+
+unittest
+{
+    // One worker means no other claimant can consume a publication.
+    // An idle worker awakened by the submitted task must discover it
+    // in the inbox on the very next work search.
+    auto pool = new SubmissionWorkerPool(1, 2, null, true);
+    waitForPark(pool, 1);
+
+    shared CountingRecord[1] records;
+    TaskRef[1] tasks;
+    prepareRecords(records[], tasks[]);
+    assert(pool.trySubmit(tasks[0]) == SubmissionResult.accepted);
+    waitForExecution(&records[0]);
+    pool.closeAndJoin();
+
+    const worker = pool.parkingStatsAfterJoin();
+    assert(worker.executions == 1);
+    assert(worker.wokeToInbox >= 1);
+    assert(worker.waitReturns ==
+        worker.waitReturnsStillBlocked +
+        worker.waitExitsInboxPending +
+        worker.waitExitsGenerationOnly +
+        worker.waitExitsDrained);
+    assert(worker.waitReturns - worker.waitReturnsStillBlocked ==
+        worker.wokeToLocal + worker.wokeToInbox +
+        worker.wokeToSteal + worker.wokeToEmptySearch +
+        worker.wokeToDrained);
+}
