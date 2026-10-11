@@ -59,3 +59,14 @@ configuration "burst-head-of-line-benchmark" {
     importPaths "source" "benchmarks/task_pipeline"
     targetName "concurrency-burst-head-of-line"
 }
+
+// Diagnostic-only build: trace mutex and event storage do not exist in the
+// standard library or uninstrumented burst benchmark configuration.
+configuration "burst-head-of-line-trace" {
+    targetType "executable"
+    mainSourceFile "benchmarks/task_pipeline/burst_head_of_line.d"
+    sourcePaths "source" "benchmarks/task_pipeline"
+    importPaths "source" "benchmarks/task_pipeline"
+    versions "R05TaskTrace"
+    targetName "concurrency-burst-head-of-line-trace"
+}
