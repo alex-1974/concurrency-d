@@ -157,7 +157,9 @@ def main():
                         f"blockers={blocked} started="
                         f"{row['started_before_release']}/{blocked} "
                         f"siblings={row['siblings_before_release']}"
-                        f"/{args.siblings} steals={row['stolen_executions']}",
+                        f"/{args.siblings} after-all-starts="
+                        f"{row['siblings_after_all_starts']} "
+                        f"steals={row['stolen_executions']}",
                         flush=True)
     write_csv(args.output / "raw.csv", records)
     write_csv(args.output / "claims.csv", claims)
