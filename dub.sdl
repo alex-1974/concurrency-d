@@ -179,3 +179,50 @@ configuration "burst-head-of-line-search-full-victim-sweep" {
     versions "R05FullVictimSweep" "R05WorkerSearchTrace"
     targetName "concurrency-burst-head-of-line-search-full-victim-sweep"
 }
+
+// R0.5 fairness experiment: full coverage plus one start-position advance
+// after a failed search. Always batch8; none of these is the library default.
+configuration "burst-head-of-line-rotating-victim-sweep" {
+    targetType "executable"
+    mainSourceFile "benchmarks/task_pipeline/burst_head_of_line.d"
+    sourcePaths "source" "benchmarks/task_pipeline"
+    importPaths "source" "benchmarks/task_pipeline"
+    versions "R05RotatingFullVictimSweep"
+    targetName "concurrency-burst-head-of-line-rotating-victim-sweep"
+}
+
+configuration "task-pipeline-mixed-rotating-victim-sweep" {
+    targetType "executable"
+    mainSourceFile "benchmarks/task_pipeline/multi_producer.d"
+    sourcePaths "source" "benchmarks/task_pipeline"
+    importPaths "source" "benchmarks/task_pipeline"
+    versions "R05RotatingFullVictimSweep"
+    targetName "concurrency-task-pipeline-mixed-rotating-victim-sweep"
+}
+
+configuration "notification-latency-full-victim-sweep" {
+    targetType "executable"
+    mainSourceFile "benchmarks/task_pipeline/notification_latency.d"
+    sourcePaths "source" "benchmarks/task_pipeline"
+    importPaths "source" "benchmarks/task_pipeline"
+    versions "R05FullVictimSweep"
+    targetName "concurrency-notification-latency-full-victim-sweep"
+}
+
+configuration "notification-latency-rotating-victim-sweep" {
+    targetType "executable"
+    mainSourceFile "benchmarks/task_pipeline/notification_latency.d"
+    sourcePaths "source" "benchmarks/task_pipeline"
+    importPaths "source" "benchmarks/task_pipeline"
+    versions "R05RotatingFullVictimSweep"
+    targetName "concurrency-notification-latency-rotating-victim-sweep"
+}
+
+configuration "burst-head-of-line-search-rotating-victim-sweep" {
+    targetType "executable"
+    mainSourceFile "benchmarks/task_pipeline/burst_head_of_line.d"
+    sourcePaths "source" "benchmarks/task_pipeline"
+    importPaths "source" "benchmarks/task_pipeline"
+    versions "R05RotatingFullVictimSweep" "R05WorkerSearchTrace"
+    targetName "concurrency-burst-head-of-line-search-rotating-victim-sweep"
+}
