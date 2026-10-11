@@ -70,3 +70,23 @@ configuration "burst-head-of-line-trace" {
     versions "R05TaskTrace"
     targetName "concurrency-burst-head-of-line-trace"
 }
+
+// R0.5 isolated uninstrumented compile-time A/B. Batch-of-eight is the
+// established baseline; batch-of-one is NOT the library default.
+configuration "burst-head-of-line-batch1" {
+    targetType "executable"
+    mainSourceFile "benchmarks/task_pipeline/burst_head_of_line.d"
+    sourcePaths "source" "benchmarks/task_pipeline"
+    importPaths "source" "benchmarks/task_pipeline"
+    versions "R05IngressBatchOne"
+    targetName "concurrency-burst-head-of-line-batch1"
+}
+
+configuration "task-pipeline-mixed-batch1" {
+    targetType "executable"
+    mainSourceFile "benchmarks/task_pipeline/multi_producer.d"
+    sourcePaths "source" "benchmarks/task_pipeline"
+    importPaths "source" "benchmarks/task_pipeline"
+    versions "R05IngressBatchOne"
+    targetName "concurrency-task-pipeline-mixed-batch1"
+}
