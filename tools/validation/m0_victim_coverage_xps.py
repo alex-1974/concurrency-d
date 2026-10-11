@@ -317,7 +317,7 @@ def main():
                   f"rounds={a.rounds} tasks={a.tasks} budget={a.budget}\n"
                   f"workers={a.workers} producers={a.producers} "
                   f"workloads={a.workloads} compute_rounds={a.compute_rounds}\n"
-                  f"idle_only={a.idle_only}\\n"
+                  f"idle_only={a.idle_only}\n"
                   f"idle_ms={a.idle_ms} wake_samples={a.wake_samples} "
                   f"gap_ms={a.gap_ms} cooldown_ms={a.cooldown_ms}\n"
                   "Both detached worktrees receive the identical benchmark "
