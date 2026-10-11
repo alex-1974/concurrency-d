@@ -128,3 +128,25 @@ configuration "task-pipeline-mixed-batch4" {
     versions "R05IngressBatchFour"
     targetName "concurrency-task-pipeline-mixed-batch4"
 }
+
+// Research-only worker-local stolen-work and park timeline, WITHOUT the
+// per-TaskRef trace mutex. Both versions use the same burst benchmark.
+
+configuration "burst-head-of-line-search-batch8" {
+    targetType "executable"
+    mainSourceFile "benchmarks/task_pipeline/burst_head_of_line.d"
+    sourcePaths "source" "benchmarks/task_pipeline"
+    importPaths "source" "benchmarks/task_pipeline"
+    versions "R05WorkerSearchTrace"
+    targetName "concurrency-burst-head-of-line-search-batch8"
+}
+
+configuration "burst-head-of-line-search-batch1" {
+    targetType "executable"
+    mainSourceFile "benchmarks/task_pipeline/burst_head_of_line.d"
+    sourcePaths "source" "benchmarks/task_pipeline"
+    importPaths "source" "benchmarks/task_pipeline"
+    versions "R05WorkerSearchTrace"
+    versions "R05IngressBatchOne"
+    targetName "concurrency-burst-head-of-line-search-batch1"
+}
