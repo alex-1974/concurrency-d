@@ -124,8 +124,8 @@ def run(binary, root, workers, tasks, budget, producers, policy,
         row[key] = int(n[key]) if n is not None else ""
     for key in ("condition_waits", "steal_attempts", "steal_successes"):
         row[key] = int(p[key]) if p is not None else ""
-    for key in ("useful_inbox", "useful_local", "useful_steal", "no_work",
-                "drained", "exit_generation"):
+    for key in ("still_blocked", "useful_inbox", "useful_local",
+                "useful_steal", "no_work", "drained", "exit_generation"):
         row[key] = int(w[key]) if w is not None else ""
     return row
 
@@ -236,7 +236,7 @@ def main():
                                for x in profile), 4),
                     "median_candidate_no_work_after_wait_pct": round(
                         median(100 * x["no_work"] / max(
-                            1, x["condition_waits"])
+                            1, x["condition_waits"] - x["still_blocked"])
                                for x in profile), 2),
                     "median_candidate_process_switches": median(
                         x["process_voluntary"] + x["process_involuntary"]
