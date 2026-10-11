@@ -1,0 +1,17 @@
+platform,workload,policy,producers,paired_profile_over_baseline,parks_per_task,failed_steals_per_task
+x86-64,minimal,gc,1,0.9151,0.3333,0.8925
+x86-64,minimal,gc,4,1.0142,0.6008,1.5433
+x86-64,minimal,recycle,1,1.0159,0.4079,1.0758
+x86-64,minimal,recycle,4,0.9628,0.5513,1.4179
+x86-64,compute,gc,1,1.5087,0.2217,0.5913
+x86-64,compute,gc,4,1.0069,0.1221,0.3358
+x86-64,compute,recycle,1,0.9249,0.2792,0.7233
+x86-64,compute,recycle,4,1.1775,0.1217,0.3337
+arm64,minimal,gc,1,1.0002,0.6062,1.5863
+arm64,minimal,gc,4,1.0166,0.6158,1.6533
+arm64,minimal,recycle,1,0.9156,0.6058,1.6104
+arm64,minimal,recycle,4,1.0701,0.67,1.7842
+arm64,compute,gc,1,0.9779,0.2963,0.8204
+arm64,compute,gc,4,1.3738,0.1229,0.3504
+arm64,compute,recycle,1,0.9391,0.3221,0.8771
+arm64,compute,recycle,4,1.0040,0.2117,0.6167
