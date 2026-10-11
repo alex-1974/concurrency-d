@@ -521,5 +521,5 @@ void main(string[] args)
 
     runCase(workers, producers, tasks, budget, policy,
         counterMode == "striped", instrumentation == "on",
-        workload == "compute" ? 96u : 0u);
+        workload == "compute" ? 1024u : 0u);
 }
