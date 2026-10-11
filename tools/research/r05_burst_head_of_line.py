@@ -16,12 +16,14 @@ import time
 BURST = ("metric", "notify", "storage", "workers", "blockers", "siblings",
          "probe_ms", "started_before_release", "siblings_before_release",
          "distinct_workers", "claimed_tasks", "local_executions",
-         "stolen_executions")
+         "stolen_executions", "siblings_after_all_starts")
 CLAIM = ("metric", "worker", "ingress_batches", "claimed_tasks",
          "local_executions", "direct_executions", "stolen_executions",
          "executions")
 TASK = ("metric", "task", "started_before_release", "worker",
         "start_delay_ns")
+SIBLING = ("metric", "task", "started_before_release", "worker",
+           "start_delay_ns")
 
 
 def parse_line(line, schema):
@@ -47,11 +49,14 @@ def run(binary, cwd, policy, storage, workers, blockers, siblings, probe_ms,
         raise RuntimeError(f"burst failed {cmd}, rc={p.returncode}\n"
                            + (p.stdout + p.stderr)[-6000:])
     lines = [x for x in p.stdout.splitlines() if
-             x.startswith(("burst,", "claim,", "task,"))]
+             x.startswith(("burst,", "claim,", "task,", "sibling,"))]
     top = [parse_line(x, BURST) for x in lines if x.startswith("burst,")]
     claims = [parse_line(x, CLAIM) for x in lines if x.startswith("claim,")]
     tasks = [parse_line(x, TASK) for x in lines if x.startswith("task,")]
-    if len(top) != 1 or len(claims) != workers or len(tasks) != blockers:
+    sibling_rows = [parse_line(x, SIBLING) for x in lines
+                    if x.startswith("sibling,")]
+    if (len(top) != 1 or len(claims) != workers or
+        len(tasks) != blockers or len(sibling_rows) != siblings):
         raise RuntimeError("incomplete burst diagnostic output")
     record = top[0]
     for name, expected in (("notify", policy), ("storage", storage),
@@ -70,7 +75,12 @@ def run(binary, cwd, policy, storage, workers, blockers, siblings, probe_ms,
         raise RuntimeError("missing per-worker claim counter")
     if sorted(int(x["task"]) for x in tasks) != list(range(blockers)):
         raise RuntimeError("duplicate/missing blocker task ID")
-    if any(int(x["start_delay_ns"]) < 0 for x in tasks):
+    if (sorted(int(x["task"]) for x in sibling_rows) !=
+        list(range(siblings)) or
+        int(record["siblings_before_release"]) != sum(
+            int(x["started_before_release"]) for x in sibling_rows)):
+        raise RuntimeError("duplicate/missing sibling or wrong start count")
+    if any(int(x["start_delay_ns"]) < 0 for x in tasks + sibling_rows):
         raise RuntimeError("negative task startup delay")
     if (sum(int(x["claimed_tasks"]) for x in claims) !=
             blockers + siblings or
@@ -84,10 +94,10 @@ def run(binary, cwd, policy, storage, workers, blockers, siblings, probe_ms,
     for row in claims:
         row.update(round=round_id, notify=policy, storage=storage,
                    blockers=blockers)
-    for row in tasks:
+    for row in tasks + sibling_rows:
         row.update(round=round_id, notify=policy, storage=storage,
                    blockers=blockers)
-    return record, claims, tasks
+    return record, claims, tasks, sibling_rows
 
 
 def write_csv(path, rows):
@@ -128,19 +138,20 @@ def main():
     if not binary.exists():
         raise RuntimeError("DUB burst executable was not emitted")
     args.output.mkdir(parents=True, exist_ok=True)
-    records, claims, tasks = [], [], []
+    records, claims, tasks, sibling_tasks = [], [], [], []
     for rnd in range(args.rounds):
         modes = ("always", "waiter") if rnd % 2 == 0 else (
             "waiter", "always")
         for storage in args.policies:
             for blocked in args.blockers:
                 for notify in modes:
-                    row, r_claims, r_tasks = run(
+                    row, r_claims, r_tasks, r_siblings = run(
                         binary, root, notify, storage, args.workers,
                         blocked, args.siblings, args.probe_ms, rnd)
                     records.append(row)
                     claims.extend(r_claims)
                     tasks.extend(r_tasks)
+                    sibling_tasks.extend(r_siblings)
                     print(
                         f"R05 burst round={rnd} {storage}/{notify} "
                         f"blockers={blocked} started="
@@ -151,6 +162,7 @@ def main():
     write_csv(args.output / "raw.csv", records)
     write_csv(args.output / "claims.csv", claims)
     write_csv(args.output / "tasks.csv", tasks)
+    write_csv(args.output / "siblings.csv", sibling_tasks)
     summary = []
     for storage in args.policies:
         for blocked in args.blockers:
@@ -175,6 +187,8 @@ def main():
                         int(x["claimed_tasks"]) for x in group),
                     "median_steals": statistics.median(
                         int(x["stolen_executions"]) for x in group),
+                    "median_siblings_after_all_starts": statistics.median(
+                        int(x["siblings_after_all_starts"]) for x in group),
                 })
     write_csv(args.output / "summary.csv", summary)
     with (args.output / "environment.txt").open("w") as fd:
