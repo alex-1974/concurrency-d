@@ -563,6 +563,17 @@ package(concurrency) final class SubmissionWorkerPool
         return total;
     }
 
+    /**
+     * Research-only per-worker execution distribution. A caller MUST
+     * invoke this only after closeAndJoin(); joining workers provides
+     * the happens-before edge for reading their dedicated counter slots.
+     * Returns a distinct snapshot rather than exposing mutable storage.
+     */
+    WorkerParkingStats[] workerStatsAfterJoin()
+    {
+        return _workerCounters.dup;
+    }
+
     /** Inbox counts are protected by the existing inbox mutex. */
     InboxParkingStats inboxParkingStatsAfterJoin()
     {
