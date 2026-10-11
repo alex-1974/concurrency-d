@@ -32,7 +32,7 @@ different CPU-compute burst workloads.
 | compute-series repeated burst | 3 | 160/160 | **160/160** | 156/160 | 89/160 |
 | compute-series repeated burst | 4 | 0/160 | **159/160** | **157/160** | 90/160 |
 
-All four blockers began before external release in **all 160
+All four blockers began before external release in **all 80
 four-blocker burst cases in each dataset**. Across **all** batch
 sizes, zero siblings started between the final blocker start and gate
 release with four blockers. Pre-gate progress in batch2/4/8 occurs
