@@ -915,3 +915,29 @@ unittest
     auto inbox = pool.inboxParkingStatsAfterJoin();
     assert(inbox.closeBroadcasts == 0);
 }
+
+unittest
+{
+    // Deterministically reach a real Condition.wait before submitting.
+    // A publication and then close must wake all parked workers without
+    // changing the existing generation-based lost-wakeup contract.
+    auto pool = new SubmissionWorkerPool(2, 2, null, true);
+    waitForPark(pool, 1);
+
+    shared CountingRecord[1] records;
+    TaskRef[1] tasks;
+    prepareRecords(records[], tasks[]);
+    assert(pool.trySubmit(tasks[0]) == SubmissionResult.accepted);
+    waitForExecution(&records[0]);
+    pool.closeAndJoin();
+
+    const worker = pool.parkingStatsAfterJoin();
+    const inbox = pool.inboxParkingStatsAfterJoin();
+    assert(worker.executions == 1);
+    assert(worker.conditionWaits >= 1);
+    assert(worker.waitReturns == worker.conditionWaits);
+    assert(inbox.ingressNotifications == 1);
+    assert(inbox.claimedTasks == 1);
+    assert(inbox.closeBroadcasts == 1);
+    assert(inbox.peakQueued <= 2);
+}
