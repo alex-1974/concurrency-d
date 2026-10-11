@@ -42,7 +42,6 @@ jobs:
         uses: dlang-community/setup-dlang@v2
         with:
           compiler: ${{ matrix.compiler }}
-          dub: 1.40.0
 
       - name: Inspect compiler and hardware
         shell: bash
