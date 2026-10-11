@@ -30,6 +30,12 @@ PARK = (
     "close_broadcasts", "drain_broadcasts",
     "claimed_batches", "claimed_tasks", "peak_queued",
 )
+WAKE = (
+    "metric", "policy", "workload", "producers", "workers", "budget",
+    "tasks", "still_blocked", "exit_inbox", "exit_generation",
+    "exit_drained", "useful_local", "useful_inbox", "useful_steal",
+    "no_work", "drained",
+)
 
 
 def read_metric(output, prefix, columns, required=True):
@@ -65,9 +71,12 @@ def trial(binary, root, workers, tasks, producers, budget, policy,
             f"round={round_id}, exit={code}:\n" + output[-7000:])
     perf = read_metric(output, "multi,mixed,", BASE)
     park = read_metric(output, "parking,", PARK, required=profile == "on")
-    if profile == "off" and any(x.startswith("parking,")
-                                for x in output.splitlines()):
-        raise RuntimeError("parking counters leaked into OFF case")
+    wake = read_metric(output, "wakeup,", WAKE, required=profile == "on")
+    if profile == "off" and any(
+        x.startswith(("parking,", "wakeup,"))
+        for x in output.splitlines()
+    ):
+        raise RuntimeError("worker counters leaked into OFF case")
 
     if (perf["policy"] != policy or int(perf["tasks"]) != tasks or
         int(perf["completed"]) != tasks or
@@ -83,6 +92,22 @@ def trial(binary, root, workers, tasks, producers, budget, policy,
             int(park["condition_waits"]) != int(park["wait_returns"]) or
             int(park["steal_successes"]) > int(park["steal_attempts"])):
             raise RuntimeError("D-side parked worker accounting mismatch")
+        if (wake["policy"] != policy or wake["workload"] != workload or
+            int(wake["producers"]) != producers or
+            int(wake["workers"]) != workers or
+            int(wake["budget"]) != budget or
+            int(wake["tasks"]) != tasks):
+            raise RuntimeError("wake outcome metadata mismatch")
+        completed_waits = (int(wake["exit_inbox"]) +
+                           int(wake["exit_generation"]) +
+                           int(wake["exit_drained"]))
+        observed_outcomes = sum(int(wake[key]) for key in (
+            "useful_local", "useful_inbox", "useful_steal",
+            "no_work", "drained"))
+        if (completed_waits != observed_outcomes or
+            int(park["wait_returns"]) !=
+                completed_waits + int(wake["still_blocked"])):
+            raise RuntimeError("wake exit/search conservation mismatch")
 
     row = {
         "round": round_id, "workload": workload, "policy": policy,
@@ -101,6 +126,8 @@ def trial(binary, root, workers, tasks, producers, budget, policy,
     }
     for label in PARK[7:]:
         row[label] = int(park[label]) if park is not None else ""
+    for label in WAKE[7:]:
+        row[label] = int(wake[label]) if wake is not None else ""
     return row
 
 
@@ -208,6 +235,21 @@ def main():
                         x["ingress_misses"] / args.tasks for x in p), 4),
                     "median_ingress_batch_size": round(median(
                         x["claimed_tasks"] / x["claimed_batches"] for x in p), 3),
+                    "median_useful_after_wait_pct": round(median(
+                        100.0 * (
+                            x["useful_local"] +
+                            x["useful_inbox"] +
+                            x["useful_steal"]
+                        ) / max(1, x["condition_waits"] - x["still_blocked"])
+                        for x in p), 2),
+                    "median_no_work_after_wait_pct": round(median(
+                        100.0 * x["no_work"] /
+                        max(1, x["condition_waits"] - x["still_blocked"])
+                        for x in p), 2),
+                    "median_generation_only_exit_pct": round(median(
+                        100.0 * x["exit_generation"] /
+                        max(1, x["condition_waits"] - x["still_blocked"])
+                        for x in p), 2),
                     "median_profile_throughput": round(median(
                         float(x["throughput_per_s"]) for x in p), 1),
                     "median_unprofiled_throughput": round(median(
