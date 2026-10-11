@@ -10,6 +10,7 @@ on:
       - "tools/research/r05_pipeline_matrix.py"
       - "tools/research/r05_mixed_producer_matrix.py"
       - "tools/research/r05_admission_matrix.py"
+      - "tools/research/r05_counter_control.py"
       - ".github/workflows/r05-storage-qualification.yml"
       - "dub.sdl"
   workflow_dispatch:
@@ -86,6 +87,19 @@ jobs:
             --budgets 8 512 \
             --counter-modes shared striped \
             --output="evidence/r05-ci/${{ matrix.label }}/admission"
+
+      - name: R0.5 uninstrumented atomic counter control (diagnostic)
+        shell: bash
+        run: |
+          python3 tools/research/r05_counter_control.py \
+            --compiler="$DC" \
+            --workers=4 \
+            --tasks=3000 \
+            --rounds=2 \
+            --producers 1 4 \
+            --budgets 512 \
+            --policies gc recycle \
+            --output="evidence/r05-ci/${{ matrix.label }}/counter-control"
 
       - name: Upload raw evidence and medians
         if: always()
