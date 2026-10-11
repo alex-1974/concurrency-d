@@ -288,7 +288,7 @@ package(concurrency) struct AdmissionProbe
     private static size_t bucket(ulong value) @safe pure nothrow @nogc
     {
         size_t bin;
-        while (value > 1 && bin < 63)
+        while (value > 0 && bin < 63)
         {
             value >>= 1;
             ++bin;
