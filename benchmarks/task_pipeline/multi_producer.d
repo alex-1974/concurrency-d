@@ -183,6 +183,7 @@ private Thread makeProducer(
                     work.counter = executions;
                     work.value = value;
                     work.payload = payload;
+                    work.rounds = cpuRounds;
                     auto handle = instrumented
                         ? executor.submitObserved(work, *profile)
                         : executor.submit(work);
