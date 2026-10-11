@@ -9,6 +9,7 @@ on:
       - "benchmarks/task_pipeline/**"
       - "tools/research/r05_pipeline_matrix.py"
       - "tools/research/r05_mixed_producer_matrix.py"
+      - "tools/research/r05_admission_matrix.py"
       - ".github/workflows/r05-storage-qualification.yml"
       - "dub.sdl"
   workflow_dispatch:
@@ -72,6 +73,19 @@ jobs:
             --producers 1 4 \
             --budgets 8 512 \
             --output="evidence/r05-ci/${{ matrix.label }}/mixed"
+
+      - name: R0.5 opt-in admission wait/hold instrumentation (diagnostic)
+        shell: bash
+        run: |
+          python3 tools/research/r05_admission_matrix.py \
+            --compiler="$DC" \
+            --workers=4 \
+            --tasks=3000 \
+            --rounds=2 \
+            --producers 1 4 \
+            --budgets 8 512 \
+            --counter-modes shared striped \
+            --output="evidence/r05-ci/${{ matrix.label }}/admission"
 
       - name: Upload raw evidence and medians
         if: always()
