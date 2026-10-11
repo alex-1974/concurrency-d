@@ -445,6 +445,40 @@ private void runCase(
             inbox.ingressNotifications, inbox.localNotifications,
             inbox.closeBroadcasts, inbox.drainBroadcasts,
             inbox.claimedBatches, inbox.claimedTasks, inbox.peakQueued);
+
+        // An entered wait can return with the predicate still false:
+        // count those separately from the final return to search.
+        // The latter is classified exactly once by the following
+        // local/inbox/steal/empty/shutdown search path.
+        const finalWaitReturns =
+            worker.waitReturns - worker.waitReturnsStillBlocked;
+        if (worker.waitReturns !=
+                worker.waitReturnsStillBlocked +
+                worker.waitExitsInboxPending +
+                worker.waitExitsGenerationOnly +
+                worker.waitExitsDrained ||
+            finalWaitReturns !=
+                worker.wokeToLocal +
+                worker.wokeToInbox +
+                worker.wokeToSteal +
+                worker.wokeToEmptySearch +
+                worker.wokeToDrained)
+            throw new Exception("unbalanced wake-to-search accounting");
+
+        writefln(
+            "wakeup,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s",
+            policyName(policy),
+            cpuRounds == 0 ? "minimal" : "compute",
+            producers, workers, budget, tasks,
+            worker.waitReturnsStillBlocked,
+            worker.waitExitsInboxPending,
+            worker.waitExitsGenerationOnly,
+            worker.waitExitsDrained,
+            worker.wokeToLocal,
+            worker.wokeToInbox,
+            worker.wokeToSteal,
+            worker.wokeToEmptySearch,
+            worker.wokeToDrained);
     }
 
     if (instrumented)
