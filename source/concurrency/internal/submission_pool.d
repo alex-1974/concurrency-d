@@ -64,7 +64,12 @@ package(concurrency) enum SubmissionResult
 }
 
 private enum size_t LocalCapacity = 1024;
-private enum size_t IngressBatchSize = 8;
+// Opt-in compile-time research A/B. The ordinary library and every
+// existing configuration retain the established batch-of-eight baseline.
+version (R05IngressBatchOne)
+    private enum size_t IngressBatchSize = 1;
+else
+    private enum size_t IngressBatchSize = 8;
 
 private alias LocalQueue =
     LocalWorkStealingDeque!(TaskRef, LocalCapacity);
