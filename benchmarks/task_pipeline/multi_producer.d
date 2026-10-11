@@ -269,7 +269,8 @@ private void runCase(
     OwnedRecordPolicy policy,
     bool striped,
     bool instrumented,
-    uint cpuRounds)
+    uint cpuRounds,
+    bool parkingProfile)
 {
     GC.collect();
 
@@ -292,7 +293,7 @@ private void runCase(
     auto resources = new ThreadResourceSnapshot[producers];
 
     auto executor = new OwnedTaskExecutor(
-        workers, 64, budget, policy);
+        workers, 64, budget, policy, parkingProfile);
 
     foreach (i; 0 .. producers)
     {
@@ -417,6 +418,35 @@ private void runCase(
         cpuRounds,
         atomicLoad!(MemoryOrder.acq)(computeChecksum));
 
+    if (parkingProfile)
+    {
+        // Only valid now: closeAndJoin has completed, so no workers
+        // can write their private counter slots.
+        auto worker = executor.parkingStatsAfterJoin();
+        auto inbox = executor.inboxParkingStatsAfterJoin();
+        if (worker.executions != tasks ||
+            worker.conditionWaits != worker.waitReturns ||
+            worker.stealSuccesses > worker.stealAttempts ||
+            inbox.ingressNotifications != tasks ||
+            inbox.claimedTasks != tasks ||
+            inbox.peakQueued > 64)
+            throw new Exception("worker parking accounting mismatch");
+
+        writefln(
+            "parking,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s",
+            policyName(policy),
+            cpuRounds == 0 ? "minimal" : "compute",
+            producers, workers, budget, tasks,
+            worker.localMisses, worker.ingressMisses,
+            worker.stealAttempts, worker.stealSuccesses,
+            worker.parkChecks, worker.conditionWaits,
+            worker.waitReturns, worker.skippedParks,
+            worker.executions,
+            inbox.ingressNotifications, inbox.localNotifications,
+            inbox.closeBroadcasts, inbox.drainBroadcasts,
+            inbox.claimedBatches, inbox.claimedTasks, inbox.peakQueued);
+    }
+
     if (instrumented)
     {
         AdmissionProbe merged;
@@ -475,6 +505,7 @@ void main(string[] args)
     string counterMode = "shared";
     string instrumentation = "off";
     string workload = "minimal";
+    string parking = "off";
 
     if (args.length > 1)
         workers = to!size_t(args[1]);
@@ -492,6 +523,8 @@ void main(string[] args)
         instrumentation = args[7];
     if (args.length > 8)
         workload = args[8];
+    if (args.length > 9)
+        parking = args[9];
 
     if (workers == 0 || workers > 64 ||
         producers == 0 || producers > 64 ||
@@ -508,6 +541,8 @@ void main(string[] args)
         throw new Exception("instrumentation must be on or off");
     if (workload != "minimal" && workload != "compute")
         throw new Exception("workload must be minimal or compute");
+    if (parking != "on" && parking != "off")
+        throw new Exception("parking profile must be on or off");
 
     const policy = policyNameArg == "gc"
         ? OwnedRecordPolicy.freshGc
@@ -521,5 +556,6 @@ void main(string[] args)
 
     runCase(workers, producers, tasks, budget, policy,
         counterMode == "striped", instrumentation == "on",
-        workload == "compute" ? 1024u : 0u);
+        workload == "compute" ? 1024u : 0u,
+        parking == "on");
 }
