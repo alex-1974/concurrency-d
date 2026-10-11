@@ -61,6 +61,16 @@ jobs:
             --gap-ms=1 --cooldown-ms=0 \
             --output="evidence/m0-validation/${{ matrix.label }}"
 
+      - name: Focused four-worker idle/wake observation (correctness only)
+        shell: bash
+        run: |
+          python3 tools/validation/m0_victim_coverage_xps.py \
+            --compiler="$DC" --idle-only --rounds=2 \
+            --workers 4 --producers 1 --workloads minimal \
+            --tasks=2048 --idle-ms=100 --wake-samples=32 \
+            --gap-ms=1 --cooldown-ms=0 \
+            --output="evidence/m0-validation/${{ matrix.label }}/idle-followup"
+
       - name: Upload raw comparison evidence (not a speed gate)
         if: always()
         uses: actions/upload-artifact@v4
