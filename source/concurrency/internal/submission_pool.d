@@ -358,7 +358,9 @@ package(concurrency) final class SubmissionWorkerPool
         _afterExecution = afterExecution;
         _queues = new LocalQueue[workerCount];
         _workers = new Thread[workerCount];
-        _workerCounters = new WorkerParkingStats[workerCount];
+        // The default unprofiled path does not allocate an extra array.
+        if (parkingProfile)
+            _workerCounters = new WorkerParkingStats[workerCount];
 
         try
         {
@@ -477,7 +479,10 @@ package(concurrency) final class SubmissionWorkerPool
         // The thread owns this slot exclusively. The controlling thread
         // may read it only after joining every worker.
         scope(exit)
-            _workerCounters[self] = counters;
+        {
+            if (_parkingProfile)
+                _workerCounters[self] = counters;
+        }
 
         size_t nextVictim =
             _queues.length > 1
