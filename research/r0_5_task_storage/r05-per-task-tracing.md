@@ -45,11 +45,13 @@ external semaphore-gate release and executor join.
 - `MonoTime` is monotonic, and events use the same process timebase,
   but recorder timestamps are **observation times at the trace mutex**.
   They are not an uninstrumented runtime timing oracle.
-- `enqueueBegin` happens before `tryPush`; `enqueueOk` happens
-  after it returns. A thief can remove the task between the successful
-  push and `enqueueOk`. Therefore a stolen event **may precede**
-  `enqueueOk` in serialized trace order. Together they bracket
-  successful enqueue, rather than giving an atomic queue-publication time.
+- `enqueueBegin` happens before `tryPush`, capturing a stable
+  submission ID. `enqueueOk` records that captured ID after return;
+  it never looks up the potentially recycled pointer again.
+  A thief may remove **and finish** the task before `enqueueOk`.
+  Therefore stolen, dispatch and even accounted events **may precede**
+  `enqueueOk` in serialized trace order. The begin/result window
+  brackets successful enqueue rather than defining one atomic timestamp.
 - `claimed` is recorded immediately after `takeBatch` returns and
   before the worker can publish/execute that batch. The inbox mutex protects
   the actual claim, but the recorded instant may lag it.
