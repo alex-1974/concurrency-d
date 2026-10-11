@@ -18,6 +18,7 @@ on:
       - "tools/research/r05_fairness_blocking_matrix.py"
       - "tools/research/r05_burst_head_of_line.py"
       - "tools/research/r05_task_trace.py"
+      - "tools/research/r05_batch_size_ab.py"
       - ".github/workflows/r05-storage-qualification.yml"
       - "dub.sdl"
   workflow_dispatch:
@@ -186,6 +187,15 @@ jobs:
           python3 tools/research/r05_task_trace.py \
             --compiler="$DC" --rounds=1 --probe-ms=60 \
             --output="evidence/r05-ci/${{ matrix.label }}/task-trace"
+
+      - name: R0.5 isolated ingress batch 1 vs 8 smoke (no performance gate)
+        shell: bash
+        run: |
+          python3 tools/research/r05_batch_size_ab.py \
+            --compiler="$DC" --rounds=1 --burst-ms=60 \
+            --tasks=384 --producers 1 4 --blockers 3 4 \
+            --policies gc recycle --notify always waiter \
+            --output="evidence/r05-ci/${{ matrix.label }}/batch-size-ab"
 
       - name: Upload raw evidence and medians
         if: always()
