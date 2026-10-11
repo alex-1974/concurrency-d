@@ -30,6 +30,12 @@ version (R05TaskTrace)
         TaskTraceRecorder, TaskTraceSnapshot, TaskTraceKind;
 }
 
+version (R05WorkerSearchTrace)
+{
+    import concurrency.internal.worker_search_trace :
+        WorkerSearchRecorder, WorkerSearchSnapshot, WorkerSearchKind;
+}
+
 import core.atomic :
     MemoryOrder,
     atomicFetchAdd,
@@ -489,6 +495,8 @@ package(concurrency) final class SubmissionWorkerPool
 
     version (R05TaskTrace)
         private TaskTraceRecorder _taskTrace;
+    version (R05WorkerSearchTrace)
+        private WorkerSearchRecorder _searchTrace;
 
     // Optional internal completion hook. Called by the claiming worker only
     // after dispatch and inbox accounting no longer need the TaskRef target.
@@ -513,6 +521,8 @@ package(concurrency) final class SubmissionWorkerPool
             _taskTrace = new TaskTraceRecorder();
             _inbox.attachTrace(_taskTrace);
         }
+        version (R05WorkerSearchTrace)
+            _searchTrace = new WorkerSearchRecorder(workerCount);
         _afterExecution = afterExecution;
         _queues = new LocalQueue[workerCount];
         _workers = new Thread[workerCount];
@@ -648,6 +658,12 @@ package(concurrency) final class SubmissionWorkerPool
         return _taskTrace.snapshotAfterJoin();
     }
 
+    version (R05WorkerSearchTrace)
+    WorkerSearchSnapshot workerSearchTraceAfterJoin()
+    {
+        return _searchTrace.snapshotAfterJoin();
+    }
+
     private void executeOne(TaskRef task, size_t worker)
     {
         version (R05TaskTrace)
@@ -694,6 +710,8 @@ package(concurrency) final class SubmissionWorkerPool
             auto local = _queues[self].pop();
             if (local.found)
             {
+                version (R05WorkerSearchTrace)
+                    _searchTrace.record(WorkerSearchKind.localPop, self);
                 version (R05TaskTrace)
                     _taskTrace.record(TaskTraceKind.ownerPop, local.value, self);
                 if (_parkingProfile && pendingWakeClassification)
@@ -720,6 +738,9 @@ package(concurrency) final class SubmissionWorkerPool
             const taken = _inbox.takeBatch(batch[]);
             if (taken != 0)
             {
+                version (R05WorkerSearchTrace)
+                    _searchTrace.record(
+                        WorkerSearchKind.ingressClaim, self, -1, taken);
                 version (R05TaskTrace)
                     _taskTrace.claimed(batch[0 .. taken], self);
                 if (_parkingProfile)
@@ -791,8 +812,18 @@ package(concurrency) final class SubmissionWorkerPool
                 auto stolen = _queues[victim].steal();
 
                 if (!stolen.found)
+                {
+                    version (R05WorkerSearchTrace)
+                        _searchTrace.record(
+                            WorkerSearchKind.stealMiss, self,
+                            cast(int) victim);
                     continue;
+                }
 
+                version (R05WorkerSearchTrace)
+                    _searchTrace.record(
+                        WorkerSearchKind.stealHit, self,
+                        cast(int) victim);
                 if (_parkingProfile && pendingWakeClassification)
                 {
                     ++counters.wokeToSteal;
@@ -816,8 +847,12 @@ package(concurrency) final class SubmissionWorkerPool
             if (foundWork)
                 continue;
 
+            version (R05WorkerSearchTrace)
+                _searchTrace.record(WorkerSearchKind.searchEmpty, self);
             if (_inbox.isDrained())
             {
+                version (R05WorkerSearchTrace)
+                    _searchTrace.record(WorkerSearchKind.drained, self);
                 if (_parkingProfile && pendingWakeClassification)
                 {
                     ++counters.wokeToDrained;
@@ -837,7 +872,15 @@ package(concurrency) final class SubmissionWorkerPool
             if (_parkingProfile)
                 ++counters.parkChecks;
             const returnsBefore = counters.waitReturns;
+            version (R05WorkerSearchTrace)
+            {
+                const waitsBeforeSearchPark = counters.conditionWaits;
+                _searchTrace.record(WorkerSearchKind.parkCheck, self);
+            }
             _inbox.parkUnlessChanged(observed, counters);
+            version (R05WorkerSearchTrace)
+                _searchTrace.record(WorkerSearchKind.parkReturn, self, -1,
+                    counters.conditionWaits > waitsBeforeSearchPark ? 1 : 0);
             // Some Condition.wait calls may have returned with the
             // predicate still blocked and immediately re-waited.
             // Only the final return starts a new worker search.
