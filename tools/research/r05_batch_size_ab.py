@@ -362,6 +362,48 @@ def main():
                     median_paired_delta=statistics.median(
                         r["delta_batch1_minus_batch8"] for r in group)))
     write_csv(a.output / "summary.csv", summary)
+
+    # Descriptive grouped latency distribution from the *actual* runnable
+    # callable starts, not child walltime or the instrumented trace.
+    # Keep per-round observations for uncertainty and paired analyses.
+    latency = []
+    for storage in a.policies:
+        for notify in a.notify:
+            for blockers in a.blockers:
+                for batch in (8, 1):
+                    group = [r for r in cases
+                             if r["batch"] == batch and
+                             r["storage"] == storage and
+                             r["notify"] == notify and
+                             r["blockers"] == blockers]
+                    samples = [r["start_ns"] for r in siblings
+                               if r["batch"] == batch and
+                               r["storage"] == storage and
+                               r["notify"] == notify and
+                               r["blockers"] == blockers]
+                    if len(group) != a.rounds or len(samples) != 8 * a.rounds:
+                        raise RuntimeError("missing sibling latency evidence")
+                    latency.append(dict(
+                        storage=storage, notify=notify,
+                        blockers=blockers, batch=batch,
+                        rounds=a.rounds, sibling_samples=len(samples),
+                        start_p50_ns=percentile(samples, 50),
+                        start_p95_ns=percentile(samples, 95),
+                        start_p99_ns=percentile(samples, 99),
+                        median_case_start_p95_ns=statistics.median(
+                            r["start_p95_ns"] for r in group),
+                        total_before_gate=sum(
+                            r["siblings_started_before_gate"] for r in group),
+                        total_after_gate=sum(
+                            r["siblings_started_after_gate"] for r in group),
+                        progress_after_final_blocker=sum(
+                            r["progress_after_final_blocker"] for r in group),
+                        median_child_cpu_user_us=statistics.median(
+                            r["child_cpu_user_us"] for r in group),
+                        median_child_cpu_system_us=statistics.median(
+                            r["child_cpu_system_us"] for r in group)))
+    write_csv(a.output / "latency_summary.csv", latency)
+
     with (a.output / "environment.txt").open("w") as fp:
         fp.write(f"platform={platform.platform()}\n"
                  f"machine={platform.machine()} compiler={a.compiler}\n"
