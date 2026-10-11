@@ -64,10 +64,25 @@ package(concurrency) enum SubmissionResult
 }
 
 private enum size_t LocalCapacity = 1024;
-// Opt-in compile-time research A/B. The ordinary library and every
-// existing configuration retain the established batch-of-eight baseline.
+// Opt-in compile-time research variants. All ordinary builds remain batch8.
+// Keep only one research variant active, including when DUB flags are supplied
+// by consumers; silently choosing one would invalidate paired comparisons.
 version (R05IngressBatchOne)
+{
+    version (R05IngressBatchTwo)
+        static assert(false, "R0.5 select only one ingress batch version");
+    version (R05IngressBatchFour)
+        static assert(false, "R0.5 select only one ingress batch version");
     private enum size_t IngressBatchSize = 1;
+}
+else version (R05IngressBatchTwo)
+{
+    version (R05IngressBatchFour)
+        static assert(false, "R0.5 select only one ingress batch version");
+    private enum size_t IngressBatchSize = 2;
+}
+else version (R05IngressBatchFour)
+    private enum size_t IngressBatchSize = 4;
 else
     private enum size_t IngressBatchSize = 8;
 
