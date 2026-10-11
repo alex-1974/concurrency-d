@@ -34,3 +34,11 @@ configuration "task-pipeline-mixed-benchmark" {
     importPaths "source" "benchmarks/task_pipeline"
     targetName "concurrency-task-pipeline-mixed"
 }
+
+configuration "notification-latency-benchmark" {
+    targetType "executable"
+    mainSourceFile "benchmarks/task_pipeline/notification_latency.d"
+    sourcePaths "source" "benchmarks/task_pipeline"
+    importPaths "source" "benchmarks/task_pipeline"
+    targetName "concurrency-notification-latency"
+}
