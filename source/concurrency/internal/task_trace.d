@@ -54,7 +54,7 @@ package(concurrency) struct TaskTraceSnapshot
 
 private struct LiveTask
 {
-    TaskRef ref;
+    TaskRef task;
     ulong id;
     bool active;
 }
@@ -100,7 +100,7 @@ package(concurrency) final class TaskTraceRecorder
     private size_t lookup(TaskRef task)
     {
         foreach (i, entry; _live)
-            if (entry.active && entry.ref.ptr == task.ptr)
+            if (entry.active && entry.task.ptr == task.ptr)
                 return i;
         return _live.length;
     }
@@ -202,8 +202,6 @@ package(concurrency) final class TaskTraceRecorder
 
 unittest
 {
-    import core.atomic : atomicStore;
-
     shared TaskHeader header;
     auto ref1 = TaskRef(&header);
     auto trace = new TaskTraceRecorder(32, 2);
