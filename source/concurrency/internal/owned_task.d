@@ -24,6 +24,9 @@ import concurrency.internal.task_record :
     TaskHeader,
     TaskRef;
 
+version (R05TaskTrace)
+    import concurrency.internal.task_trace : TaskTraceSnapshot;
+
 import core.sync.condition :
     Condition;
 
@@ -609,6 +612,20 @@ package(concurrency) final class OwnedTaskExecutor
             if (_lifecycle != Lifecycle.stopped)
                 throw new Exception("inbox parking stats require joined executor");
             return _pool.inboxParkingStatsAfterJoin();
+        }
+    }
+
+    version (R05TaskTrace)
+    {
+        /** Research-only snapshot. Not readable during worker execution. */
+        TaskTraceSnapshot taskTraceAfterJoin()
+        {
+            synchronized (_mutex)
+            {
+                if (_lifecycle != Lifecycle.stopped)
+                    throw new Exception("task trace requires joined executor");
+                return _pool.taskTraceAfterJoin();
+            }
         }
     }
 
