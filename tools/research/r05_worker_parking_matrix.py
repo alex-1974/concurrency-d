@@ -291,7 +291,10 @@ def main():
             f"producers={s['producers']} "
             f"ratio={s['median_profile_over_baseline']:.4f}x "
             f"parks/task={s['median_parks_per_task']} "
-            f"failed-steals/task={s['median_failed_steals_per_task']}")
+            f"failed-steals/task={s['median_failed_steals_per_task']} "
+            f"useful-after-wait={s['median_useful_after_wait_pct']}% "
+            f"empty-after-wait={s['median_no_work_after_wait_pct']}% "
+            f"generation-only-exit={s['median_generation_only_exit_pct']}%")
     print("evidence: " + str(args.output))
 
 
