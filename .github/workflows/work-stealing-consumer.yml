@@ -99,6 +99,14 @@ jobs:
           grep -q '^control,gateRelease,' "$RUNNER_TEMP/r05-batch1-burst.csv"
           dub run --config=task-pipeline-mixed-batch1 --build=release --compiler="$DC" --force -- 4 4 384 512 gc striped off minimal off always > "$RUNNER_TEMP/r05-batch1-mixed.csv"
           grep -q '^multi,mixed,gc,' "$RUNNER_TEMP/r05-batch1-mixed.csv"
+          dub run --config=burst-head-of-line-batch2 --build=release --compiler="$DC" --force -- always gc 4 3 8 60 > "$RUNNER_TEMP/r05-batch2-burst.csv"
+          grep -q '^control,gateRelease,' "$RUNNER_TEMP/r05-batch2-burst.csv"
+          dub run --config=burst-head-of-line-batch4 --build=release --compiler="$DC" --force -- always gc 4 4 8 60 > "$RUNNER_TEMP/r05-batch4-burst.csv"
+          grep -q '^control,gateRelease,' "$RUNNER_TEMP/r05-batch4-burst.csv"
+          dub run --config=burst-head-of-line-search-batch8 --build=release --compiler="$DC" --force -- always gc 4 3 8 60 > "$RUNNER_TEMP/r05-search-batch8.csv"
+          grep -q '^search_status,4,' "$RUNNER_TEMP/r05-search-batch8.csv"
+          dub run --config=burst-head-of-line-search-batch1 --build=release --compiler="$DC" --force -- always gc 4 3 8 60 > "$RUNNER_TEMP/r05-search-batch1.csv"
+          grep -q '^search_status,4,' "$RUNNER_TEMP/r05-search-batch1.csv"
 
   native-arm64:
     name: Consumer / native ARM64 / LDC 1.41
@@ -170,3 +178,11 @@ jobs:
           grep -q '^control,gateRelease,' "$RUNNER_TEMP/r05-batch1-burst.csv"
           dub run --config=task-pipeline-mixed-batch1 --build=release --compiler="$DC" --force -- 4 4 384 512 gc striped off minimal off always > "$RUNNER_TEMP/r05-batch1-mixed.csv"
           grep -q '^multi,mixed,gc,' "$RUNNER_TEMP/r05-batch1-mixed.csv"
+          dub run --config=burst-head-of-line-batch2 --build=release --compiler="$DC" --force -- always gc 4 3 8 60 > "$RUNNER_TEMP/r05-batch2-burst.csv"
+          grep -q '^control,gateRelease,' "$RUNNER_TEMP/r05-batch2-burst.csv"
+          dub run --config=burst-head-of-line-batch4 --build=release --compiler="$DC" --force -- always gc 4 4 8 60 > "$RUNNER_TEMP/r05-batch4-burst.csv"
+          grep -q '^control,gateRelease,' "$RUNNER_TEMP/r05-batch4-burst.csv"
+          dub run --config=burst-head-of-line-search-batch8 --build=release --compiler="$DC" --force -- always gc 4 3 8 60 > "$RUNNER_TEMP/r05-search-batch8.csv"
+          grep -q '^search_status,4,' "$RUNNER_TEMP/r05-search-batch8.csv"
+          dub run --config=burst-head-of-line-search-batch1 --build=release --compiler="$DC" --force -- always gc 4 3 8 60 > "$RUNNER_TEMP/r05-search-batch1.csv"
+          grep -q '^search_status,4,' "$RUNNER_TEMP/r05-search-batch1.csv"
