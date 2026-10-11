@@ -22,6 +22,7 @@ on:
       - "tools/research/r05_batch_size_sweep.py"
       - "tools/research/r05_worker_search_matrix.py"
       - "tools/research/r05_victim_sweep_ab.py"
+      - "tools/research/r05_rotating_victim_matrix.py"
       - ".github/workflows/r05-storage-qualification.yml"
       - "dub.sdl"
   workflow_dispatch:
@@ -225,6 +226,18 @@ jobs:
             --blockers 3 4 --policies gc --notify always \
             --tasks=384 --producers 1 4 --workloads minimal compute \
             --output="evidence/r05-ci/${{ matrix.label }}/victim-sweep"
+
+      - name: R0.5 rotating full-victim sweep and idle CPU matrix (diagnostic)
+        shell: bash
+        run: |
+          python3 tools/research/r05_rotating_victim_matrix.py \
+            --compiler="$DC" --rounds=1 --tasks=384 \
+            --workers 1 4 --producers 1 4 \
+            --blockers 3 4 --burst-ms=60 \
+            --policies gc --notify always \
+            --workloads minimal compute \
+            --idle-ms=100 --wake-samples=8 --gap-ms=1 \
+            --output="evidence/r05-ci/${{ matrix.label }}/rotating-victim"
 
       - name: Upload raw evidence and medians
         if: always()
