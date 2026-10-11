@@ -1,0 +1,17 @@
+platform,producers,budget,counter_mode,median_recycle_over_gc,rounds
+arm64,1,8,shared,0.9526,2
+arm64,1,8,striped,0.9930,2
+arm64,1,512,shared,1.0543,2
+arm64,1,512,striped,1.0083,2
+arm64,4,8,shared,0.9918,2
+arm64,4,8,striped,1.0222,2
+arm64,4,512,shared,1.0867,2
+arm64,4,512,striped,1.0551,2
+x86-64,1,8,shared,0.9771,2
+x86-64,1,8,striped,0.9528,2
+x86-64,1,512,shared,1.0263,2
+x86-64,1,512,striped,1.0890,2
+x86-64,4,8,shared,0.9498,2
+x86-64,4,8,striped,0.9703,2
+x86-64,4,512,shared,1.0728,2
+x86-64,4,512,striped,1.0137,2
