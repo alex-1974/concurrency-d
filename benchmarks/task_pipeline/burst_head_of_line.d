@@ -132,11 +132,16 @@ void main(string[] args)
             ++siblingBefore;
     }
 
+    version (R05TaskTrace)
+        const gateReleaseTicks = MonoTime.currTime.ticks;
+
     // All accepted blockers must be unblocked, including blockers
     // that were still in a deque when the observation ended.
     foreach (_; 0 .. blockers)
         gate.notify();
     pool.closeAndJoin();
+    version (R05TaskTrace)
+        const joinedTicks = MonoTime.currTime.ticks;
 
     if (pool.acceptedCount() != blockers + siblings ||
         pool.completedCount() != blockers + siblings)
@@ -244,4 +249,29 @@ void main(string[] args)
         startedBefore, siblingBefore, distinctWorkers,
         claimed, localExecuted, stolenExecuted,
         siblingsAfterAllStarts);
+
+    version (R05TaskTrace)
+    {
+        auto trace = pool.taskTraceAfterJoin();
+        if (trace.admitted != blockers + siblings ||
+            trace.stillLive != 0 ||
+            trace.lostEvents != 0 ||
+            trace.registryOverflow != 0 ||
+            trace.unmatched != 0)
+            throw new Exception("burst task trace lost events or identity");
+
+        // No raw pointers or OS thread IDs enter the trace artifact.
+        foreach (event; trace.events)
+            writefln("trace,%s,%s,%s,%s,%s,%s,%s,%s",
+                event.sequence, event.taskId, event.kind,
+                event.worker, event.victim, event.batchId,
+                ticksToNSecs(event.ticks - begin), 0);
+        writefln("trace_status,%s,%s,%s,%s,%s",
+            trace.admitted, trace.lostEvents, trace.registryOverflow,
+            trace.unmatched, trace.stillLive);
+        writefln("control,gateRelease,%s",
+            ticksToNSecs(gateReleaseTicks - begin));
+        writefln("control,joined,%s",
+            ticksToNSecs(joinedTicks - begin));
+    }
 }
