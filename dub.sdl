@@ -42,3 +42,11 @@ configuration "notification-latency-benchmark" {
     importPaths "source" "benchmarks/task_pipeline"
     targetName "concurrency-notification-latency"
 }
+
+configuration "fairness-blocking-benchmark" {
+    targetType "executable"
+    mainSourceFile "benchmarks/task_pipeline/fairness_blocking.d"
+    sourcePaths "source" "benchmarks/task_pipeline"
+    importPaths "source" "benchmarks/task_pipeline"
+    targetName "concurrency-fairness-blocking"
+}
