@@ -94,6 +94,11 @@ jobs:
           dub run --config=burst-head-of-line-benchmark --build=release --compiler="$DC" --force -- waiter recycle 4 3 8 60
           dub run --config=burst-head-of-line-trace --build=release --compiler="$DC" --force -- always gc 4 3 8 60 > "$RUNNER_TEMP/r05-task-trace.csv"
           grep -q '^trace_status,11,0,0,0,0$' "$RUNNER_TEMP/r05-task-trace.csv"
+          # Distinct research build: no trace mutex or event recorder.
+          dub run --config=burst-head-of-line-batch1 --build=release --compiler="$DC" --force -- always gc 4 3 8 60 > "$RUNNER_TEMP/r05-batch1-burst.csv"
+          grep -q '^control,gateRelease,' "$RUNNER_TEMP/r05-batch1-burst.csv"
+          dub run --config=task-pipeline-mixed-batch1 --build=release --compiler="$DC" --force -- 4 4 384 512 gc striped off minimal off always > "$RUNNER_TEMP/r05-batch1-mixed.csv"
+          grep -q '^multi,mixed,gc,' "$RUNNER_TEMP/r05-batch1-mixed.csv"
 
   native-arm64:
     name: Consumer / native ARM64 / LDC 1.41
@@ -160,3 +165,8 @@ jobs:
           dub run --config=burst-head-of-line-benchmark --build=release --compiler="$DC" --force -- waiter recycle 4 3 8 60
           dub run --config=burst-head-of-line-trace --build=release --compiler="$DC" --force -- always gc 4 3 8 60 > "$RUNNER_TEMP/r05-task-trace.csv"
           grep -q '^trace_status,11,0,0,0,0$' "$RUNNER_TEMP/r05-task-trace.csv"
+          # Distinct research build: no trace mutex or event recorder.
+          dub run --config=burst-head-of-line-batch1 --build=release --compiler="$DC" --force -- always gc 4 3 8 60 > "$RUNNER_TEMP/r05-batch1-burst.csv"
+          grep -q '^control,gateRelease,' "$RUNNER_TEMP/r05-batch1-burst.csv"
+          dub run --config=task-pipeline-mixed-batch1 --build=release --compiler="$DC" --force -- 4 4 384 512 gc striped off minimal off always > "$RUNNER_TEMP/r05-batch1-mixed.csv"
+          grep -q '^multi,mixed,gc,' "$RUNNER_TEMP/r05-batch1-mixed.csv"
