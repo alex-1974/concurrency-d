@@ -15,7 +15,7 @@ authoritative; all checksums below refer to the **original bytes**:
 
 | File | Bytes | SHA-256 |
 |---|---:|---|
-| `r05-xps-fairness-blocking.tar.gz` | 3,? | `3f8519d307136a5b08e32b602e1552e17bd9ff32410f9db68feedb9c29bbb93f` |
+| `r05-xps-fairness-blocking.tar.gz` | 3,761 | `3f8519d307136a5b08e32b602e1552e17bd9ff32410f9db68feedb9c29bbb93f` |
 | `raw.csv` | 4,261 | `b8c4d5799159c933d3a8b39740e2764d97f1f74519f14942a69b1c58de74c001` |
 | `summary.csv` | 325 | `204dcf2d3f4accecce5b91d3de4eab4f194b70660656c6a2ce99eed1789f432f` |
 | `environment.txt` | 5,527 | `df63000bf04e8ade34bafd2573bf52d0476c32c6a3a207a8c8ba9f7afb6e88b4` |
