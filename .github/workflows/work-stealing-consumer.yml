@@ -114,6 +114,12 @@ jobs:
           grep -q '^multi,mixed,gc,' "$RUNNER_TEMP/r05-full-scan-mixed.csv"
           dub run --config=burst-head-of-line-search-full-victim-sweep --build=release --compiler="$DC" --force -- always gc 4 3 8 60 > "$RUNNER_TEMP/r05-full-scan-search.csv"
           grep -q '^search_status,4,' "$RUNNER_TEMP/r05-full-scan-search.csv"
+          dub run --config=burst-head-of-line-rotating-victim-sweep --build=release --compiler="$DC" --force -- always gc 4 3 8 60 > "$RUNNER_TEMP/r05-rotating-burst.csv"
+          grep -q '^control,gateRelease,' "$RUNNER_TEMP/r05-rotating-burst.csv"
+          dub run --config=task-pipeline-mixed-rotating-victim-sweep --build=release --compiler="$DC" --force -- 4 4 384 512 gc striped off compute off always > "$RUNNER_TEMP/r05-rotating-mixed.csv"
+          grep -q '^multi,mixed,gc,' "$RUNNER_TEMP/r05-rotating-mixed.csv"
+          dub run --config=notification-latency-rotating-victim-sweep --build=release --compiler="$DC" --force -- 4 always 100 8 1 > "$RUNNER_TEMP/r05-rotating-idle.csv"
+          grep -q '^latency,always,4,' "$RUNNER_TEMP/r05-rotating-idle.csv"
 
   native-arm64:
     name: Consumer / native ARM64 / LDC 1.41
@@ -200,3 +206,9 @@ jobs:
           grep -q '^multi,mixed,gc,' "$RUNNER_TEMP/r05-full-scan-mixed.csv"
           dub run --config=burst-head-of-line-search-full-victim-sweep --build=release --compiler="$DC" --force -- always gc 4 3 8 60 > "$RUNNER_TEMP/r05-full-scan-search.csv"
           grep -q '^search_status,4,' "$RUNNER_TEMP/r05-full-scan-search.csv"
+          dub run --config=burst-head-of-line-rotating-victim-sweep --build=release --compiler="$DC" --force -- always gc 4 3 8 60 > "$RUNNER_TEMP/r05-rotating-burst.csv"
+          grep -q '^control,gateRelease,' "$RUNNER_TEMP/r05-rotating-burst.csv"
+          dub run --config=task-pipeline-mixed-rotating-victim-sweep --build=release --compiler="$DC" --force -- 4 4 384 512 gc striped off compute off always > "$RUNNER_TEMP/r05-rotating-mixed.csv"
+          grep -q '^multi,mixed,gc,' "$RUNNER_TEMP/r05-rotating-mixed.csv"
+          dub run --config=notification-latency-rotating-victim-sweep --build=release --compiler="$DC" --force -- 4 always 100 8 1 > "$RUNNER_TEMP/r05-rotating-idle.csv"
+          grep -q '^latency,always,4,' "$RUNNER_TEMP/r05-rotating-idle.csv"
