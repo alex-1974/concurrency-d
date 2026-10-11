@@ -11,6 +11,7 @@ on:
       - "tools/research/r05_mixed_producer_matrix.py"
       - "tools/research/r05_admission_matrix.py"
       - "tools/research/r05_counter_control.py"
+      - "tools/research/r05_scheduler_resources.py"
       - ".github/workflows/r05-storage-qualification.yml"
       - "dub.sdl"
   workflow_dispatch:
@@ -100,6 +101,20 @@ jobs:
             --budgets 512 \
             --policies gc recycle \
             --output="evidence/r05-ci/${{ matrix.label }}/counter-control"
+
+      - name: R0.5 CPU / context-switch producer diagnostics
+        shell: bash
+        run: |
+          python3 tools/research/r05_scheduler_resources.py \
+            --compiler="$DC" \
+            --workers=4 \
+            --tasks=1200 \
+            --rounds=2 \
+            --producers 1 4 \
+            --budget=512 \
+            --policies gc recycle \
+            --workloads minimal compute \
+            --output="evidence/r05-ci/${{ matrix.label }}/scheduler"
 
       - name: Upload raw evidence and medians
         if: always()
