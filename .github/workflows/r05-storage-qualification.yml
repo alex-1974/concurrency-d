@@ -14,6 +14,7 @@ on:
       - "tools/research/r05_scheduler_resources.py"
       - "tools/research/r05_worker_parking_matrix.py"
       - "tools/research/r05_notification_policy_matrix.py"
+      - "tools/research/r05_notification_idle_latency.py"
       - ".github/workflows/r05-storage-qualification.yml"
       - "dub.sdl"
   workflow_dispatch:
@@ -145,6 +146,18 @@ jobs:
             --workloads minimal compute \
             --policies gc \
             --output="evidence/r05-ci/${{ matrix.label }}/notification"
+
+      - name: R0.5 idle-CPU and p95/p99 wake-latency control
+        shell: bash
+        run: |
+          python3 tools/research/r05_notification_idle_latency.py \
+            --compiler="$DC" \
+            --workers=4 \
+            --idle-ms=100 \
+            --samples=40 \
+            --gap-ms=1 \
+            --rounds=2 \
+            --output="evidence/r05-ci/${{ matrix.label }}/notification-latency"
 
       - name: Upload raw evidence and medians
         if: always()
