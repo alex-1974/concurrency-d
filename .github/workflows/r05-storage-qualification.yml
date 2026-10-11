@@ -15,6 +15,7 @@ on:
       - "tools/research/r05_worker_parking_matrix.py"
       - "tools/research/r05_notification_policy_matrix.py"
       - "tools/research/r05_notification_idle_latency.py"
+      - "tools/research/r05_fairness_blocking_matrix.py"
       - ".github/workflows/r05-storage-qualification.yml"
       - "dub.sdl"
   workflow_dispatch:
@@ -158,6 +159,15 @@ jobs:
             --gap-ms=1 \
             --rounds=2 \
             --output="evidence/r05-ci/${{ matrix.label }}/notification-latency"
+
+      - name: R0.5 fairness distribution and semaphore scenario
+        shell: bash
+        run: |
+          python3 tools/research/r05_fairness_blocking_matrix.py \
+            --compiler="$DC" \
+            --workers=4 --producers=4 --tasks=256 \
+            --siblings=16 --rounds=1 --policies gc recycle \
+            --output="evidence/r05-ci/${{ matrix.label }}/fairness-blocking"
 
       - name: Upload raw evidence and medians
         if: always()
