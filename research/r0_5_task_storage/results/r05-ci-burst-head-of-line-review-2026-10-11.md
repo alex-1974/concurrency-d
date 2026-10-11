@@ -50,9 +50,10 @@ There are exactly **32 hosted scenario rows**.
 
 The 4-blocker anomalous case is evidence of a **delayed
 accepted-to-execution start** under this particular burst
-interleaving. All four blockers and all eight sibling tasks
-eventually executed after gate release, and that child
-passed the exact execution and typed-result checks.
+interleaving. After external gate release, the pool joined with all four
+blockers and all eight sibling tasks completed (some sibling tasks
+had executed before release); that child passed the exact execution
+and typed-result checks.
 The data do **not** prove persistent starvation, dropped tasks,
 or that the withheld blocker resided in a particular owner's
 deque: only event timestamps, actual executing worker and
