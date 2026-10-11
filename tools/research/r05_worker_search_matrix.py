@@ -113,9 +113,12 @@ def parse_search(rows, gate):
         if worker in previous and ns < previous[worker]:
             raise RuntimeError("non-monotonic worker-local event timestamps")
         previous[worker] = ns
+        # Uniform event schema is required for csv.DictWriter regardless
+        # of whether the first event happens to be a park return.
         event = dict(worker=worker, kind=kind, victim=victim,
                      detail=detail, offset_ns=ns,
-                     before_gate=int(ns < gate))
+                     before_gate=int(ns < gate),
+                     park_duration_ns=0, park_spanned_gate=0)
         if kind == "parkCheck":
             if pending_park[worker] is not None:
                 raise RuntimeError("nested park checks")
