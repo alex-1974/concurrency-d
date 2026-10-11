@@ -262,10 +262,10 @@ void main(string[] args)
 
         // No raw pointers or OS thread IDs enter the trace artifact.
         foreach (event; trace.events)
-            writefln("trace,%s,%s,%s,%s,%s,%s,%s,%s",
+            writefln("trace,%s,%s,%s,%s,%s,%s,%s",
                 event.sequence, event.taskId, event.kind,
                 event.worker, event.victim, event.batchId,
-                ticksToNSecs(event.ticks - begin), 0);
+                ticksToNSecs(event.ticks - begin));
         writefln("trace_status,%s,%s,%s,%s,%s",
             trace.admitted, trace.lostEvents, trace.registryOverflow,
             trace.unmatched, trace.stillLive);
