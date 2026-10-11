@@ -1,0 +1,9 @@
+platform,workload,storage_policy,producers,median_paired_waiter_over_always,waiter_wins,rounds,median_candidate_ingress_skipped_pct
+x86-64,minimal,gc,1,1.0704,2,2,1.33
+x86-64,minimal,gc,4,1.1362,2,2,2.88
+x86-64,compute,gc,1,0.9928,1,2,7.38
+x86-64,compute,gc,4,1.1022,2,2,51.54
+arm64,minimal,gc,1,1.0283,1,2,5.79
+arm64,minimal,gc,4,1.0677,2,2,4.25
+arm64,compute,gc,1,1.0411,2,2,15.08
+arm64,compute,gc,4,1.0572,1,2,40.0
