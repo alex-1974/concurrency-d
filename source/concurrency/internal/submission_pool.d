@@ -848,11 +848,65 @@ unittest
     assert(inbox.trySubmit(task) == SubmissionResult.accepted);
 
     // An incorrect generation protocol could block this test forever.
-    inbox.parkUnlessChanged(observed);
+    WorkerParkingStats unused;
+    inbox.parkUnlessChanged(observed, unused);
 
     TaskRef[1] received;
     assert(inbox.takeBatch(received[]) == 1);
     inbox.completeOne();
     inbox.close();
     assert(inbox.isDrained());
+}
+
+unittest
+{
+    // Every accepted task is dispatched exactly once when parking
+    // instrumentation is enabled, including tasks from ingress batches,
+    // owner-local queues and stolen tasks.
+    enum size_t TaskCount = 2048;
+    auto records = new shared CountingRecord[TaskCount];
+    auto tasks = new TaskRef[TaskCount];
+    prepareRecords(records, tasks);
+
+    auto pool = new SubmissionWorkerPool(4, 8, null, true);
+    Thread[4] producers;
+    foreach (p; 0 .. 4)
+    {
+        producers[p] = makeProducer(pool, tasks, p, 4);
+        producers[p].start();
+    }
+    foreach (producer; producers)
+        producer.join();
+    pool.closeAndJoin();
+
+    auto workers = pool.parkingStatsAfterJoin();
+    auto inbox = pool.inboxParkingStatsAfterJoin();
+    assert(pool.acceptedCount() == TaskCount);
+    assert(pool.completedCount() == TaskCount);
+    assert(workers.executions == TaskCount);
+    assert(workers.stealAttempts >= workers.stealSuccesses);
+    assert(workers.conditionWaits == workers.waitReturns);
+    // Each park check either returned without sleeping or waited at
+    // least once (possibly more often after a spurious wake).
+    assert(workers.parkChecks <=
+        workers.conditionWaits + workers.skippedParks);
+    assert(inbox.ingressNotifications == TaskCount);
+    assert(inbox.claimedTasks == TaskCount);
+    assert(inbox.peakQueued <= 8);
+    assert(inbox.claimedBatches > 0);
+}
+
+unittest
+{
+    // The same normal/default worker-pool path does not collect new
+    // per-worker research counters, while existing semantics remain.
+    auto pool = new SubmissionWorkerPool(2, 2);
+    pool.closeAndJoin();
+
+    auto counters = pool.parkingStatsAfterJoin();
+    assert(counters.localMisses == 0);
+    assert(counters.conditionWaits == 0);
+    assert(counters.executions == 0);
+    auto inbox = pool.inboxParkingStatsAfterJoin();
+    assert(inbox.closeBroadcasts == 0);
 }
