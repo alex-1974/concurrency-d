@@ -17,6 +17,7 @@ on:
       - "tools/research/r05_notification_idle_latency.py"
       - "tools/research/r05_fairness_blocking_matrix.py"
       - "tools/research/r05_burst_head_of_line.py"
+      - "tools/research/r05_task_trace.py"
       - ".github/workflows/r05-storage-qualification.yml"
       - "dub.sdl"
   workflow_dispatch:
@@ -178,6 +179,13 @@ jobs:
             --probe-ms=60 --rounds=2 --blockers 3 4 \
             --policies gc recycle \
             --output="evidence/r05-ci/${{ matrix.label }}/burst-head-of-line"
+
+      - name: R0.5 per-task trace and uninstrumented pairing (diagnostic)
+        shell: bash
+        run: |
+          python3 tools/research/r05_task_trace.py \
+            --compiler="$DC" --rounds=1 --probe-ms=60 \
+            --output="evidence/r05-ci/${{ matrix.label }}/task-trace"
 
       - name: Upload raw evidence and medians
         if: always()
