@@ -13,6 +13,7 @@ on:
       - "tools/research/r05_counter_control.py"
       - "tools/research/r05_scheduler_resources.py"
       - "tools/research/r05_worker_parking_matrix.py"
+      - "tools/research/r05_notification_policy_matrix.py"
       - ".github/workflows/r05-storage-qualification.yml"
       - "dub.sdl"
   workflow_dispatch:
@@ -130,6 +131,20 @@ jobs:
             --policies gc recycle \
             --workloads minimal compute \
             --output="evidence/r05-ci/${{ matrix.label }}/worker-parking"
+
+      - name: R0.5 waiter-aware notification policy A/B (diagnostic)
+        shell: bash
+        run: |
+          python3 tools/research/r05_notification_policy_matrix.py \
+            --compiler="$DC" \
+            --workers=4 \
+            --tasks=1200 \
+            --rounds=2 \
+            --producers 1 4 \
+            --budget=512 \
+            --workloads minimal compute \
+            --policies gc \
+            --output="evidence/r05-ci/${{ matrix.label }}/notification"
 
       - name: Upload raw evidence and medians
         if: always()
