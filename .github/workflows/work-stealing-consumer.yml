@@ -82,6 +82,14 @@ jobs:
           dub run --config=task-pipeline-mixed-benchmark --build=release --compiler="$DC" --force -- 4 4 384 512 recycle striped off compute on waiter
           dub run --config=notification-latency-benchmark --build=release --compiler="$DC" --force -- 2 always 20 8 1
           dub run --config=notification-latency-benchmark --build=release --compiler="$DC" --force -- 2 waiter 20 8 1
+          # Research: fairness distribution is observed, not constrained to
+          # uniform shares. Blocked-work progress remains bounded.
+          dub run --config=fairness-blocking-benchmark --build=release --compiler="$DC" --force -- fair always gc 4 4 256
+          dub run --config=fairness-blocking-benchmark --build=release --compiler="$DC" --force -- fair waiter recycle 4 4 256
+          dub run --config=fairness-blocking-benchmark --build=release --compiler="$DC" --force -- block always gc 4 1 32
+          dub run --config=fairness-blocking-benchmark --build=release --compiler="$DC" --force -- block waiter gc 4 1 32
+          dub run --config=fairness-blocking-benchmark --build=release --compiler="$DC" --force -- block always gc 4 4 1
+          dub run --config=fairness-blocking-benchmark --build=release --compiler="$DC" --force -- block waiter recycle 4 4 1
 
   native-arm64:
     name: Consumer / native ARM64 / LDC 1.41
@@ -136,3 +144,11 @@ jobs:
           dub run --config=task-pipeline-mixed-benchmark --build=release --compiler="$DC" --force -- 4 4 384 512 recycle striped off compute on waiter
           dub run --config=notification-latency-benchmark --build=release --compiler="$DC" --force -- 2 always 20 8 1
           dub run --config=notification-latency-benchmark --build=release --compiler="$DC" --force -- 2 waiter 20 8 1
+          # Research: fairness distribution is observed, not constrained to
+          # uniform shares. Blocked-work progress remains bounded.
+          dub run --config=fairness-blocking-benchmark --build=release --compiler="$DC" --force -- fair always gc 4 4 256
+          dub run --config=fairness-blocking-benchmark --build=release --compiler="$DC" --force -- fair waiter recycle 4 4 256
+          dub run --config=fairness-blocking-benchmark --build=release --compiler="$DC" --force -- block always gc 4 1 32
+          dub run --config=fairness-blocking-benchmark --build=release --compiler="$DC" --force -- block waiter gc 4 1 32
+          dub run --config=fairness-blocking-benchmark --build=release --compiler="$DC" --force -- block always gc 4 4 1
+          dub run --config=fairness-blocking-benchmark --build=release --compiler="$DC" --force -- block waiter recycle 4 4 1
