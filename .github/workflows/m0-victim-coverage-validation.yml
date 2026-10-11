@@ -1,0 +1,72 @@
+name: M0 pinned victim-coverage validation
+
+on:
+  push:
+    branches:
+      - validation/m0-victim-coverage-xps
+    paths:
+      - "benchmarks/m0_victim_coverage/**"
+      - "tools/validation/m0_victim_coverage_xps.py"
+      - ".github/workflows/m0-victim-coverage-validation.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  paired-m0-smoke:
+    name: M0 baseline-vs-fix / ${{ matrix.label }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: dmd-x86
+            runner: ubuntu-24.04
+            compiler: dmd-2.111.0
+          - label: ldc-x86
+            runner: ubuntu-24.04
+            compiler: ldc-1.41.0
+          - label: ldc-arm64
+            runner: ubuntu-24.04-arm
+            compiler: ldc-1.41.0
+
+    steps:
+      - name: Checkout full history for both pinned M0 commits
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Install D toolchain
+        uses: dlang-community/setup-dlang@v2
+        with:
+          compiler: ${{ matrix.compiler }}
+          dub: 1.40.0
+
+      - name: Inspect compiler and hardware
+        shell: bash
+        run: |
+          "$DC" --version
+          dub --version
+          uname -m
+
+      - name: Paired production M0 correctness and resource smoke
+        shell: bash
+        run: |
+          python3 tools/validation/m0_victim_coverage_xps.py \
+            --compiler="$DC" --rounds=1 --tasks=2048 \
+            --workers 1 2 4 --producers 1 4 \
+            --workloads minimal compute --compute-rounds=128 \
+            --budget=128 --idle-ms=100 --wake-samples=8 \
+            --gap-ms=1 --cooldown-ms=0 \
+            --output="evidence/m0-validation/${{ matrix.label }}"
+
+      - name: Upload raw comparison evidence (not a speed gate)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m0-victim-${{ matrix.label }}-${{ github.run_id }}
+          path: evidence/m0-validation/${{ matrix.label }}/
+          retention-days: 30
+          if-no-files-found: warn
