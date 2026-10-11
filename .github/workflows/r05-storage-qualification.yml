@@ -16,6 +16,7 @@ on:
       - "tools/research/r05_notification_policy_matrix.py"
       - "tools/research/r05_notification_idle_latency.py"
       - "tools/research/r05_fairness_blocking_matrix.py"
+      - "tools/research/r05_burst_head_of_line.py"
       - ".github/workflows/r05-storage-qualification.yml"
       - "dub.sdl"
   workflow_dispatch:
@@ -168,6 +169,15 @@ jobs:
             --workers=4 --producers=4 --tasks=256 \
             --siblings=16 --rounds=1 --policies gc recycle \
             --output="evidence/r05-ci/${{ matrix.label }}/fairness-blocking"
+
+      - name: R0.5 burst head-of-line start and work-source attribution
+        shell: bash
+        run: |
+          python3 tools/research/r05_burst_head_of_line.py \
+            --compiler="$DC" --workers=4 --siblings=8 \
+            --probe-ms=60 --rounds=2 --blockers 3 4 \
+            --policies gc recycle \
+            --output="evidence/r05-ci/${{ matrix.label }}/burst-head-of-line"
 
       - name: Upload raw evidence and medians
         if: always()
