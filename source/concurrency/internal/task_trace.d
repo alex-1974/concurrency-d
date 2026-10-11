@@ -92,9 +92,11 @@ package(concurrency) final class TaskTraceRecorder
             ++_lostEvents;
             return;
         }
-        _events[_count++] = TaskTraceEvent(
-            cast(ulong) (_count + 1), id, batch,
+        const sequence = cast(ulong) (_count + 1);
+        _events[_count] = TaskTraceEvent(
+            sequence, id, batch,
             cast(long) MonoTime.currTime.ticks, kind, worker, victim);
+        ++_count;
     }
 
     private size_t lookup(TaskRef task)
@@ -231,8 +233,8 @@ unittest
     narrow.claimed(batch[], 0);
     auto overflow = narrow.snapshotAfterJoin();
     assert(overflow.events.length == 1 && overflow.lostEvents == 1);
-    auto other = new shared TaskHeader;
-    narrow.published(TaskRef(other));
+    shared TaskHeader secondHeader;
+    narrow.published(TaskRef(&secondHeader));
     overflow = narrow.snapshotAfterJoin();
     assert(overflow.registryOverflow == 1 && overflow.stillLive == 1);
 }
