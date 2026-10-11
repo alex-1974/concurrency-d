@@ -91,6 +91,8 @@ explicit loss counters. Results:
 - `cases.csv`: paired child wall time **including** startup and the
   artificial sleep — **not throughput** and **not a scheduler speedup**;
 - `events.csv`: address-free per-task event timeline and claim batch;
+- `callables.csv`: each accepted submission's actual callable-start worker,
+  timestamp and pre-release flag (the burst uses one logical producer);
 - `summary.csv`: group medians of child wall-time ratios;
 - `environment.txt`: compiler/platform and Git provenance.
 
