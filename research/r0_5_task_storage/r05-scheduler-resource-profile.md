@@ -51,7 +51,7 @@ but they still contribute a small startup/shutdown cost.
 ## Workload control
 
 The existing `minimal` mode remains the default. The optional
-`compute` mode performs 96 iterations of deterministic unsigned
+`compute` mode performs 1024 iterations of deterministic unsigned
 integer mixing in **every** task, with an input depending on task ID.
 Scalar/wide TaskHandle results include and verify a digest-derived
 supplement. The void tasks atomically accumulate a separate compute
