@@ -271,6 +271,23 @@ void main(string[] args)
             trace.unmatched, trace.stillLive);
     }
 
+    version (R05WorkerSearchTrace)
+    {
+        auto search = pool.workerSearchTraceAfterJoin();
+        if (search.lostEvents != 0 || search.workers != workers)
+            throw new Exception("worker search trace dropped events");
+        // Workers write independent buffers, so output is grouped per
+        // worker rather than a globally serialized event order. Use each
+        // worker's own monotonic timestamps when reconstructing its path.
+        foreach (event; search.events)
+            writefln("search,%s,%s,%s,%s,%s",
+                event.kind, event.worker, event.victim, event.detail,
+                ticksToNSecs(event.ticks - begin));
+        writefln("search_status,%s,%s,%s,%s",
+            search.workers, search.events.length,
+            search.lostEvents, search.perWorkerCapacity);
+    }
+
     // Every variant exports the same external gate/join controls.
     // Existing burst, task and sibling CSV rows stay unchanged.
     writefln("control,gateRelease,%s",
