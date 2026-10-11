@@ -24,6 +24,18 @@ import concurrency.internal.task_record :
 import concurrency.internal.work_stealing_queue :
     LocalWorkStealingDeque;
 
+version (R05TaskTrace)
+{
+    import concurrency.internal.task_trace :
+        TaskTraceRecorder, TaskTraceSnapshot, TaskTraceKind;
+}
+
+version (R05WorkerSearchTrace)
+{
+    import concurrency.internal.worker_search_trace :
+        WorkerSearchRecorder, WorkerSearchSnapshot, WorkerSearchKind;
+}
+
 import core.atomic :
     MemoryOrder,
     atomicFetchAdd,
@@ -38,6 +50,18 @@ import core.sync.condition :
 import core.thread :
     Thread;
 
+/**
+ * R0.5 research-only notification selection. The baseline always calls
+ * notify after publishing, even if there are no actual Condition waiters.
+ * waiterAware skips only calls with no registered waiter. It never delays
+ * publication and never changes the generation predicate.
+ */
+package(concurrency) enum NotificationPolicy
+{
+    always,
+    waiterAware
+}
+
 package(concurrency) enum SubmissionResult
 {
     accepted,
@@ -46,10 +70,92 @@ package(concurrency) enum SubmissionResult
 }
 
 private enum size_t LocalCapacity = 1024;
-private enum size_t IngressBatchSize = 8;
+// Opt-in compile-time research variants. All ordinary builds remain batch8.
+// Keep only one research variant active, including when DUB flags are supplied
+// by consumers; silently choosing one would invalidate paired comparisons.
+version (R05IngressBatchOne)
+{
+    version (R05IngressBatchTwo)
+        static assert(false, "R0.5 select only one ingress batch version");
+    version (R05IngressBatchFour)
+        static assert(false, "R0.5 select only one ingress batch version");
+    private enum size_t IngressBatchSize = 1;
+}
+else version (R05IngressBatchTwo)
+{
+    version (R05IngressBatchFour)
+        static assert(false, "R0.5 select only one ingress batch version");
+    private enum size_t IngressBatchSize = 2;
+}
+else version (R05IngressBatchFour)
+    private enum size_t IngressBatchSize = 4;
+else
+    private enum size_t IngressBatchSize = 8;
 
 private alias LocalQueue =
     LocalWorkStealingDeque!(TaskRef, LocalCapacity);
+
+/**
+ * Experimental R0.5 counters. Written by each owning worker and collected
+ * only after join; no per-event atomics and no timing in dispatch/steal.
+ */
+package(concurrency) struct WorkerParkingStats
+{
+    ulong localMisses;
+    ulong ingressMisses;
+    ulong stealAttempts;
+    ulong stealSuccesses;
+    ulong parkChecks;
+    ulong conditionWaits;
+    ulong waitReturns;
+    ulong skippedParks;
+    ulong executions;
+
+    // R0.5 opt-in research only: per-worker work source attribution.
+    // This records counts, not task identity or causal task ownership.
+    // A stable OS-thread identity only for mapping task-start events
+    // to the owning worker index in post-join research. Not aggregated.
+    ulong osThreadId;
+    ulong ingressBatches;
+    ulong ingressClaimedTasks;
+    ulong ownerLocalExecutions;
+    ulong directIngressExecutions;
+    ulong stealExecutions;
+
+    // A wait can return with its predicate still blocking; such a
+    // return is retried immediately under the same inbox mutex.
+    ulong waitReturnsStillBlocked;
+
+    // The mutually exclusive predicate state when an actual wait
+    // finishes. These do not identify which notify (if any) woke it.
+    ulong waitExitsInboxPending;
+    ulong waitExitsGenerationOnly;
+    ulong waitExitsDrained;
+
+    // First following worker search, exactly one per finished wait.
+    ulong wokeToLocal;
+    ulong wokeToInbox;
+    ulong wokeToSteal;
+    ulong wokeToEmptySearch;
+    ulong wokeToDrained;
+}
+
+/** Events counted under the existing inbox mutex, if profiling is enabled. */
+package(concurrency) struct InboxParkingStats
+{
+    ulong ingressNotifications;
+    ulong localNotifications;
+    ulong ingressNotifyCalls;
+    ulong ingressNotifySkipped;
+    ulong localNotifyCalls;
+    ulong localNotifySkipped;
+    ulong closeBroadcasts;
+    ulong drainBroadcasts;
+    ulong claimedBatches;
+    ulong claimedTasks;
+    size_t peakQueued;
+}
+
 
 /**
  * A bounded MPMC inbox. Every state transition is protected by one mutex.
@@ -67,13 +173,33 @@ private final class TaskInbox
     private size_t _completed;
     private size_t _generation;
     private size_t _parkCount;
+    private size_t _sleepers; // guarded by _mutex; only maintained in waiterAware
     private bool _closed;
+    private NotificationPolicy _notificationPolicy;
 
-    this(size_t capacity)
+    private bool _parkingProfile;
+    private InboxParkingStats _parkingCounters;
+
+    version (R05TaskTrace)
+    {
+        private TaskTraceRecorder _taskTrace;
+
+        void attachTrace(TaskTraceRecorder recorder)
+        {
+            _taskTrace = recorder;
+        }
+    }
+
+    this(
+        size_t capacity,
+        bool parkingProfile = false,
+        NotificationPolicy notificationPolicy = NotificationPolicy.always)
     {
         if (capacity == 0)
             throw new Exception("ingress capacity must be positive");
 
+        _parkingProfile = parkingProfile;
+        _notificationPolicy = notificationPolicy;
         _mutex = new Mutex();
         _changed = new Condition(_mutex);
         _slots = new TaskRef[capacity];
@@ -99,15 +225,38 @@ private final class TaskInbox
             ++_used;
             ++_accepted;
             ++_generation;
-            _changed.notify();
+            version (R05TaskTrace)
+                _taskTrace.published(task);
+            if (_parkingProfile)
+            {
+                ++_parkingCounters.ingressNotifications;
+                if (_used > _parkingCounters.peakQueued)
+                    _parkingCounters.peakQueued = _used;
+            }
+            // _sleepers is changed under this exact mutex around
+            // Condition.wait. With zero sleepers no thread can need
+            // an actual notification: a future parker must observe
+            // the changed generation and/or nonempty inbox.
+            if (_notificationPolicy == NotificationPolicy.always ||
+                _sleepers != 0)
+            {
+                if (_parkingProfile)
+                    ++_parkingCounters.ingressNotifyCalls;
+                _changed.notify();
+            }
+            else if (_parkingProfile)
+            {
+                ++_parkingCounters.ingressNotifySkipped;
+            }
             return SubmissionResult.accepted;
         }
     }
 
     /**
-     * Advisory full-inbox check, called while OwnedTaskExecutor's producer
-     * admission mutex is held. Worker threads only remove entries; another
-     * owned producer cannot add an entry before that owner's trySubmit.
+     * An advisory non-reserving capacity check. The owned executor holds
+     * its submission mutex while querying and publishing, so another
+     * owned producer cannot fill the inbox in between. A worker may only
+     * remove slots, making a positive result remain valid for that path.
      */
     bool hasCapacity()
     {
@@ -130,6 +279,11 @@ private final class TaskInbox
                 ++taken;
             }
 
+            if (_parkingProfile && taken != 0)
+            {
+                ++_parkingCounters.claimedBatches;
+                _parkingCounters.claimedTasks += taken;
+            }
             return taken;
         }
     }
@@ -146,6 +300,8 @@ private final class TaskInbox
             if (_closed && _completed == _accepted)
             {
                 ++_generation;
+                if (_parkingProfile)
+                    ++_parkingCounters.drainBroadcasts;
                 _changed.notifyAll();
             }
         }
@@ -157,6 +313,8 @@ private final class TaskInbox
         {
             _closed = true;
             ++_generation;
+            if (_parkingProfile)
+                ++_parkingCounters.closeBroadcasts;
             _changed.notifyAll();
         }
     }
@@ -183,7 +341,19 @@ private final class TaskInbox
         synchronized (_mutex)
         {
             ++_generation;
-            _changed.notify();
+            if (_parkingProfile)
+                ++_parkingCounters.localNotifications;
+            if (_notificationPolicy == NotificationPolicy.always ||
+                _sleepers != 0)
+            {
+                if (_parkingProfile)
+                    ++_parkingCounters.localNotifyCalls;
+                _changed.notify();
+            }
+            else if (_parkingProfile)
+            {
+                ++_parkingCounters.localNotifySkipped;
+            }
         }
     }
 
@@ -192,18 +362,75 @@ private final class TaskInbox
      * release the mutex while sleeping. Any producer that publishes during
      * the search-to-park window changes the generation under this same lock.
      */
-    void parkUnlessChanged(size_t observed)
+    void parkUnlessChanged(size_t observed, ref WorkerParkingStats stats)
     {
         synchronized (_mutex)
         {
+            bool waited;
             while (_generation == observed &&
                    _used == 0 &&
                    !(_closed && _completed == _accepted))
             {
                 ++_parkCount;
+                if (_parkingProfile)
+                {
+                    ++stats.conditionWaits;
+                    waited = true;
+                }
+
+                // wait() may return spuriously. Counting returns is not
+                // the same as counting useful work-producing notifications.
+                if (_notificationPolicy == NotificationPolicy.waiterAware)
+                    ++_sleepers;
                 _changed.wait();
+                if (_notificationPolicy == NotificationPolicy.waiterAware)
+                {
+                    assert(_sleepers != 0);
+                    --_sleepers;
+                }
+                if (_parkingProfile)
+                {
+                    ++stats.waitReturns;
+                    if (_generation == observed &&
+                        _used == 0 &&
+                        !(_closed && _completed == _accepted))
+                        ++stats.waitReturnsStillBlocked;
+                }
+            }
+
+            if (_parkingProfile)
+            {
+                if (!waited)
+                {
+                    ++stats.skippedParks;
+                }
+                else if (_closed && _used == 0 &&
+                         _completed == _accepted)
+                {
+                    ++stats.waitExitsDrained;
+                }
+                else if (_used != 0)
+                {
+                    ++stats.waitExitsInboxPending;
+                }
+                else
+                {
+                    // Changed generation, but no queued inbox tasks.
+                    // Another worker may have claimed the published
+                    // task already; the reason is NOT necessarily a
+                    // spurious notification.
+                    ++stats.waitExitsGenerationOnly;
+                }
             }
         }
+    }
+
+    InboxParkingStats parkingStatsAfterJoin()
+    {
+        // Stable after workers join; synchronization also permits tests
+        // to inspect an internally consistent inbox snapshot.
+        synchronized (_mutex)
+            return _parkingCounters;
     }
 
     size_t parkCount()
@@ -263,6 +490,14 @@ package(concurrency) final class SubmissionWorkerPool
     private Thread[] _workers;
     private size_t _started;
 
+    private bool _parkingProfile;
+    private WorkerParkingStats[] _workerCounters;
+
+    version (R05TaskTrace)
+        private TaskTraceRecorder _taskTrace;
+    version (R05WorkerSearchTrace)
+        private WorkerSearchRecorder _searchTrace;
+
     // Optional internal completion hook. Called by the claiming worker only
     // after dispatch and inbox accounting no longer need the TaskRef target.
     // It must not throw or retain the borrowed TaskRef past this invocation.
@@ -271,15 +506,29 @@ package(concurrency) final class SubmissionWorkerPool
     this(
         size_t workerCount,
         size_t ingressCapacity,
-        void function(TaskRef) nothrow afterExecution = null)
+        void function(TaskRef) nothrow afterExecution = null,
+        bool parkingProfile = false,
+        NotificationPolicy notificationPolicy = NotificationPolicy.always)
     {
         if (workerCount == 0)
             throw new Exception("workerCount must be positive");
 
-        _inbox = new TaskInbox(ingressCapacity);
+        _parkingProfile = parkingProfile;
+        _inbox = new TaskInbox(
+            ingressCapacity, parkingProfile, notificationPolicy);
+        version (R05TaskTrace)
+        {
+            _taskTrace = new TaskTraceRecorder();
+            _inbox.attachTrace(_taskTrace);
+        }
+        version (R05WorkerSearchTrace)
+            _searchTrace = new WorkerSearchRecorder(workerCount);
         _afterExecution = afterExecution;
         _queues = new LocalQueue[workerCount];
         _workers = new Thread[workerCount];
+        // The default unprofiled path does not allocate an extra array.
+        if (parkingProfile)
+            _workerCounters = new WorkerParkingStats[workerCount];
 
         try
         {
@@ -317,7 +566,7 @@ package(concurrency) final class SubmissionWorkerPool
         return _inbox.trySubmit(task);
     }
 
-    /** Reject known-full inboxes before creating owned task records. */
+    /** Optional fast rejection before constructing a costly owned record. */
     bool hasIngressCapacity()
     {
         return _inbox.hasCapacity();
@@ -350,10 +599,81 @@ package(concurrency) final class SubmissionWorkerPool
         return _inbox.parkCount();
     }
 
-    private void executeOne(TaskRef task)
+    /**
+     * Aggregate worker-local counters only AFTER closeAndJoin().
+     * Reading during live worker execution would be a data race.
+     */
+    WorkerParkingStats parkingStatsAfterJoin()
     {
+        WorkerParkingStats total;
+        foreach (entry; _workerCounters)
+        {
+            total.localMisses += entry.localMisses;
+            total.ingressMisses += entry.ingressMisses;
+            total.stealAttempts += entry.stealAttempts;
+            total.stealSuccesses += entry.stealSuccesses;
+            total.parkChecks += entry.parkChecks;
+            total.conditionWaits += entry.conditionWaits;
+            total.waitReturns += entry.waitReturns;
+            total.skippedParks += entry.skippedParks;
+            total.executions += entry.executions;
+            total.ingressBatches += entry.ingressBatches;
+            total.ingressClaimedTasks += entry.ingressClaimedTasks;
+            total.ownerLocalExecutions += entry.ownerLocalExecutions;
+            total.directIngressExecutions += entry.directIngressExecutions;
+            total.stealExecutions += entry.stealExecutions;
+            total.waitReturnsStillBlocked += entry.waitReturnsStillBlocked;
+            total.waitExitsInboxPending += entry.waitExitsInboxPending;
+            total.waitExitsGenerationOnly += entry.waitExitsGenerationOnly;
+            total.waitExitsDrained += entry.waitExitsDrained;
+            total.wokeToLocal += entry.wokeToLocal;
+            total.wokeToInbox += entry.wokeToInbox;
+            total.wokeToSteal += entry.wokeToSteal;
+            total.wokeToEmptySearch += entry.wokeToEmptySearch;
+            total.wokeToDrained += entry.wokeToDrained;
+        }
+        return total;
+    }
+
+    /**
+     * Research-only per-worker execution distribution. A caller MUST
+     * invoke this only after closeAndJoin(); joining workers provides
+     * the happens-before edge for reading their dedicated counter slots.
+     * Returns a distinct snapshot rather than exposing mutable storage.
+     */
+    WorkerParkingStats[] workerStatsAfterJoin()
+    {
+        return _workerCounters.dup;
+    }
+
+    /** Inbox counts are protected by the existing inbox mutex. */
+    InboxParkingStats inboxParkingStatsAfterJoin()
+    {
+        return _inbox.parkingStatsAfterJoin();
+    }
+
+    version (R05TaskTrace)
+    TaskTraceSnapshot taskTraceAfterJoin()
+    {
+        return _taskTrace.snapshotAfterJoin();
+    }
+
+    version (R05WorkerSearchTrace)
+    WorkerSearchSnapshot workerSearchTraceAfterJoin()
+    {
+        return _searchTrace.snapshotAfterJoin();
+    }
+
+    private void executeOne(TaskRef task, size_t worker)
+    {
+        version (R05TaskTrace)
+            _taskTrace.record(TaskTraceKind.dispatchBegin, task, worker);
         dispatchTask(task);
+        version (R05TaskTrace)
+            _taskTrace.record(TaskTraceKind.dispatchEnd, task, worker);
         _inbox.completeOne();
+        version (R05TaskTrace)
+            _taskTrace.accounted(task, worker);
 
         // Returning from the record's execute thunk alone is not a
         // lifetime-safe reclamation marker: the worker could still hold
@@ -366,6 +686,17 @@ package(concurrency) final class SubmissionWorkerPool
     private void workerLoop(size_t self)
     {
         TaskRef[IngressBatchSize] batch;
+        WorkerParkingStats counters;
+        if (_parkingProfile)
+            counters.osThreadId = cast(ulong) Thread.getThis().id;
+        bool pendingWakeClassification;
+        // The thread owns this slot exclusively. The controlling thread
+        // may read it only after joining every worker.
+        scope(exit)
+        {
+            if (_parkingProfile)
+                _workerCounters[self] = counters;
+        }
 
         size_t nextVictim =
             _queues.length > 1
@@ -379,9 +710,26 @@ package(concurrency) final class SubmissionWorkerPool
             auto local = _queues[self].pop();
             if (local.found)
             {
-                executeOne(local.value);
+                version (R05WorkerSearchTrace)
+                    _searchTrace.record(WorkerSearchKind.localPop, self);
+                version (R05TaskTrace)
+                    _taskTrace.record(TaskTraceKind.ownerPop, local.value, self);
+                if (_parkingProfile && pendingWakeClassification)
+                {
+                    ++counters.wokeToLocal;
+                    pendingWakeClassification = false;
+                }
+                executeOne(local.value, self);
+                if (_parkingProfile)
+                {
+                    ++counters.executions;
+                    ++counters.ownerLocalExecutions;
+                }
                 continue;
             }
+
+            if (_parkingProfile)
+                ++counters.localMisses;
 
             // Capture the ticket before checking external ingress and
             // attempting steals. Publication after this point changes it.
@@ -390,32 +738,94 @@ package(concurrency) final class SubmissionWorkerPool
             const taken = _inbox.takeBatch(batch[]);
             if (taken != 0)
             {
+                version (R05WorkerSearchTrace)
+                    _searchTrace.record(
+                        WorkerSearchKind.ingressClaim, self, -1, taken);
+                version (R05TaskTrace)
+                    _taskTrace.claimed(batch[0 .. taken], self);
+                if (_parkingProfile)
+                {
+                    ++counters.ingressBatches;
+                    counters.ingressClaimedTasks += taken;
+                }
+                if (_parkingProfile && pendingWakeClassification)
+                {
+                    ++counters.wokeToInbox;
+                    pendingWakeClassification = false;
+                }
                 // Publish newly claimed work only into this worker's
                 // owner deque, permitting other workers to steal it.
                 bool enqueued;
                 foreach (i; 1 .. taken)
                 {
                     TaskRef task = batch[i];
+                    // A successful push becomes visible to thieves before
+                    // enqueueOk can be recorded. Begin/Ok bracket it.
+                    version (R05TaskTrace)
+                        const traceEnqueueId =
+                            _taskTrace.enqueueBegin(task, self);
                     if (_queues[self].tryPush(task))
                     {
+                        version (R05TaskTrace)
+                            _taskTrace.enqueueResult(traceEnqueueId, self, true);
                         enqueued = true;
                     }
                     else
                     {
-                        executeOne(task);
+                        version (R05TaskTrace)
+                            _taskTrace.enqueueResult(traceEnqueueId, self, false);
+                        executeOne(task, self);
+                        if (_parkingProfile)
+                        {
+                            ++counters.executions;
+                            ++counters.directIngressExecutions;
+                        }
                     }
                 }
 
                 if (enqueued)
                     _inbox.announceLocalWork();
 
-                executeOne(batch[0]);
+                executeOne(batch[0], self);
+                if (_parkingProfile)
+                {
+                    ++counters.executions;
+                    ++counters.directIngressExecutions;
+                }
                 continue;
             }
 
+            if (_parkingProfile)
+                ++counters.ingressMisses;
             bool foundWork;
 
-            foreach (_; 0 .. _queues.length - 1)
+            // In the rotating research variant, each new search must
+            // begin at a foreign worker, even when the last steal left
+            // nextVictim == self. This avoids double-weighting self+1
+            // as first actual foreign victim on consecutive failed scans.
+            version (R05RotatingFullVictimSweep)
+            {
+                if (_queues.length > 1 && nextVictim == self)
+                    nextVictim = (nextVictim + 1) % _queues.length;
+            }
+
+            // R0.5 qualified mechanism A/B: the original N-1 slot
+            // iterations can include self and therefore miss a foreign
+            // queue entirely. A full N-slot sweep visits exactly N-1
+            // non-self queues. This opt-in variant changes no dequeue,
+            // memory-model or wakeup operation.
+            version (R05RotatingFullVictimSweep)
+            {
+                version (R05FullVictimSweep)
+                    static assert(false,
+                        "Choose one R0.5 full-victim-sweep research variant");
+                const victimSlots = _queues.length;
+            }
+            else version (R05FullVictimSweep)
+                const victimSlots = _queues.length;
+            else
+                const victimSlots = _queues.length - 1;
+            foreach (_; 0 .. victimSlots)
             {
                 const victim = nextVictim;
                 nextVictim = (nextVictim + 1) % _queues.length;
@@ -423,12 +833,39 @@ package(concurrency) final class SubmissionWorkerPool
                 if (victim == self)
                     continue;
 
+                if (_parkingProfile)
+                    ++counters.stealAttempts;
                 auto stolen = _queues[victim].steal();
 
                 if (!stolen.found)
+                {
+                    version (R05WorkerSearchTrace)
+                        _searchTrace.record(
+                            WorkerSearchKind.stealMiss, self,
+                            cast(int) victim);
                     continue;
+                }
 
-                executeOne(stolen.value);
+                version (R05WorkerSearchTrace)
+                    _searchTrace.record(
+                        WorkerSearchKind.stealHit, self,
+                        cast(int) victim);
+                if (_parkingProfile && pendingWakeClassification)
+                {
+                    ++counters.wokeToSteal;
+                    pendingWakeClassification = false;
+                }
+                version (R05TaskTrace)
+                    _taskTrace.record(
+                        TaskTraceKind.stolen, stolen.value,
+                        self, cast(int) victim);
+                executeOne(stolen.value, self);
+                if (_parkingProfile)
+                {
+                    ++counters.stealSuccesses;
+                    ++counters.stealExecutions;
+                    ++counters.executions;
+                }
                 foundWork = true;
                 break;
             }
@@ -436,12 +873,57 @@ package(concurrency) final class SubmissionWorkerPool
             if (foundWork)
                 continue;
 
+            // A complete failed N-slot sweep leaves nextVictim unchanged
+            // modulo N. Rotate only the opt-in experiment so subsequent
+            // failed sweeps start at different foreign victims. Successful
+            // steals keep the existing nextVictim = successor behavior.
+            version (R05RotatingFullVictimSweep)
+            {
+                nextVictim = (nextVictim + 1) % _queues.length;
+                if (_queues.length > 1 && nextVictim == self)
+                    nextVictim = (nextVictim + 1) % _queues.length;
+            }
+
+            version (R05WorkerSearchTrace)
+                _searchTrace.record(WorkerSearchKind.searchEmpty, self);
             if (_inbox.isDrained())
+            {
+                version (R05WorkerSearchTrace)
+                    _searchTrace.record(WorkerSearchKind.drained, self);
+                if (_parkingProfile && pendingWakeClassification)
+                {
+                    ++counters.wokeToDrained;
+                    pendingWakeClassification = false;
+                }
                 break;
+            }
+
+            if (_parkingProfile && pendingWakeClassification)
+            {
+                ++counters.wokeToEmptySearch;
+                pendingWakeClassification = false;
+            }
 
             // Condition.wait releases _mutex atomically. If any
             // publication/close happened since observed, this won't sleep.
-            _inbox.parkUnlessChanged(observed);
+            if (_parkingProfile)
+                ++counters.parkChecks;
+            const returnsBefore = counters.waitReturns;
+            version (R05WorkerSearchTrace)
+            {
+                const waitsBeforeSearchPark = counters.conditionWaits;
+                _searchTrace.record(WorkerSearchKind.parkCheck, self);
+            }
+            _inbox.parkUnlessChanged(observed, counters);
+            version (R05WorkerSearchTrace)
+                _searchTrace.record(WorkerSearchKind.parkReturn, self, -1,
+                    counters.conditionWaits > waitsBeforeSearchPark ? 1 : 0);
+            // Some Condition.wait calls may have returned with the
+            // predicate still blocked and immediately re-waited.
+            // Only the final return starts a new worker search.
+            if (_parkingProfile &&
+                counters.waitReturns != returnsBefore)
+                pendingWakeClassification = true;
         }
     }
 }
@@ -716,11 +1198,251 @@ unittest
     assert(inbox.trySubmit(task) == SubmissionResult.accepted);
 
     // An incorrect generation protocol could block this test forever.
-    inbox.parkUnlessChanged(observed);
+    WorkerParkingStats unused;
+    inbox.parkUnlessChanged(observed, unused);
 
     TaskRef[1] received;
     assert(inbox.takeBatch(received[]) == 1);
     inbox.completeOne();
     inbox.close();
     assert(inbox.isDrained());
+}
+
+unittest
+{
+    // Every accepted task is dispatched exactly once when parking
+    // instrumentation is enabled, including tasks from ingress batches,
+    // owner-local queues and stolen tasks.
+    enum size_t TaskCount = 2048;
+    auto records = new shared CountingRecord[TaskCount];
+    auto tasks = new TaskRef[TaskCount];
+    prepareRecords(records, tasks);
+
+    auto pool = new SubmissionWorkerPool(4, 8, null, true);
+    Thread[4] producers;
+    foreach (p; 0 .. 4)
+    {
+        producers[p] = makeProducer(pool, tasks, p, 4);
+        producers[p].start();
+    }
+    foreach (producer; producers)
+        producer.join();
+    pool.closeAndJoin();
+
+    auto workers = pool.parkingStatsAfterJoin();
+    auto inbox = pool.inboxParkingStatsAfterJoin();
+    assert(pool.acceptedCount() == TaskCount);
+    assert(pool.completedCount() == TaskCount);
+    assert(workers.executions == TaskCount);
+    assert(workers.stealAttempts >= workers.stealSuccesses);
+    assert(workers.conditionWaits == workers.waitReturns);
+    assert(workers.waitReturns ==
+        workers.waitReturnsStillBlocked +
+        workers.waitExitsInboxPending +
+        workers.waitExitsGenerationOnly +
+        workers.waitExitsDrained);
+    assert(workers.waitReturns - workers.waitReturnsStillBlocked ==
+        workers.wokeToLocal +
+        workers.wokeToInbox +
+        workers.wokeToSteal +
+        workers.wokeToEmptySearch +
+        workers.wokeToDrained);
+    // Each park check either returned without sleeping or waited at
+    // least once (possibly more often after a spurious wake).
+    assert(workers.parkChecks <=
+        workers.conditionWaits + workers.skippedParks);
+    assert(inbox.ingressNotifications == TaskCount);
+    assert(inbox.claimedTasks == TaskCount);
+    assert(inbox.peakQueued <= 8);
+    assert(inbox.claimedBatches > 0);
+}
+
+unittest
+{
+    // The same normal/default worker-pool path does not collect new
+    // per-worker research counters, while existing semantics remain.
+    auto pool = new SubmissionWorkerPool(2, 2);
+    pool.closeAndJoin();
+
+    auto counters = pool.parkingStatsAfterJoin();
+    assert(counters.localMisses == 0);
+    assert(counters.conditionWaits == 0);
+    assert(counters.executions == 0);
+    auto inbox = pool.inboxParkingStatsAfterJoin();
+    assert(inbox.closeBroadcasts == 0);
+}
+
+unittest
+{
+    // Deterministically reach a real Condition.wait before submitting.
+    // A publication and then close must wake all parked workers without
+    // changing the existing generation-based lost-wakeup contract.
+    auto pool = new SubmissionWorkerPool(2, 2, null, true);
+    waitForPark(pool, 1);
+
+    shared CountingRecord[1] records;
+    TaskRef[1] tasks;
+    prepareRecords(records[], tasks[]);
+    assert(pool.trySubmit(tasks[0]) == SubmissionResult.accepted);
+    waitForExecution(&records[0]);
+    pool.closeAndJoin();
+
+    const worker = pool.parkingStatsAfterJoin();
+    const inbox = pool.inboxParkingStatsAfterJoin();
+    assert(worker.executions == 1);
+    assert(worker.conditionWaits >= 1);
+    assert(worker.waitReturns == worker.conditionWaits);
+    assert(inbox.ingressNotifications == 1);
+    assert(inbox.claimedTasks == 1);
+    assert(inbox.closeBroadcasts == 1);
+    assert(inbox.peakQueued <= 2);
+    assert(worker.waitReturns == worker.waitReturnsStillBlocked +
+        worker.waitExitsInboxPending +
+        worker.waitExitsGenerationOnly +
+        worker.waitExitsDrained);
+    assert(worker.waitReturns - worker.waitReturnsStillBlocked ==
+        worker.wokeToLocal + worker.wokeToInbox +
+        worker.wokeToSteal + worker.wokeToEmptySearch +
+        worker.wokeToDrained);
+}
+
+unittest
+{
+    // Idle shutdown has no user work. Every worker wait exit is
+    // classified as drain, or a generation change followed by drain.
+    auto pool = new SubmissionWorkerPool(4, 2, null, true);
+    waitForPark(pool, 1);
+    pool.closeAndJoin();
+
+    const stats = pool.parkingStatsAfterJoin();
+    assert(stats.executions == 0);
+    assert(stats.waitReturns == stats.conditionWaits);
+    assert(stats.waitReturns == stats.waitReturnsStillBlocked +
+        stats.waitExitsInboxPending +
+        stats.waitExitsGenerationOnly +
+        stats.waitExitsDrained);
+    assert(stats.waitReturns - stats.waitReturnsStillBlocked ==
+        stats.wokeToLocal + stats.wokeToInbox +
+        stats.wokeToSteal + stats.wokeToEmptySearch +
+        stats.wokeToDrained);
+    assert(stats.wokeToDrained >= 1);
+    assert(stats.wokeToInbox == 0);
+    assert(stats.wokeToSteal == 0);
+    assert(stats.wokeToLocal == 0);
+}
+
+unittest
+{
+    // One worker means no other claimant can consume a publication.
+    // An idle worker awakened by the submitted task must discover it
+    // in the inbox on the very next work search.
+    auto pool = new SubmissionWorkerPool(1, 2, null, true);
+    waitForPark(pool, 1);
+
+    shared CountingRecord[1] records;
+    TaskRef[1] tasks;
+    prepareRecords(records[], tasks[]);
+    assert(pool.trySubmit(tasks[0]) == SubmissionResult.accepted);
+    waitForExecution(&records[0]);
+    pool.closeAndJoin();
+
+    const worker = pool.parkingStatsAfterJoin();
+    assert(worker.executions == 1);
+    assert(worker.wokeToInbox >= 1);
+    assert(worker.waitReturns ==
+        worker.waitReturnsStillBlocked +
+        worker.waitExitsInboxPending +
+        worker.waitExitsGenerationOnly +
+        worker.waitExitsDrained);
+    assert(worker.waitReturns - worker.waitReturnsStillBlocked ==
+        worker.wokeToLocal + worker.wokeToInbox +
+        worker.wokeToSteal + worker.wokeToEmptySearch +
+        worker.wokeToDrained);
+}
+
+unittest
+{
+    // In the research variant there are no registered Condition waiters:
+    // publishing does not notify, but still commits the generation/task.
+    auto inbox = new TaskInbox(
+        2, true, NotificationPolicy.waiterAware);
+    shared CountingRecord[1] records;
+    TaskRef[1] tasks;
+    prepareRecords(records[], tasks[]);
+
+    const generation = inbox.wakeGeneration();
+    assert(inbox.trySubmit(tasks[0]) == SubmissionResult.accepted);
+    WorkerParkingStats unused;
+    inbox.parkUnlessChanged(generation, unused); // must NOT wait
+    TaskRef[1] claimed;
+    assert(inbox.takeBatch(claimed[]) == 1);
+    inbox.completeOne();
+    inbox.close();
+    auto profile = inbox.parkingStatsAfterJoin();
+    assert(profile.ingressNotifications == 1);
+    assert(profile.ingressNotifyCalls == 0);
+    assert(profile.ingressNotifySkipped == 1);
+    assert(inbox.isDrained());
+}
+
+unittest
+{
+    // A real waiter is registered before publication; the conditional
+    // notification must deliver exactly one task without a lost wake.
+    auto pool = new SubmissionWorkerPool(
+        1, 2, null, true, NotificationPolicy.waiterAware);
+    waitForPark(pool, 1);
+
+    shared CountingRecord[1] records;
+    TaskRef[1] tasks;
+    prepareRecords(records[], tasks[]);
+    assert(pool.trySubmit(tasks[0]) == SubmissionResult.accepted);
+    waitForExecution(&records[0]);
+    pool.closeAndJoin();
+
+    auto profile = pool.inboxParkingStatsAfterJoin();
+    auto workers = pool.parkingStatsAfterJoin();
+    assert(profile.ingressNotifyCalls == 1);
+    assert(profile.ingressNotifySkipped == 0);
+    assert(profile.closeBroadcasts == 1);
+    assert(workers.executions == 1);
+    assert(workers.conditionWaits == workers.waitReturns);
+}
+
+unittest
+{
+    // Many concurrent publishers and idle->active transitions. An
+    // accepted task must still dispatch exactly once, even when a
+    // notification is skipped because all workers were active.
+    enum size_t TaskCount = 2048;
+    auto records = new shared CountingRecord[TaskCount];
+    auto refs = new TaskRef[TaskCount];
+    prepareRecords(records, refs);
+
+    auto pool = new SubmissionWorkerPool(
+        4, 8, null, true, NotificationPolicy.waiterAware);
+    Thread[4] producerThreads;
+    foreach (i; 0 .. 4)
+    {
+        producerThreads[i] = makeProducer(pool, refs, i, 4);
+        producerThreads[i].start();
+    }
+    foreach (t; producerThreads)
+        t.join();
+    pool.closeAndJoin();
+
+    assert(pool.acceptedCount() == TaskCount);
+    assert(pool.completedCount() == TaskCount);
+    const workers = pool.parkingStatsAfterJoin();
+    const inbox = pool.inboxParkingStatsAfterJoin();
+    assert(workers.executions == TaskCount);
+    assert(inbox.claimedTasks == TaskCount);
+    assert(inbox.ingressNotifications == TaskCount);
+    assert(inbox.ingressNotifyCalls + inbox.ingressNotifySkipped ==
+        TaskCount);
+    assert(inbox.localNotifyCalls + inbox.localNotifySkipped ==
+        inbox.localNotifications);
+    assert(workers.waitReturns == workers.conditionWaits);
+    foreach (ref rec; records)
+        assert(atomicLoad!(MemoryOrder.acq)(rec.executions) == 1u);
 }

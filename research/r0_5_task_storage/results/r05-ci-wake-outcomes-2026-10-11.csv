@@ -1,0 +1,17 @@
+platform,workload,policy,producers,median_profile_over_baseline,median_waits_per_task,median_failed_steals_per_task,median_useful_after_wait_pct,median_empty_after_wait_pct,median_generation_only_exit_pct
+x86-64,minimal,gc,1,0.9904,0.4496,1.1308,60.45,38.81,40.58
+x86-64,minimal,gc,4,0.9790,0.5971,1.4912,61.43,38.01,34.18
+x86-64,minimal,recycle,1,1.0371,0.4446,1.1346,60.24,39.01,38.4
+x86-64,minimal,recycle,4,1.0304,0.6308,1.5667,63.13,36.34,34.56
+x86-64,compute,gc,1,1.0174,0.2558,0.6787,80.62,18.08,34.36
+x86-64,compute,gc,4,1.0452,0.1029,0.2821,72.86,23.86,34.98
+x86-64,compute,recycle,1,0.9667,0.2454,0.6492,80.58,18.05,36.34
+x86-64,compute,recycle,4,1.1724,0.0583,0.1667,77.91,16.36,30.86
+arm64,minimal,gc,1,0.9939,0.6038,1.6263,56.67,42.78,51.53
+arm64,minimal,gc,4,1.0074,0.6583,1.7396,62.05,37.44,38.97
+arm64,minimal,recycle,1,1.0327,0.5633,1.5112,59.46,39.94,49.4
+arm64,minimal,recycle,4,0.9330,0.6546,1.7825,64.19,35.3,33.59
+arm64,compute,gc,1,1.2088,0.3271,0.905,77.42,21.55,44.27
+arm64,compute,gc,4,1.0726,0.2175,0.6067,78.88,19.59,29.63
+arm64,compute,recycle,1,0.9947,0.3071,0.8462,79.29,19.62,42.2
+arm64,compute,recycle,4,0.8535,0.2512,0.7146,74.48,24.19,34.07

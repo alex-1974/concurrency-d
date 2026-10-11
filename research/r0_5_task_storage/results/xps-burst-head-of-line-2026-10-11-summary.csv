@@ -1,0 +1,9 @@
+storage,notify,blockers,workers,siblings,rounds,fully_started_before_release,median_started_before_release,median_siblings_before_release,median_claimed,median_steals,median_siblings_after_all_starts
+gc,always,3,4,8,5,5,3,4,11,3,1
+gc,waiter,3,4,8,5,5,3,4,11,3,1
+gc,always,4,4,8,5,5,4,4,12,3,0
+gc,waiter,4,4,8,5,5,4,4,12,3,0
+recycle,always,3,4,8,5,5,3,4,11,3,1
+recycle,waiter,3,4,8,5,5,3,4,11,3,1
+recycle,always,4,4,8,5,5,4,4,12,3,0
+recycle,waiter,4,4,8,5,5,4,4,12,3,0

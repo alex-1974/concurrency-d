@@ -1,0 +1,9 @@
+platform,producers,budget,policy,median_striped_over_shared,striped_wins,rounds
+arm64,1,512,gc,0.9912,1,2
+arm64,1,512,recycle,0.9810,1,2
+arm64,4,512,gc,1.0632,2,2
+arm64,4,512,recycle,0.9909,1,2
+x86-64,1,512,gc,1.0281,1,2
+x86-64,1,512,recycle,0.9774,1,2
+x86-64,4,512,gc,1.2368,2,2
+x86-64,4,512,recycle,1.0053,1,2

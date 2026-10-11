@@ -1,0 +1,13 @@
+workload,policy,producers,rounds,paired_waiter_over_baseline,waiter_wins,median_baseline_tps,median_waiter_tps,median_candidate_ingress_skipped_pct,median_candidate_condition_waits_per_task,median_candidate_no_work_after_wait_pct,median_candidate_process_switches
+minimal,gc,1,5,0.9192,2,359199.9,329711.6,17.80,0.6068,41.76,38978
+minimal,gc,4,5,1.0142,3,197127.6,199699.5,11.44,0.8562,43.28,79890
+minimal,gc,8,5,0.9848,2,192848.8,193490.5,11.47,0.8572,43.41,79371
+minimal,recycle,1,5,1.0746,3,366782.9,374400.4,15.69,0.6917,43.68,43798
+minimal,recycle,4,5,0.9911,2,201833.2,196374.3,12.24,0.8429,42.99,80659
+minimal,recycle,8,5,0.9935,1,194187.4,192927.6,12.63,0.8285,43.66,78838
+compute,gc,1,5,1.0142,3,436669.0,378840.0,38.77,0.4233,23.64,25248
+compute,gc,4,5,1.0186,3,233366.7,233914.3,28.84,0.6069,35.55,60933
+compute,gc,8,5,0.9889,1,229303.9,223239.9,26.30,0.6610,37.25,65847
+compute,recycle,1,5,0.9814,2,479917.6,454123.9,47.02,0.2851,15.40,17267
+compute,recycle,4,5,0.9983,2,241932.4,241526.7,31.85,0.5770,36.44,60530
+compute,recycle,8,5,1.0113,4,228092.1,235263.9,29.91,0.6026,36.58,62778

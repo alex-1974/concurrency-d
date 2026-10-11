@@ -8,6 +8,7 @@ on:
       - "dub.sdl"
       - "source/concurrency/internal/**"
       - "benchmarks/parking/**"
+      - "benchmarks/task_pipeline/**"
       - ".github/workflows/work-stealing-consumer.yml"
   push:
     branches:
@@ -16,6 +17,7 @@ on:
       - "dub.sdl"
       - "source/concurrency/internal/**"
       - "benchmarks/parking/**"
+      - "benchmarks/task_pipeline/**"
       - ".github/workflows/work-stealing-consumer.yml"
   workflow_dispatch:
 
@@ -62,6 +64,63 @@ jobs:
         shell: bash
         run: dub run --config=parking-benchmark --build=release --compiler="$DC" --force -- 2 64
 
+      - name: R0.5 paired storage diagnostic (not a performance gate)
+        shell: bash
+        run: dub run --config=task-pipeline-benchmark --build=release --compiler="$DC" --force -- 2 768 1 scalar
+
+      - name: R0.5 mixed multi-producer correctness smoke (no timing gate)
+        shell: bash
+        run: |
+          dub run --config=task-pipeline-mixed-benchmark --build=release --compiler="$DC" --force -- 4 4 384 8 gc
+          dub run --config=task-pipeline-mixed-benchmark --build=release --compiler="$DC" --force -- 4 4 384 8 recycle
+          dub run --config=task-pipeline-mixed-benchmark --build=release --compiler="$DC" --force -- 4 4 384 8 gc striped on
+          dub run --config=task-pipeline-mixed-benchmark --build=release --compiler="$DC" --force -- 4 4 384 512 gc striped off compute
+          dub run --config=task-pipeline-mixed-benchmark --build=release --compiler="$DC" --force -- 4 4 384 512 recycle striped off compute
+          dub run --config=task-pipeline-mixed-benchmark --build=release --compiler="$DC" --force -- 4 4 384 512 gc striped off minimal on
+          dub run --config=task-pipeline-mixed-benchmark --build=release --compiler="$DC" --force -- 4 4 384 512 recycle striped off compute on
+          dub run --config=task-pipeline-mixed-benchmark --build=release --compiler="$DC" --force -- 4 4 384 512 gc striped off minimal on waiter
+          dub run --config=task-pipeline-mixed-benchmark --build=release --compiler="$DC" --force -- 4 4 384 512 recycle striped off compute on waiter
+          dub run --config=notification-latency-benchmark --build=release --compiler="$DC" --force -- 2 always 20 8 1
+          dub run --config=notification-latency-benchmark --build=release --compiler="$DC" --force -- 2 waiter 20 8 1
+          # Research: fairness distribution is observed, not constrained to
+          # uniform shares. Blocked-work progress remains bounded.
+          dub run --config=fairness-blocking-benchmark --build=release --compiler="$DC" --force -- fair always gc 4 4 256
+          dub run --config=fairness-blocking-benchmark --build=release --compiler="$DC" --force -- fair waiter recycle 4 4 256
+          dub run --config=fairness-blocking-benchmark --build=release --compiler="$DC" --force -- block always gc 4 1 32
+          dub run --config=fairness-blocking-benchmark --build=release --compiler="$DC" --force -- block waiter gc 4 1 32
+          dub run --config=fairness-blocking-benchmark --build=release --compiler="$DC" --force -- block always gc 4 4 1
+          dub run --config=fairness-blocking-benchmark --build=release --compiler="$DC" --force -- block waiter recycle 4 4 1
+          dub run --config=burst-head-of-line-benchmark --build=release --compiler="$DC" --force -- always gc 4 4 8 60
+          dub run --config=burst-head-of-line-benchmark --build=release --compiler="$DC" --force -- waiter recycle 4 3 8 60
+          dub run --config=burst-head-of-line-trace --build=release --compiler="$DC" --force -- always gc 4 3 8 60 > "$RUNNER_TEMP/r05-task-trace.csv"
+          grep -q '^trace_status,11,0,0,0,0$' "$RUNNER_TEMP/r05-task-trace.csv"
+          # Distinct research build: no trace mutex or event recorder.
+          dub run --config=burst-head-of-line-batch1 --build=release --compiler="$DC" --force -- always gc 4 3 8 60 > "$RUNNER_TEMP/r05-batch1-burst.csv"
+          grep -q '^control,gateRelease,' "$RUNNER_TEMP/r05-batch1-burst.csv"
+          dub run --config=task-pipeline-mixed-batch1 --build=release --compiler="$DC" --force -- 4 4 384 512 gc striped off minimal off always > "$RUNNER_TEMP/r05-batch1-mixed.csv"
+          grep -q '^multi,mixed,gc,' "$RUNNER_TEMP/r05-batch1-mixed.csv"
+          dub run --config=burst-head-of-line-batch2 --build=release --compiler="$DC" --force -- always gc 4 3 8 60 > "$RUNNER_TEMP/r05-batch2-burst.csv"
+          grep -q '^control,gateRelease,' "$RUNNER_TEMP/r05-batch2-burst.csv"
+          dub run --config=burst-head-of-line-batch4 --build=release --compiler="$DC" --force -- always gc 4 4 8 60 > "$RUNNER_TEMP/r05-batch4-burst.csv"
+          grep -q '^control,gateRelease,' "$RUNNER_TEMP/r05-batch4-burst.csv"
+          dub run --config=burst-head-of-line-search-batch8 --build=release --compiler="$DC" --force -- always gc 4 3 8 60 > "$RUNNER_TEMP/r05-search-batch8.csv"
+          grep -q '^search_status,4,' "$RUNNER_TEMP/r05-search-batch8.csv"
+          dub run --config=burst-head-of-line-search-batch1 --build=release --compiler="$DC" --force -- always gc 4 3 8 60 > "$RUNNER_TEMP/r05-search-batch1.csv"
+          grep -q '^search_status,4,' "$RUNNER_TEMP/r05-search-batch1.csv"
+          # Opt-in victim-sweep hypothesis: no change to ordinary scheduler.
+          dub run --config=burst-head-of-line-full-victim-sweep --build=release --compiler="$DC" --force -- always gc 4 3 8 60 > "$RUNNER_TEMP/r05-full-scan-burst.csv"
+          grep -q '^control,gateRelease,' "$RUNNER_TEMP/r05-full-scan-burst.csv"
+          dub run --config=task-pipeline-mixed-full-victim-sweep --build=release --compiler="$DC" --force -- 4 4 384 512 gc striped off compute off always > "$RUNNER_TEMP/r05-full-scan-mixed.csv"
+          grep -q '^multi,mixed,gc,' "$RUNNER_TEMP/r05-full-scan-mixed.csv"
+          dub run --config=burst-head-of-line-search-full-victim-sweep --build=release --compiler="$DC" --force -- always gc 4 3 8 60 > "$RUNNER_TEMP/r05-full-scan-search.csv"
+          grep -q '^search_status,4,' "$RUNNER_TEMP/r05-full-scan-search.csv"
+          dub run --config=burst-head-of-line-rotating-victim-sweep --build=release --compiler="$DC" --force -- always gc 4 3 8 60 > "$RUNNER_TEMP/r05-rotating-burst.csv"
+          grep -q '^control,gateRelease,' "$RUNNER_TEMP/r05-rotating-burst.csv"
+          dub run --config=task-pipeline-mixed-rotating-victim-sweep --build=release --compiler="$DC" --force -- 4 4 384 512 gc striped off compute off always > "$RUNNER_TEMP/r05-rotating-mixed.csv"
+          grep -q '^multi,mixed,gc,' "$RUNNER_TEMP/r05-rotating-mixed.csv"
+          dub run --config=notification-latency-rotating-victim-sweep --build=release --compiler="$DC" --force -- 4 always 100 8 1 > "$RUNNER_TEMP/r05-rotating-idle.csv"
+          grep -q '^latency,always,4,' "$RUNNER_TEMP/r05-rotating-idle.csv"
+
   native-arm64:
     name: Consumer / native ARM64 / LDC 1.41
     runs-on: ubuntu-24.04-arm
@@ -96,3 +155,60 @@ jobs:
       - name: Portable parking smoke and metrics (not a fixed performance gate)
         shell: bash
         run: dub run --config=parking-benchmark --build=release --compiler="$DC" --force -- 2 64
+
+      - name: R0.5 paired storage diagnostic (not a performance gate)
+        shell: bash
+        run: dub run --config=task-pipeline-benchmark --build=release --compiler="$DC" --force -- 2 768 1 scalar
+
+      - name: R0.5 mixed multi-producer correctness smoke (no timing gate)
+        shell: bash
+        run: |
+          dub run --config=task-pipeline-mixed-benchmark --build=release --compiler="$DC" --force -- 4 4 384 8 gc
+          dub run --config=task-pipeline-mixed-benchmark --build=release --compiler="$DC" --force -- 4 4 384 8 recycle
+          dub run --config=task-pipeline-mixed-benchmark --build=release --compiler="$DC" --force -- 4 4 384 8 gc striped on
+          dub run --config=task-pipeline-mixed-benchmark --build=release --compiler="$DC" --force -- 4 4 384 512 gc striped off compute
+          dub run --config=task-pipeline-mixed-benchmark --build=release --compiler="$DC" --force -- 4 4 384 512 recycle striped off compute
+          dub run --config=task-pipeline-mixed-benchmark --build=release --compiler="$DC" --force -- 4 4 384 512 gc striped off minimal on
+          dub run --config=task-pipeline-mixed-benchmark --build=release --compiler="$DC" --force -- 4 4 384 512 recycle striped off compute on
+          dub run --config=task-pipeline-mixed-benchmark --build=release --compiler="$DC" --force -- 4 4 384 512 gc striped off minimal on waiter
+          dub run --config=task-pipeline-mixed-benchmark --build=release --compiler="$DC" --force -- 4 4 384 512 recycle striped off compute on waiter
+          dub run --config=notification-latency-benchmark --build=release --compiler="$DC" --force -- 2 always 20 8 1
+          dub run --config=notification-latency-benchmark --build=release --compiler="$DC" --force -- 2 waiter 20 8 1
+          # Research: fairness distribution is observed, not constrained to
+          # uniform shares. Blocked-work progress remains bounded.
+          dub run --config=fairness-blocking-benchmark --build=release --compiler="$DC" --force -- fair always gc 4 4 256
+          dub run --config=fairness-blocking-benchmark --build=release --compiler="$DC" --force -- fair waiter recycle 4 4 256
+          dub run --config=fairness-blocking-benchmark --build=release --compiler="$DC" --force -- block always gc 4 1 32
+          dub run --config=fairness-blocking-benchmark --build=release --compiler="$DC" --force -- block waiter gc 4 1 32
+          dub run --config=fairness-blocking-benchmark --build=release --compiler="$DC" --force -- block always gc 4 4 1
+          dub run --config=fairness-blocking-benchmark --build=release --compiler="$DC" --force -- block waiter recycle 4 4 1
+          dub run --config=burst-head-of-line-benchmark --build=release --compiler="$DC" --force -- always gc 4 4 8 60
+          dub run --config=burst-head-of-line-benchmark --build=release --compiler="$DC" --force -- waiter recycle 4 3 8 60
+          dub run --config=burst-head-of-line-trace --build=release --compiler="$DC" --force -- always gc 4 3 8 60 > "$RUNNER_TEMP/r05-task-trace.csv"
+          grep -q '^trace_status,11,0,0,0,0$' "$RUNNER_TEMP/r05-task-trace.csv"
+          # Distinct research build: no trace mutex or event recorder.
+          dub run --config=burst-head-of-line-batch1 --build=release --compiler="$DC" --force -- always gc 4 3 8 60 > "$RUNNER_TEMP/r05-batch1-burst.csv"
+          grep -q '^control,gateRelease,' "$RUNNER_TEMP/r05-batch1-burst.csv"
+          dub run --config=task-pipeline-mixed-batch1 --build=release --compiler="$DC" --force -- 4 4 384 512 gc striped off minimal off always > "$RUNNER_TEMP/r05-batch1-mixed.csv"
+          grep -q '^multi,mixed,gc,' "$RUNNER_TEMP/r05-batch1-mixed.csv"
+          dub run --config=burst-head-of-line-batch2 --build=release --compiler="$DC" --force -- always gc 4 3 8 60 > "$RUNNER_TEMP/r05-batch2-burst.csv"
+          grep -q '^control,gateRelease,' "$RUNNER_TEMP/r05-batch2-burst.csv"
+          dub run --config=burst-head-of-line-batch4 --build=release --compiler="$DC" --force -- always gc 4 4 8 60 > "$RUNNER_TEMP/r05-batch4-burst.csv"
+          grep -q '^control,gateRelease,' "$RUNNER_TEMP/r05-batch4-burst.csv"
+          dub run --config=burst-head-of-line-search-batch8 --build=release --compiler="$DC" --force -- always gc 4 3 8 60 > "$RUNNER_TEMP/r05-search-batch8.csv"
+          grep -q '^search_status,4,' "$RUNNER_TEMP/r05-search-batch8.csv"
+          dub run --config=burst-head-of-line-search-batch1 --build=release --compiler="$DC" --force -- always gc 4 3 8 60 > "$RUNNER_TEMP/r05-search-batch1.csv"
+          grep -q '^search_status,4,' "$RUNNER_TEMP/r05-search-batch1.csv"
+          # Opt-in victim-sweep hypothesis: no change to ordinary scheduler.
+          dub run --config=burst-head-of-line-full-victim-sweep --build=release --compiler="$DC" --force -- always gc 4 3 8 60 > "$RUNNER_TEMP/r05-full-scan-burst.csv"
+          grep -q '^control,gateRelease,' "$RUNNER_TEMP/r05-full-scan-burst.csv"
+          dub run --config=task-pipeline-mixed-full-victim-sweep --build=release --compiler="$DC" --force -- 4 4 384 512 gc striped off compute off always > "$RUNNER_TEMP/r05-full-scan-mixed.csv"
+          grep -q '^multi,mixed,gc,' "$RUNNER_TEMP/r05-full-scan-mixed.csv"
+          dub run --config=burst-head-of-line-search-full-victim-sweep --build=release --compiler="$DC" --force -- always gc 4 3 8 60 > "$RUNNER_TEMP/r05-full-scan-search.csv"
+          grep -q '^search_status,4,' "$RUNNER_TEMP/r05-full-scan-search.csv"
+          dub run --config=burst-head-of-line-rotating-victim-sweep --build=release --compiler="$DC" --force -- always gc 4 3 8 60 > "$RUNNER_TEMP/r05-rotating-burst.csv"
+          grep -q '^control,gateRelease,' "$RUNNER_TEMP/r05-rotating-burst.csv"
+          dub run --config=task-pipeline-mixed-rotating-victim-sweep --build=release --compiler="$DC" --force -- 4 4 384 512 gc striped off compute off always > "$RUNNER_TEMP/r05-rotating-mixed.csv"
+          grep -q '^multi,mixed,gc,' "$RUNNER_TEMP/r05-rotating-mixed.csv"
+          dub run --config=notification-latency-rotating-victim-sweep --build=release --compiler="$DC" --force -- 4 always 100 8 1 > "$RUNNER_TEMP/r05-rotating-idle.csv"
+          grep -q '^latency,always,4,' "$RUNNER_TEMP/r05-rotating-idle.csv"

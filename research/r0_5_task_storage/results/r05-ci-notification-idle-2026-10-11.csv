@@ -1,0 +1,9 @@
+platform,notification_policy,round,idle_cpu_us,p95_submit_to_result_ns,p99_submit_to_result_ns
+x86-64,always,0,67,32349,36104
+x86-64,waiter,0,72,38677,63004
+x86-64,waiter,1,70,24276,53360
+x86-64,always,1,60,37245,43846
+arm64,always,0,168,136957,257665
+arm64,waiter,0,115,130285,263738
+arm64,waiter,1,157,127917,185526
+arm64,always,1,48,26369,155286

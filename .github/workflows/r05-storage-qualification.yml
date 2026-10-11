@@ -1,0 +1,249 @@
+name: R0.5 owned-task storage qualification
+
+on:
+  pull_request:
+    branches:
+      - develop
+    paths:
+      - "source/concurrency/internal/**"
+      - "benchmarks/task_pipeline/**"
+      - "tools/research/r05_pipeline_matrix.py"
+      - "tools/research/r05_mixed_producer_matrix.py"
+      - "tools/research/r05_admission_matrix.py"
+      - "tools/research/r05_counter_control.py"
+      - "tools/research/r05_scheduler_resources.py"
+      - "tools/research/r05_worker_parking_matrix.py"
+      - "tools/research/r05_notification_policy_matrix.py"
+      - "tools/research/r05_notification_idle_latency.py"
+      - "tools/research/r05_fairness_blocking_matrix.py"
+      - "tools/research/r05_burst_head_of_line.py"
+      - "tools/research/r05_task_trace.py"
+      - "tools/research/r05_batch_size_ab.py"
+      - "tools/research/r05_batch_size_sweep.py"
+      - "tools/research/r05_worker_search_matrix.py"
+      - "tools/research/r05_victim_sweep_ab.py"
+      - "tools/research/r05_rotating_victim_matrix.py"
+      - ".github/workflows/r05-storage-qualification.yml"
+      - "dub.sdl"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  storage-matrix:
+    name: R0.5 paired LDC / ${{ matrix.label }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: x86-64
+            runner: ubuntu-24.04
+          - label: arm64
+            runner: ubuntu-24.04-arm
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Install LDC
+        uses: dlang-community/setup-dlang@v2
+        with:
+          compiler: ldc-1.41.0
+
+      - name: Platform and compiler evidence
+        shell: bash
+        run: |
+          "$DC" --version
+          dub --version
+          uname -a
+          uname -m
+          lscpu
+
+      - name: Paired storage comparison (diagnostic, not a speed gate)
+        shell: bash
+        run: |
+          python3 tools/research/r05_pipeline_matrix.py \
+            --compiler="$DC" \
+            --workers=4 \
+            --tasks=6000 \
+            --rounds=3 \
+            --scenarios scalar wide void \
+            --budgets 8 64 512 4096 \
+            --output="evidence/r05-ci/${{ matrix.label }}"
+
+      - name: Mixed callable multi-producer comparison (diagnostic only)
+        shell: bash
+        run: |
+          python3 tools/research/r05_mixed_producer_matrix.py \
+            --compiler="$DC" \
+            --workers=4 \
+            --tasks=3000 \
+            --rounds=2 \
+            --producers 1 4 \
+            --budgets 8 512 \
+            --output="evidence/r05-ci/${{ matrix.label }}/mixed"
+
+      - name: R0.5 opt-in admission wait/hold instrumentation (diagnostic)
+        shell: bash
+        run: |
+          python3 tools/research/r05_admission_matrix.py \
+            --compiler="$DC" \
+            --workers=4 \
+            --tasks=3000 \
+            --rounds=2 \
+            --producers 1 4 \
+            --budgets 8 512 \
+            --counter-modes shared striped \
+            --output="evidence/r05-ci/${{ matrix.label }}/admission"
+
+      - name: R0.5 uninstrumented atomic counter control (diagnostic)
+        shell: bash
+        run: |
+          python3 tools/research/r05_counter_control.py \
+            --compiler="$DC" \
+            --workers=4 \
+            --tasks=3000 \
+            --rounds=2 \
+            --producers 1 4 \
+            --budgets 512 \
+            --policies gc recycle \
+            --output="evidence/r05-ci/${{ matrix.label }}/counter-control"
+
+      - name: R0.5 CPU / context-switch producer diagnostics
+        shell: bash
+        run: |
+          python3 tools/research/r05_scheduler_resources.py \
+            --compiler="$DC" \
+            --workers=4 \
+            --tasks=1200 \
+            --rounds=2 \
+            --producers 1 4 \
+            --budget=512 \
+            --policies gc recycle \
+            --workloads minimal compute \
+            --output="evidence/r05-ci/${{ matrix.label }}/scheduler"
+
+      - name: R0.5 worker park, wake, steal and inbox diagnostics
+        shell: bash
+        run: |
+          python3 tools/research/r05_worker_parking_matrix.py \
+            --compiler="$DC" \
+            --workers=4 \
+            --tasks=1200 \
+            --rounds=2 \
+            --producers 1 4 \
+            --budget=512 \
+            --policies gc recycle \
+            --workloads minimal compute \
+            --output="evidence/r05-ci/${{ matrix.label }}/worker-parking"
+
+      - name: R0.5 waiter-aware notification policy A/B (diagnostic)
+        shell: bash
+        run: |
+          python3 tools/research/r05_notification_policy_matrix.py \
+            --compiler="$DC" \
+            --workers=4 \
+            --tasks=1200 \
+            --rounds=2 \
+            --producers 1 4 \
+            --budget=512 \
+            --workloads minimal compute \
+            --policies gc \
+            --output="evidence/r05-ci/${{ matrix.label }}/notification"
+
+      - name: R0.5 idle-CPU and p95/p99 wake-latency control
+        shell: bash
+        run: |
+          python3 tools/research/r05_notification_idle_latency.py \
+            --compiler="$DC" \
+            --workers=4 \
+            --idle-ms=100 \
+            --samples=40 \
+            --gap-ms=1 \
+            --rounds=2 \
+            --output="evidence/r05-ci/${{ matrix.label }}/notification-latency"
+
+      - name: R0.5 fairness distribution and semaphore scenario
+        shell: bash
+        run: |
+          python3 tools/research/r05_fairness_blocking_matrix.py \
+            --compiler="$DC" \
+            --workers=4 --producers=4 --tasks=256 \
+            --siblings=16 --rounds=1 --policies gc recycle \
+            --output="evidence/r05-ci/${{ matrix.label }}/fairness-blocking"
+
+      - name: R0.5 burst head-of-line start and work-source attribution
+        shell: bash
+        run: |
+          python3 tools/research/r05_burst_head_of_line.py \
+            --compiler="$DC" --workers=4 --siblings=8 \
+            --probe-ms=60 --rounds=2 --blockers 3 4 \
+            --policies gc recycle \
+            --output="evidence/r05-ci/${{ matrix.label }}/burst-head-of-line"
+
+      - name: R0.5 per-task trace and uninstrumented pairing (diagnostic)
+        shell: bash
+        run: |
+          python3 tools/research/r05_task_trace.py \
+            --compiler="$DC" --rounds=1 --probe-ms=60 \
+            --output="evidence/r05-ci/${{ matrix.label }}/task-trace"
+
+      - name: R0.5 isolated ingress batch 1 vs 8 smoke (no performance gate)
+        shell: bash
+        run: |
+          python3 tools/research/r05_batch_size_ab.py \
+            --compiler="$DC" --rounds=1 --burst-ms=60 \
+            --tasks=384 --producers 1 4 --blockers 3 4 \
+            --policies gc recycle --notify always waiter \
+            --output="evidence/r05-ci/${{ matrix.label }}/batch-size-ab"
+
+      - name: R0.5 intermediate batch1/2/4/8 sweep smoke (diagnostic)
+        shell: bash
+        run: |
+          python3 tools/research/r05_batch_size_sweep.py \
+            --compiler="$DC" --rounds=1 --burst-ms=60 \
+            --tasks=384 --producers 1 4 --blockers 3 4 \
+            --policies gc recycle --notify always waiter \
+            --output="evidence/r05-ci/${{ matrix.label }}/batch-size-sweep"
+
+      - name: R0.5 worker-local missed-steal and park search (diagnostic)
+        shell: bash
+        run: |
+          python3 tools/research/r05_worker_search_matrix.py \
+            --compiler="$DC" --rounds=1 --burst-ms=60 \
+            --blockers 3 4 --policies gc --notify always waiter \
+            --output="evidence/r05-ci/${{ matrix.label }}/worker-search"
+
+      - name: R0.5 complete foreign-victim sweep paired smoke (diagnostic)
+        shell: bash
+        run: |
+          python3 tools/research/r05_victim_sweep_ab.py \
+            --compiler="$DC" --rounds=1 --burst-ms=60 \
+            --blockers 3 4 --policies gc --notify always \
+            --tasks=384 --producers 1 4 --workloads minimal compute \
+            --output="evidence/r05-ci/${{ matrix.label }}/victim-sweep"
+
+      - name: R0.5 rotating full-victim sweep and idle CPU matrix (diagnostic)
+        shell: bash
+        run: |
+          python3 tools/research/r05_rotating_victim_matrix.py \
+            --compiler="$DC" --rounds=1 --tasks=384 \
+            --workers 1 4 --producers 1 4 \
+            --blockers 3 4 --burst-ms=60 \
+            --policies gc --notify always \
+            --workloads minimal compute \
+            --idle-ms=100 --wake-samples=8 --gap-ms=1 \
+            --output="evidence/r05-ci/${{ matrix.label }}/rotating-victim"
+
+      - name: Upload raw evidence and medians
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: r05-storage-${{ matrix.label }}-${{ github.run_id }}
+          path: evidence/r05-ci/${{ matrix.label }}/
+          retention-days: 30
+          if-no-files-found: warn

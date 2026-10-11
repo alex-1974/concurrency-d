@@ -18,3 +18,211 @@ configuration "parking-benchmark" {
     importPaths "source" "benchmarks/parking"
     targetName "concurrency-parking-benchmark"
 }
+
+configuration "task-pipeline-benchmark" {
+    targetType "executable"
+    mainSourceFile "benchmarks/task_pipeline/main.d"
+    sourcePaths "source" "benchmarks/task_pipeline"
+    importPaths "source" "benchmarks/task_pipeline"
+    targetName "concurrency-task-pipeline-benchmark"
+}
+
+configuration "task-pipeline-mixed-benchmark" {
+    targetType "executable"
+    mainSourceFile "benchmarks/task_pipeline/multi_producer.d"
+    sourcePaths "source" "benchmarks/task_pipeline"
+    importPaths "source" "benchmarks/task_pipeline"
+    targetName "concurrency-task-pipeline-mixed"
+}
+
+configuration "notification-latency-benchmark" {
+    targetType "executable"
+    mainSourceFile "benchmarks/task_pipeline/notification_latency.d"
+    sourcePaths "source" "benchmarks/task_pipeline"
+    importPaths "source" "benchmarks/task_pipeline"
+    targetName "concurrency-notification-latency"
+}
+
+configuration "fairness-blocking-benchmark" {
+    targetType "executable"
+    mainSourceFile "benchmarks/task_pipeline/fairness_blocking.d"
+    sourcePaths "source" "benchmarks/task_pipeline"
+    importPaths "source" "benchmarks/task_pipeline"
+    targetName "concurrency-fairness-blocking"
+}
+
+// Opt-in research-only burst blocking / owner-deque head-of-line probe.
+configuration "burst-head-of-line-benchmark" {
+    targetType "executable"
+    mainSourceFile "benchmarks/task_pipeline/burst_head_of_line.d"
+    sourcePaths "source" "benchmarks/task_pipeline"
+    importPaths "source" "benchmarks/task_pipeline"
+    targetName "concurrency-burst-head-of-line"
+}
+
+// Diagnostic-only build: trace mutex and event storage do not exist in the
+// standard library or uninstrumented burst benchmark configuration.
+configuration "burst-head-of-line-trace" {
+    targetType "executable"
+    mainSourceFile "benchmarks/task_pipeline/burst_head_of_line.d"
+    sourcePaths "source" "benchmarks/task_pipeline"
+    importPaths "source" "benchmarks/task_pipeline"
+    versions "R05TaskTrace"
+    targetName "concurrency-burst-head-of-line-trace"
+}
+
+// R0.5 isolated uninstrumented compile-time A/B. Batch-of-eight is the
+// established baseline; batch-of-one is NOT the library default.
+configuration "burst-head-of-line-batch1" {
+    targetType "executable"
+    mainSourceFile "benchmarks/task_pipeline/burst_head_of_line.d"
+    sourcePaths "source" "benchmarks/task_pipeline"
+    importPaths "source" "benchmarks/task_pipeline"
+    versions "R05IngressBatchOne"
+    targetName "concurrency-burst-head-of-line-batch1"
+}
+
+configuration "task-pipeline-mixed-batch1" {
+    targetType "executable"
+    mainSourceFile "benchmarks/task_pipeline/multi_producer.d"
+    sourcePaths "source" "benchmarks/task_pipeline"
+    importPaths "source" "benchmarks/task_pipeline"
+    versions "R05IngressBatchOne"
+    targetName "concurrency-task-pipeline-mixed-batch1"
+}
+
+// R0.5 intermediate claim sizes, no trace and no production default change.
+
+configuration "burst-head-of-line-batch2" {
+    targetType "executable"
+    mainSourceFile "benchmarks/task_pipeline/burst_head_of_line.d"
+    sourcePaths "source" "benchmarks/task_pipeline"
+    importPaths "source" "benchmarks/task_pipeline"
+    versions "R05IngressBatchTwo"
+    targetName "concurrency-burst-head-of-line-batch2"
+}
+
+configuration "task-pipeline-mixed-batch2" {
+    targetType "executable"
+    mainSourceFile "benchmarks/task_pipeline/multi_producer.d"
+    sourcePaths "source" "benchmarks/task_pipeline"
+    importPaths "source" "benchmarks/task_pipeline"
+    versions "R05IngressBatchTwo"
+    targetName "concurrency-task-pipeline-mixed-batch2"
+}
+
+configuration "burst-head-of-line-batch4" {
+    targetType "executable"
+    mainSourceFile "benchmarks/task_pipeline/burst_head_of_line.d"
+    sourcePaths "source" "benchmarks/task_pipeline"
+    importPaths "source" "benchmarks/task_pipeline"
+    versions "R05IngressBatchFour"
+    targetName "concurrency-burst-head-of-line-batch4"
+}
+
+configuration "task-pipeline-mixed-batch4" {
+    targetType "executable"
+    mainSourceFile "benchmarks/task_pipeline/multi_producer.d"
+    sourcePaths "source" "benchmarks/task_pipeline"
+    importPaths "source" "benchmarks/task_pipeline"
+    versions "R05IngressBatchFour"
+    targetName "concurrency-task-pipeline-mixed-batch4"
+}
+
+// Research-only worker-local stolen-work and park timeline, WITHOUT the
+// per-TaskRef trace mutex. Both versions use the same burst benchmark.
+
+configuration "burst-head-of-line-search-batch8" {
+    targetType "executable"
+    mainSourceFile "benchmarks/task_pipeline/burst_head_of_line.d"
+    sourcePaths "source" "benchmarks/task_pipeline"
+    importPaths "source" "benchmarks/task_pipeline"
+    versions "R05WorkerSearchTrace"
+    targetName "concurrency-burst-head-of-line-search-batch8"
+}
+
+configuration "burst-head-of-line-search-batch1" {
+    targetType "executable"
+    mainSourceFile "benchmarks/task_pipeline/burst_head_of_line.d"
+    sourcePaths "source" "benchmarks/task_pipeline"
+    importPaths "source" "benchmarks/task_pipeline"
+    versions "R05WorkerSearchTrace"
+    versions "R05IngressBatchOne"
+    targetName "concurrency-burst-head-of-line-search-batch1"
+}
+
+// R0.5 isolated complete-victim-sweep A/B. Untraced baseline batch8 and
+// record lifetime remain unchanged. The worker-local trace is separate.
+configuration "burst-head-of-line-full-victim-sweep" {
+    targetType "executable"
+    mainSourceFile "benchmarks/task_pipeline/burst_head_of_line.d"
+    sourcePaths "source" "benchmarks/task_pipeline"
+    importPaths "source" "benchmarks/task_pipeline"
+    versions "R05FullVictimSweep"
+    targetName "concurrency-burst-head-of-line-full-victim-sweep"
+}
+
+configuration "task-pipeline-mixed-full-victim-sweep" {
+    targetType "executable"
+    mainSourceFile "benchmarks/task_pipeline/multi_producer.d"
+    sourcePaths "source" "benchmarks/task_pipeline"
+    importPaths "source" "benchmarks/task_pipeline"
+    versions "R05FullVictimSweep"
+    targetName "concurrency-task-pipeline-mixed-full-victim-sweep"
+}
+
+configuration "burst-head-of-line-search-full-victim-sweep" {
+    targetType "executable"
+    mainSourceFile "benchmarks/task_pipeline/burst_head_of_line.d"
+    sourcePaths "source" "benchmarks/task_pipeline"
+    importPaths "source" "benchmarks/task_pipeline"
+    versions "R05FullVictimSweep" "R05WorkerSearchTrace"
+    targetName "concurrency-burst-head-of-line-search-full-victim-sweep"
+}
+
+// R0.5 fairness experiment: full coverage plus one start-position advance
+// after a failed search. Always batch8; none of these is the library default.
+configuration "burst-head-of-line-rotating-victim-sweep" {
+    targetType "executable"
+    mainSourceFile "benchmarks/task_pipeline/burst_head_of_line.d"
+    sourcePaths "source" "benchmarks/task_pipeline"
+    importPaths "source" "benchmarks/task_pipeline"
+    versions "R05RotatingFullVictimSweep"
+    targetName "concurrency-burst-head-of-line-rotating-victim-sweep"
+}
+
+configuration "task-pipeline-mixed-rotating-victim-sweep" {
+    targetType "executable"
+    mainSourceFile "benchmarks/task_pipeline/multi_producer.d"
+    sourcePaths "source" "benchmarks/task_pipeline"
+    importPaths "source" "benchmarks/task_pipeline"
+    versions "R05RotatingFullVictimSweep"
+    targetName "concurrency-task-pipeline-mixed-rotating-victim-sweep"
+}
+
+configuration "notification-latency-full-victim-sweep" {
+    targetType "executable"
+    mainSourceFile "benchmarks/task_pipeline/notification_latency.d"
+    sourcePaths "source" "benchmarks/task_pipeline"
+    importPaths "source" "benchmarks/task_pipeline"
+    versions "R05FullVictimSweep"
+    targetName "concurrency-notification-latency-full-victim-sweep"
+}
+
+configuration "notification-latency-rotating-victim-sweep" {
+    targetType "executable"
+    mainSourceFile "benchmarks/task_pipeline/notification_latency.d"
+    sourcePaths "source" "benchmarks/task_pipeline"
+    importPaths "source" "benchmarks/task_pipeline"
+    versions "R05RotatingFullVictimSweep"
+    targetName "concurrency-notification-latency-rotating-victim-sweep"
+}
+
+configuration "burst-head-of-line-search-rotating-victim-sweep" {
+    targetType "executable"
+    mainSourceFile "benchmarks/task_pipeline/burst_head_of_line.d"
+    sourcePaths "source" "benchmarks/task_pipeline"
+    importPaths "source" "benchmarks/task_pipeline"
+    versions "R05RotatingFullVictimSweep" "R05WorkerSearchTrace"
+    targetName "concurrency-burst-head-of-line-search-rotating-victim-sweep"
+}
