@@ -81,6 +81,9 @@ package(concurrency) struct WorkerParkingStats
 
     // R0.5 opt-in research only: per-worker work source attribution.
     // This records counts, not task identity or causal task ownership.
+    // A stable OS-thread identity only for mapping task-start events
+    // to the owning worker index in post-join research. Not aggregated.
+    ulong osThreadId;
     ulong ingressBatches;
     ulong ingressClaimedTasks;
     ulong ownerLocalExecutions;
@@ -610,6 +613,8 @@ package(concurrency) final class SubmissionWorkerPool
     {
         TaskRef[IngressBatchSize] batch;
         WorkerParkingStats counters;
+        if (_parkingProfile)
+            counters.osThreadId = cast(ulong) Thread.getThis().id;
         bool pendingWakeClassification;
         // The thread owns this slot exclusively. The controlling thread
         // may read it only after joining every worker.
