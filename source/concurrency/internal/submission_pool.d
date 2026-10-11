@@ -799,6 +799,16 @@ package(concurrency) final class SubmissionWorkerPool
                 ++counters.ingressMisses;
             bool foundWork;
 
+            // In the rotating research variant, each new search must
+            // begin at a foreign worker, even when the last steal left
+            // nextVictim == self. This avoids double-weighting self+1
+            // as first actual foreign victim on consecutive failed scans.
+            version (R05RotatingFullVictimSweep)
+            {
+                if (_queues.length > 1 && nextVictim == self)
+                    nextVictim = (nextVictim + 1) % _queues.length;
+            }
+
             // R0.5 qualified mechanism A/B: the original N-1 slot
             // iterations can include self and therefore miss a foreign
             // queue entirely. A full N-slot sweep visits exactly N-1
@@ -868,7 +878,11 @@ package(concurrency) final class SubmissionWorkerPool
             // failed sweeps start at different foreign victims. Successful
             // steals keep the existing nextVictim = successor behavior.
             version (R05RotatingFullVictimSweep)
+            {
                 nextVictim = (nextVictim + 1) % _queues.length;
+                if (_queues.length > 1 && nextVictim == self)
+                    nextVictim = (nextVictim + 1) % _queues.length;
+            }
 
             version (R05WorkerSearchTrace)
                 _searchTrace.record(WorkerSearchKind.searchEmpty, self);
