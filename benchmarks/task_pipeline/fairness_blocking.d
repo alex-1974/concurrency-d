@@ -53,7 +53,7 @@ private bool waitStarted(shared(uint)* value, uint target) {
     }
     return true;
 }
-private bool awaitSiblings(shared(uint)[] hits) {
+private bool awaitSiblings(shared(uint)[] hits, ulong timeoutNs) {
     const begin = MonoTime.currTime;
     do {
         bool all = true;
@@ -62,7 +62,7 @@ private bool awaitSiblings(shared(uint)[] hits) {
                 all = false;
         if (all) return true;
         Thread.yield();
-    } while (nanosSince(begin) < 5_000_000_000UL);
+    } while (nanosSince(begin) < timeoutNs);
     return false;
 }
 private void fair(size_t workers, size_t producers, size_t tasks,
@@ -127,7 +127,8 @@ private void blocking(size_t workers, size_t blocked, size_t siblings,
         work.id = cast(uint) i;
         auto handle = pool.submit(work);
     }
-    const beforeRelease = awaitSiblings(hits);
+    const beforeRelease = awaitSiblings(hits,
+        blocked == workers ? 100_000_000UL : 5_000_000_000UL);
     foreach (_; 0 .. blocked) gate.notify();
     pool.closeAndJoin();
     const expected = blocked < workers;
