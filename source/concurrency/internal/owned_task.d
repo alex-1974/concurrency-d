@@ -27,6 +27,9 @@ import concurrency.internal.task_record :
 version (R05TaskTrace)
     import concurrency.internal.task_trace : TaskTraceSnapshot;
 
+version (R05WorkerSearchTrace)
+    import concurrency.internal.worker_search_trace : WorkerSearchSnapshot;
+
 import core.sync.condition :
     Condition;
 
@@ -625,6 +628,20 @@ package(concurrency) final class OwnedTaskExecutor
                 if (_lifecycle != Lifecycle.stopped)
                     throw new Exception("task trace requires joined executor");
                 return _pool.taskTraceAfterJoin();
+            }
+        }
+    }
+
+    version (R05WorkerSearchTrace)
+    {
+        /** Worker-owned missed-steal/park events, only after close/join. */
+        WorkerSearchSnapshot workerSearchTraceAfterJoin()
+        {
+            synchronized (_mutex)
+            {
+                if (_lifecycle != Lifecycle.stopped)
+                    throw new Exception("worker search trace requires joined executor");
+                return _pool.workerSearchTraceAfterJoin();
             }
         }
     }
