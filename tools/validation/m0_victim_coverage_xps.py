@@ -143,6 +143,8 @@ def main():
     p.add_argument("--wake-samples", type=int, default=64)
     p.add_argument("--gap-ms", type=int, default=1)
     p.add_argument("--cooldown-ms", type=int, default=25)
+    p.add_argument("--idle-only", action="store_true",
+                   help="Run paired idle/wake tests without mixed throughput")
     p.add_argument("--output", type=Path,
                    default=Path("evidence/m0-victim-coverage-xps"))
     a = p.parse_args()
@@ -206,7 +208,7 @@ def main():
                     raise RuntimeError("warmup failed")
             for rnd in range(a.rounds):
                 for workers in a.workers:
-                    for producers in a.producers:
+                    for producers in ([] if a.idle_only else a.producers):
                         for workload in a.workloads:
                             rounds = (0 if workload == "minimal"
                                       else a.compute_rounds)
@@ -277,7 +279,8 @@ def main():
                     subprocess.run(["git", "worktree", "remove", "--force",
                                     str(dirs[mode])], cwd=root,
                                    capture_output=True, text=True)
-    csv_save(output / "mixed.csv", mixed)
+    if mixed:
+        csv_save(output / "mixed.csv", mixed)
     csv_save(output / "idle.csv", idle)
     csv_save(output / "pairs.csv", comparisons)
 
@@ -314,6 +317,7 @@ def main():
                   f"rounds={a.rounds} tasks={a.tasks} budget={a.budget}\n"
                   f"workers={a.workers} producers={a.producers} "
                   f"workloads={a.workloads} compute_rounds={a.compute_rounds}\n"
+                  f"idle_only={a.idle_only}\\n"
                   f"idle_ms={a.idle_ms} wake_samples={a.wake_samples} "
                   f"gap_ms={a.gap_ms} cooldown_ms={a.cooldown_ms}\n"
                   "Both detached worktrees receive the identical benchmark "
