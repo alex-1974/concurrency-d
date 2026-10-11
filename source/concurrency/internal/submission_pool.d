@@ -601,11 +601,13 @@ unittest
 
 unittest
 {
-    // Multiple independent producers, bounded ingress and 1/4 workers.
+    // Multiple producers, bounded ingress and uneven/even worker counts.
+    // These exercise the actual concurrent pop/steal/park/close lifecycle,
+    // complementing the deterministic all-start-index coverage regression.
     enum size_t TaskCount = 3072;
     enum size_t ProducerCount = 4;
 
-    foreach (workerCount; [1, 4])
+    foreach (workerCount; [1, 2, 3, 4, 8])
     {
         auto records = new shared CountingRecord[TaskCount];
         auto tasks = new TaskRef[TaskCount];
