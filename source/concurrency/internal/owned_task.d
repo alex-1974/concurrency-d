@@ -35,6 +35,10 @@ import core.sync.mutex :
 import core.thread :
     Thread;
 
+import core.time :
+    MonoTime,
+    ticksToNSecs;
+
 import std.traits :
     ReturnType;
 
@@ -259,6 +263,56 @@ package(concurrency) enum OwnedRecordPolicy
     recycleTyped
 }
 
+/**
+ * Per-producer R0.5 instrumentation, exclusively owned by its calling
+ * producer thread. No sharing or synchronization is needed for the sample
+ * itself. Measurements include profiler clock overhead and are diagnostic.
+ */
+package(concurrency) struct AdmissionProbe
+{
+    ulong attempts;
+    ulong accepted;
+    ulong retentionFull;
+    ulong ingressFull;
+    ulong yields;
+    ulong mutexWaitNs;
+    ulong mutexHoldNs;
+    ulong maxWaitNs;
+    ulong maxHoldNs;
+
+    // Fixed log2 buckets (ns): [0], [1], [2..3], [4..7], ...
+    // No allocation or atomics in the measured critical section.
+    ulong[64] waitBuckets;
+    ulong[64] holdBuckets;
+
+    private static size_t bucket(ulong value) @safe pure nothrow @nogc
+    {
+        size_t bin;
+        while (value > 1 && bin < 63)
+        {
+            value >>= 1;
+            ++bin;
+        }
+        return bin;
+    }
+
+    void recordWait(ulong nanoseconds) @safe nothrow @nogc
+    {
+        mutexWaitNs += nanoseconds;
+        if (nanoseconds > maxWaitNs)
+            maxWaitNs = nanoseconds;
+        ++waitBuckets[bucket(nanoseconds)];
+    }
+
+    void recordHold(ulong nanoseconds) @safe nothrow @nogc
+    {
+        mutexHoldNs += nanoseconds;
+        if (nanoseconds > maxHoldNs)
+            maxHoldNs = nanoseconds;
+        ++holdBuckets[bucket(nanoseconds)];
+    }
+}
+
 package(concurrency) final class OwnedTaskExecutor
 {
     private enum Lifecycle : ubyte
@@ -313,11 +367,43 @@ package(concurrency) final class OwnedTaskExecutor
      */
     auto trySubmit(F)(F callable) @system
     {
+        // The standard path is specialized without timers or probe writes.
+        return trySubmitImpl!(F, false)(callable, null);
+    }
+
+    /** Research-only timed admission; profile belongs to this producer. */
+    auto trySubmitObserved(F)(F callable, ref AdmissionProbe profile) @system
+    {
+        return trySubmitImpl!(F, true)(callable, &profile);
+    }
+
+    private auto trySubmitImpl(F, bool Observed)(
+        F callable, AdmissionProbe* profile) @system
+    {
         alias R = ReturnType!F;
         TaskHandle!R handle;
 
+        static if (Observed)
+        {
+            const beforeLock = MonoTime.currTime.ticks;
+            ++profile.attempts;
+        }
+
         synchronized (_mutex)
         {
+            static if (Observed)
+            {
+                const lockAcquired = MonoTime.currTime.ticks;
+                profile.recordWait(cast(ulong) ticksToNSecs(
+                    lockAcquired - beforeLock));
+                scope(exit)
+                {
+                    const lockLeaving = MonoTime.currTime.ticks;
+                    profile.recordHold(cast(ulong) ticksToNSecs(
+                        lockLeaving - lockAcquired));
+                }
+            }
+
             if (_lifecycle != Lifecycle.running)
                 throw new Exception("executor is closed");
 
@@ -329,7 +415,11 @@ package(concurrency) final class OwnedTaskExecutor
                 reapCompletedUnderLock();
 
                 if (_retained.length >= _maxRetained)
+                {
+                    static if (Observed)
+                        ++profile.retentionFull;
                     return TaskHandle!R.init;
+                }
             }
 
             // Admission is serialized by this executor's mutex. Since
@@ -337,7 +427,11 @@ package(concurrency) final class OwnedTaskExecutor
             // check stays valid until trySubmit below. Avoid allocating
             // the ResultCell and handle on every unsuccessful retry.
             if (!_pool.hasIngressCapacity())
+            {
+                static if (Observed)
+                    ++profile.ingressFull;
                 return TaskHandle!R.init;
+            }
 
             auto cell = new ResultCell!R();
             handle = new TaskHandle!R(cell);
@@ -388,8 +482,13 @@ package(concurrency) final class OwnedTaskExecutor
                     throw new Exception("executor is closed");
 
                 assert(status == SubmissionResult.full);
+                static if (Observed)
+                    ++profile.ingressFull;
                 return typeof(handle).init;
             }
+
+            static if (Observed)
+                ++profile.accepted;
         }
 
         return handle;
@@ -478,6 +577,19 @@ package(concurrency) final class OwnedTaskExecutor
             if (handle !is null)
                 return handle;
 
+            Thread.yield();
+        }
+    }
+
+    /** Instrumented semantic equivalent of submit(), research only. */
+    auto submitObserved(F)(F callable, ref AdmissionProbe profile) @system
+    {
+        for (;;)
+        {
+            auto handle = trySubmitObserved(callable, profile);
+            if (handle !is null)
+                return handle;
+            ++profile.yields;
             Thread.yield();
         }
     }
