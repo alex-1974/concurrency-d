@@ -51,15 +51,37 @@ private final class ProducerPayload
     }
 }
 
+/**
+ * Deterministic, input-dependent integer computation. Its result is
+ * observed by typed TaskHandles or the void-task checksum.
+ * An optimized compiler cannot remove it as dead benchmark work.
+ */
+private uint computeDigest(uint input, uint rounds)
+    @safe pure nothrow @nogc
+{
+    uint value = input ^ 0x9e3779b9u;
+    foreach (_; 0 .. rounds)
+    {
+        value = (value ^ (value >> 16)) * 0x7feb352du;
+        value = (value ^ (value >> 15)) * 0x846ca68bu;
+        value ^= value >> 16;
+    }
+    return value;
+}
+
 private struct SmallWork
 {
     shared(ulong)* counter;
     int value;
+    uint rounds;
 
     int opCall()
     {
+        const supplement = rounds
+            ? cast(int)(computeDigest(cast(uint) value, rounds) % 17u)
+            : 0;
         atomicFetchAdd!(MemoryOrder.rel)(*counter, 1UL);
-        return value + 1;
+        return value + 1 + supplement;
     }
 }
 
@@ -68,21 +90,34 @@ private struct WideWork
     shared(ulong)* counter;
     ProducerPayload payload;
     int value;
+    uint rounds;
 
     int opCall()
     {
+        const supplement = rounds
+            ? cast(int)(computeDigest(cast(uint) value, rounds) % 17u)
+            : 0;
         atomicFetchAdd!(MemoryOrder.rel)(*counter, 1UL);
         return value + 1 + payload.bytes[0]
-            + cast(int) payload.description.length;
+            + cast(int) payload.description.length + supplement;
     }
 }
 
 private struct VoidWork
 {
     shared(ulong)* counter;
+    shared(ulong)* computeChecksum;
+    int value;
+    uint rounds;
 
     void opCall()
     {
+        if (rounds != 0)
+        {
+            const digest = computeDigest(cast(uint) value, rounds);
+            atomicFetchAdd!(MemoryOrder.rel)(*computeChecksum,
+                cast(ulong) digest);
+        }
         atomicFetchAdd!(MemoryOrder.rel)(*counter, 1UL);
     }
 }
@@ -105,6 +140,8 @@ private Thread makeProducer(
     shared(ulong)* producerBytes,
     AdmissionProbe* profile,
     ThreadResourceSnapshot* resources,
+    shared(ulong)* computeChecksum,
+    uint cpuRounds,
     bool instrumented)
 {
     return new Thread({
@@ -124,13 +161,18 @@ private Thread makeProducer(
                     SmallWork work;
                     work.counter = executions;
                     work.value = value;
+                    work.rounds = cpuRounds;
                     auto handle = instrumented
                         ? executor.submitObserved(work, *profile)
                         : executor.submit(work);
 
                     if (taskId % 17 == 0)
                     {
-                        if (handle.get() != value + 1)
+                        const supplement = cpuRounds
+                            ? cast(int)(computeDigest(
+                                cast(uint) value, cpuRounds) % 17u)
+                            : 0;
+                        if (handle.get() != value + 1 + supplement)
                             throw new Exception("wrong scalar result");
                         atomicFetchAdd!(MemoryOrder.rel)(*observed, 1UL);
                     }
@@ -147,9 +189,14 @@ private Thread makeProducer(
 
                     if (taskId % 17 == 0)
                     {
+                        const supplement = cpuRounds
+                            ? cast(int)(computeDigest(
+                                cast(uint) value, cpuRounds) % 17u)
+                            : 0;
                         const expected = value + 1
                             + payload.bytes[0]
-                            + cast(int) payload.description.length;
+                            + cast(int) payload.description.length
+                            + supplement;
                         if (handle.get() != expected)
                             throw new Exception("wrong GC-visible result");
                         atomicFetchAdd!(MemoryOrder.rel)(*observed, 1UL);
@@ -159,6 +206,9 @@ private Thread makeProducer(
                 case 2:
                     VoidWork work;
                     work.counter = executions;
+                    work.computeChecksum = computeChecksum;
+                    work.value = value;
+                    work.rounds = cpuRounds;
                     auto handle = instrumented
                         ? executor.submitObserved(work, *profile)
                         : executor.submit(work);
@@ -217,7 +267,8 @@ private void runCase(
     size_t budget,
     OwnedRecordPolicy policy,
     bool striped,
-    bool instrumented)
+    bool instrumented,
+    uint cpuRounds)
 {
     GC.collect();
 
@@ -227,6 +278,7 @@ private void runCase(
     shared ulong executions;
     shared ulong admitted;
     shared ulong observed;
+    shared ulong computeChecksum;
 
     // Separate counter slot per producer. Read only after its Thread.join.
     auto producerBytes = new shared ulong[producers];
@@ -247,7 +299,8 @@ private void runCase(
         threads[i] = makeProducer(
             executor, i, producers, tasks, target,
             &admitted, &observed, &producerBytes[i],
-            &profiles[i], &resources[i], instrumented);
+            &profiles[i], &resources[i],
+            &computeChecksum, cpuRounds, instrumented);
         threads[i].start();
     }
 
@@ -291,6 +344,18 @@ private void runCase(
 
     if (atomicLoad!(MemoryOrder.acq)(observed) != expectedObservations)
         throw new Exception("mixed multi-producer result mismatch");
+
+    if (cpuRounds != 0)
+    {
+        ulong expectedChecksum;
+        foreach (i; 0 .. tasks)
+        {
+            if (i % 3 == 2)
+                expectedChecksum += computeDigest(cast(uint) i, cpuRounds);
+        }
+        if (atomicLoad!(MemoryOrder.acq)(computeChecksum) != expectedChecksum)
+            throw new Exception("wrong compute workload checksum");
+    }
 
     ulong allocatedInProducers;
     foreach (i; 0 .. producers)
@@ -345,6 +410,11 @@ private void runCase(
         producerTotal.voluntarySwitches,
         producerTotal.involuntarySwitches,
         producerTotal.minorFaults, producerTotal.majorFaults);
+
+    writefln("workload,%s,%s,%s",
+        cpuRounds == 0 ? "minimal" : "compute",
+        cpuRounds,
+        atomicLoad!(MemoryOrder.acq)(computeChecksum));
 
     if (instrumented)
     {
@@ -403,6 +473,7 @@ void main(string[] args)
     string policyNameArg = "gc";
     string counterMode = "shared";
     string instrumentation = "off";
+    string workload = "minimal";
 
     if (args.length > 1)
         workers = to!size_t(args[1]);
@@ -418,6 +489,8 @@ void main(string[] args)
         counterMode = args[6];
     if (args.length > 7)
         instrumentation = args[7];
+    if (args.length > 8)
+        workload = args[8];
 
     if (workers == 0 || workers > 64 ||
         producers == 0 || producers > 64 ||
@@ -432,6 +505,8 @@ void main(string[] args)
         throw new Exception("counter mode must be shared or striped");
     if (instrumentation != "on" && instrumentation != "off")
         throw new Exception("instrumentation must be on or off");
+    if (workload != "minimal" && workload != "compute")
+        throw new Exception("workload must be minimal or compute");
 
     const policy = policyNameArg == "gc"
         ? OwnedRecordPolicy.freshGc
@@ -444,5 +519,6 @@ void main(string[] args)
         ~ "observed_handles,completed");
 
     runCase(workers, producers, tasks, budget, policy,
-        counterMode == "striped", instrumentation == "on");
+        counterMode == "striped", instrumentation == "on",
+        workload == "compute" ? 96u : 0u);
 }
