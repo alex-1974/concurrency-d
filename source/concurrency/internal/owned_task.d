@@ -587,6 +587,20 @@ package(concurrency) final class OwnedTaskExecutor
         }
     }
 
+    /**
+     * Research-only per-worker dispatch distribution. Only valid after
+     * closeAndJoin(), never concurrently with worker execution.
+     */
+    WorkerParkingStats[] workerStatsAfterJoin()
+    {
+        synchronized (_mutex)
+        {
+            if (_lifecycle != Lifecycle.stopped)
+                throw new Exception("worker fairness stats require joined executor");
+            return _pool.workerStatsAfterJoin();
+        }
+    }
+
     /** R0.5 inbox notification and occupancy counts after shutdown. */
     InboxParkingStats inboxParkingStatsAfterJoin()
     {
