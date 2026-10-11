@@ -15,7 +15,9 @@ module concurrency.internal.owned_task;
 
 import concurrency.internal.submission_pool :
     SubmissionResult,
-    SubmissionWorkerPool;
+    SubmissionWorkerPool,
+    WorkerParkingStats,
+    InboxParkingStats;
 
 import concurrency.internal.task_record :
     TaskHeader,
@@ -341,13 +343,14 @@ package(concurrency) final class OwnedTaskExecutor
         size_t workers,
         size_t ingressCapacity,
         size_t maxRetained = 4096,
-        OwnedRecordPolicy policy = OwnedRecordPolicy.freshGc)
+        OwnedRecordPolicy policy = OwnedRecordPolicy.freshGc,
+        bool parkingProfile = false)
     {
         if (maxRetained == 0)
             throw new Exception("maxRetained must be positive");
 
         _pool = new SubmissionWorkerPool(
-            workers, ingressCapacity, &markReturned);
+            workers, ingressCapacity, &markReturned, parkingProfile);
         _mutex = new Mutex();
         _lifecycleChanged = new Condition(_mutex);
         _lifecycle = Lifecycle.running;
@@ -565,6 +568,31 @@ package(concurrency) final class OwnedTaskExecutor
     {
         synchronized (_mutex)
             return _spare.length;
+    }
+
+    /**
+     * R0.5 internal diagnostics, valid only AFTER closeAndJoin().
+     * Worker-local counter slots are never read while workers are live.
+     */
+    WorkerParkingStats parkingStatsAfterJoin()
+    {
+        synchronized (_mutex)
+        {
+            if (_lifecycle != Lifecycle.stopped)
+                throw new Exception("worker parking stats require joined executor");
+            return _pool.parkingStatsAfterJoin();
+        }
+    }
+
+    /** R0.5 inbox notification and occupancy counts after shutdown. */
+    InboxParkingStats inboxParkingStatsAfterJoin()
+    {
+        synchronized (_mutex)
+        {
+            if (_lifecycle != Lifecycle.stopped)
+                throw new Exception("inbox parking stats require joined executor");
+            return _pool.inboxParkingStatsAfterJoin();
+        }
     }
 
     /** Retry while ingress or the in-flight record budget is full. */
