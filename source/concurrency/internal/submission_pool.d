@@ -721,17 +721,18 @@ package(concurrency) final class SubmissionWorkerPool
                     // A successful push becomes visible to thieves before
                     // enqueueOk can be recorded. Begin/Ok bracket it.
                     version (R05TaskTrace)
-                        _taskTrace.record(TaskTraceKind.enqueueBegin, task, self);
+                        const traceEnqueueId =
+                            _taskTrace.enqueueBegin(task, self);
                     if (_queues[self].tryPush(task))
                     {
                         version (R05TaskTrace)
-                            _taskTrace.record(TaskTraceKind.enqueueOk, task, self);
+                            _taskTrace.enqueueResult(traceEnqueueId, self, true);
                         enqueued = true;
                     }
                     else
                     {
                         version (R05TaskTrace)
-                            _taskTrace.record(TaskTraceKind.enqueueFull, task, self);
+                            _taskTrace.enqueueResult(traceEnqueueId, self, false);
                         executeOne(task, self);
                         if (_parkingProfile)
                         {
