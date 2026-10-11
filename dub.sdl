@@ -50,3 +50,12 @@ configuration "fairness-blocking-benchmark" {
     importPaths "source" "benchmarks/task_pipeline"
     targetName "concurrency-fairness-blocking"
 }
+
+// Opt-in research-only burst blocking / owner-deque head-of-line probe.
+configuration "burst-head-of-line-benchmark" {
+    targetType "executable"
+    mainSourceFile "benchmarks/task_pipeline/burst_head_of_line.d"
+    sourcePaths "source" "benchmarks/task_pipeline"
+    importPaths "source" "benchmarks/task_pipeline"
+    targetName "concurrency-burst-head-of-line"
+}
