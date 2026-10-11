@@ -132,16 +132,16 @@ void main(string[] args)
             ++siblingBefore;
     }
 
-    version (R05TaskTrace)
-        const gateReleaseTicks = MonoTime.currTime.ticks;
+    // Required for precise uninstrumented A/B: the probe's requested
+    // sleep duration is not the actual gate-release timestamp.
+    const gateReleaseTicks = MonoTime.currTime.ticks;
 
     // All accepted blockers must be unblocked, including blockers
     // that were still in a deque when the observation ended.
     foreach (_; 0 .. blockers)
         gate.notify();
     pool.closeAndJoin();
-    version (R05TaskTrace)
-        const joinedTicks = MonoTime.currTime.ticks;
+    const joinedTicks = MonoTime.currTime.ticks;
 
     if (pool.acceptedCount() != blockers + siblings ||
         pool.completedCount() != blockers + siblings)
@@ -269,9 +269,12 @@ void main(string[] args)
         writefln("trace_status,%s,%s,%s,%s,%s",
             trace.admitted, trace.lostEvents, trace.registryOverflow,
             trace.unmatched, trace.stillLive);
-        writefln("control,gateRelease,%s",
-            ticksToNSecs(gateReleaseTicks - begin));
-        writefln("control,joined,%s",
-            ticksToNSecs(joinedTicks - begin));
     }
+
+    // Every variant exports the same external gate/join controls.
+    // Existing burst, task and sibling CSV rows stay unchanged.
+    writefln("control,gateRelease,%s",
+        ticksToNSecs(gateReleaseTicks - begin));
+    writefln("control,joined,%s",
+        ticksToNSecs(joinedTicks - begin));
 }
