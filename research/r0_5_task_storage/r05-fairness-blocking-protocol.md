@@ -86,6 +86,34 @@ No arbitrary task runtime deadline, starvation-freedom property,
 OS fairness, absolute latency p99, or scheduler-wide
 help-while-wait is asserted by this narrow suite.
 
+## Observed blocking-batch setup hazard (negative evidence)
+
+An early implementation submitted all four blocking tasks **in a burst**
+and only then waited for all four to reach their semaphores.
+[The research consumer gate at commit `e478f5fc`](https://github.com/alex-1974/concurrency-d/actions/runs/38134605155)
+revealed an LDC x86-64 failure: not all blockers entered their
+semaphore within the bounded 10-second startup window. This does
+**not** establish a lost task, failed eventual completion, or a
+defect in `Condition.wait`: by design the ingress permits a worker
+to claim up to eight tasks and place additional work into its owner
+deque. If its first claimed task blocks, other tasks may wait in
+that deque for work stealing; admission is not a contract for
+simultaneous start.
+
+The pure all-worker-capacity test now **submits a blocker and waits
+for its semaphore-start counter before submitting the next**.
+This ensures the requested number of executor threads are
+actually occupied before checking whether siblings can progress.
+If a sequential blocker still does not start within the bound,
+the test releases all gate tokens, joins the pool and reports a
+genuine setup/progress failure.
+
+The burst-admission head-of-line behavior merits a **separate**
+future bounded and explicitly nondeterministic experiment, with
+the claimant/victim deque distribution and recovery on gate release.
+It must not be silently conflated with a fixed thread pool's
+ordinary inability to run extra tasks after all workers block.
+
 ## Reproduction
 
 The source lives on grandfathered branch
