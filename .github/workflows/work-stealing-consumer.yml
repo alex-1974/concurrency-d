@@ -74,6 +74,8 @@ jobs:
           dub run --config=task-pipeline-mixed-benchmark --build=release --compiler="$DC" --force -- 4 4 384 8 gc
           dub run --config=task-pipeline-mixed-benchmark --build=release --compiler="$DC" --force -- 4 4 384 8 recycle
           dub run --config=task-pipeline-mixed-benchmark --build=release --compiler="$DC" --force -- 4 4 384 8 gc striped on
+          dub run --config=task-pipeline-mixed-benchmark --build=release --compiler="$DC" --force -- 4 4 384 512 gc striped off compute
+          dub run --config=task-pipeline-mixed-benchmark --build=release --compiler="$DC" --force -- 4 4 384 512 recycle striped off compute
 
   native-arm64:
     name: Consumer / native ARM64 / LDC 1.41
@@ -120,3 +122,5 @@ jobs:
           dub run --config=task-pipeline-mixed-benchmark --build=release --compiler="$DC" --force -- 4 4 384 8 gc
           dub run --config=task-pipeline-mixed-benchmark --build=release --compiler="$DC" --force -- 4 4 384 8 recycle
           dub run --config=task-pipeline-mixed-benchmark --build=release --compiler="$DC" --force -- 4 4 384 8 gc striped on
+          dub run --config=task-pipeline-mixed-benchmark --build=release --compiler="$DC" --force -- 4 4 384 512 gc striped off compute
+          dub run --config=task-pipeline-mixed-benchmark --build=release --compiler="$DC" --force -- 4 4 384 512 recycle striped off compute
