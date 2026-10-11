@@ -62,9 +62,12 @@ The paired runner records separately:
    minimal or compute workload, GC-visible captures, and sampled outputs
    are the same in both variants. This is **not** the burst child walltime.
 3. `pairs.csv`: individual 1-versus-8 paired differences and run order.
-4. `summary.csv`: medians over matched rounds, separately by blocker
-   count, record policy, notification policy and producer count.
-5. `environment.txt`: exact Git SHA, compiler version, CPU/platform,
+4. `summary.csv`: medians of matched case comparisons, separated by
+   blocker count, record policy, notification policy and producer count.
+5. `latency_summary.csv`: pooled **untraced sibling start offsets** p50,
+   p95 and p99 for each configuration, plus post-gate counts, per-case
+   medians and child-process CPU diagnostics.
+6. `environment.txt`: exact Git SHA, compiler version, CPU/platform,
    round count and workload settings.
 
 The runner alternates order within a case, uses distinct fresh child
