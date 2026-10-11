@@ -107,6 +107,13 @@ jobs:
           grep -q '^search_status,4,' "$RUNNER_TEMP/r05-search-batch8.csv"
           dub run --config=burst-head-of-line-search-batch1 --build=release --compiler="$DC" --force -- always gc 4 3 8 60 > "$RUNNER_TEMP/r05-search-batch1.csv"
           grep -q '^search_status,4,' "$RUNNER_TEMP/r05-search-batch1.csv"
+          # Opt-in victim-sweep hypothesis: no change to ordinary scheduler.
+          dub run --config=burst-head-of-line-full-victim-sweep --build=release --compiler="$DC" --force -- always gc 4 3 8 60 > "$RUNNER_TEMP/r05-full-scan-burst.csv"
+          grep -q '^control,gateRelease,' "$RUNNER_TEMP/r05-full-scan-burst.csv"
+          dub run --config=task-pipeline-mixed-full-victim-sweep --build=release --compiler="$DC" --force -- 4 4 384 512 gc striped off compute off always > "$RUNNER_TEMP/r05-full-scan-mixed.csv"
+          grep -q '^multi,mixed,gc,' "$RUNNER_TEMP/r05-full-scan-mixed.csv"
+          dub run --config=burst-head-of-line-search-full-victim-sweep --build=release --compiler="$DC" --force -- always gc 4 3 8 60 > "$RUNNER_TEMP/r05-full-scan-search.csv"
+          grep -q '^search_status,4,' "$RUNNER_TEMP/r05-full-scan-search.csv"
 
   native-arm64:
     name: Consumer / native ARM64 / LDC 1.41
@@ -186,3 +193,10 @@ jobs:
           grep -q '^search_status,4,' "$RUNNER_TEMP/r05-search-batch8.csv"
           dub run --config=burst-head-of-line-search-batch1 --build=release --compiler="$DC" --force -- always gc 4 3 8 60 > "$RUNNER_TEMP/r05-search-batch1.csv"
           grep -q '^search_status,4,' "$RUNNER_TEMP/r05-search-batch1.csv"
+          # Opt-in victim-sweep hypothesis: no change to ordinary scheduler.
+          dub run --config=burst-head-of-line-full-victim-sweep --build=release --compiler="$DC" --force -- always gc 4 3 8 60 > "$RUNNER_TEMP/r05-full-scan-burst.csv"
+          grep -q '^control,gateRelease,' "$RUNNER_TEMP/r05-full-scan-burst.csv"
+          dub run --config=task-pipeline-mixed-full-victim-sweep --build=release --compiler="$DC" --force -- 4 4 384 512 gc striped off compute off always > "$RUNNER_TEMP/r05-full-scan-mixed.csv"
+          grep -q '^multi,mixed,gc,' "$RUNNER_TEMP/r05-full-scan-mixed.csv"
+          dub run --config=burst-head-of-line-search-full-victim-sweep --build=release --compiler="$DC" --force -- always gc 4 3 8 60 > "$RUNNER_TEMP/r05-full-scan-search.csv"
+          grep -q '^search_status,4,' "$RUNNER_TEMP/r05-full-scan-search.csv"
