@@ -4,7 +4,7 @@
 
 ## Provenance and verification
 
-Source: user-uploaded Dell-XPS terminal capture `Eingefügter Text(20261011-075926).txt`, 46,801? No: byte count and SHA are verified in the uploaded container as **48,041 bytes**, SHA-256
+Source: user-uploaded Dell-XPS terminal capture `Eingefügter Text(20261011-075926).txt`, **48,041 bytes**, verified SHA-256
 `912f7deb5f7f5282dc91f47494930ce8148e0493b70f31c3f16ea2f3fa4c8fee`.
 
 After `git fetch` and `git pull --ff-only`, the checkout fast-forwarded
@@ -93,9 +93,9 @@ Caveats:
 
 ### Backpressure exclusions
 
-- All 160 admission-profile rows with retention budget **64, 512 or 4096**
+- All 180 admission-profile rows with retention budget **64, 512 or 4096**
   have **zero `Thread.yield()` retries**.
-- The 80 budget-8 rows have a nonzero or sometimes zero retry count;
+- The 60 budget-8 rows have a nonzero or sometimes zero retry count;
   across those rows total retries were 5,630, broken down as:
   1 producer 4,280, 4 producers 634, 8 producers 716.
   These are **aggregate retries across both storage/counter policies
