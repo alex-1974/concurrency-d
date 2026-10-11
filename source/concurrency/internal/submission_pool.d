@@ -66,6 +66,23 @@ package(concurrency) struct WorkerParkingStats
     ulong waitReturns;
     ulong skippedParks;
     ulong executions;
+
+    // A wait can return with its predicate still blocking; such a
+    // return is retried immediately under the same inbox mutex.
+    ulong waitReturnsStillBlocked;
+
+    // The mutually exclusive predicate state when an actual wait
+    // finishes. These do not identify which notify (if any) woke it.
+    ulong waitExitsInboxPending;
+    ulong waitExitsGenerationOnly;
+    ulong waitExitsDrained;
+
+    // First following worker search, exactly one per finished wait.
+    ulong wokeToLocal;
+    ulong wokeToInbox;
+    ulong wokeToSteal;
+    ulong wokeToEmptySearch;
+    ulong wokeToDrained;
 }
 
 /** Events counted under the existing inbox mutex, if profiling is enabled. */
@@ -264,10 +281,39 @@ private final class TaskInbox
                 // the same as counting useful work-producing notifications.
                 _changed.wait();
                 if (_parkingProfile)
+                {
                     ++stats.waitReturns;
+                    if (_generation == observed &&
+                        _used == 0 &&
+                        !(_closed && _completed == _accepted))
+                        ++stats.waitReturnsStillBlocked;
+                }
             }
-            if (_parkingProfile && !waited)
-                ++stats.skippedParks;
+
+            if (_parkingProfile)
+            {
+                if (!waited)
+                {
+                    ++stats.skippedParks;
+                }
+                else if (_closed && _used == 0 &&
+                         _completed == _accepted)
+                {
+                    ++stats.waitExitsDrained;
+                }
+                else if (_used != 0)
+                {
+                    ++stats.waitExitsInboxPending;
+                }
+                else
+                {
+                    // Changed generation, but no queued inbox tasks.
+                    // Another worker may have claimed the published
+                    // task already; the reason is NOT necessarily a
+                    // spurious notification.
+                    ++stats.waitExitsGenerationOnly;
+                }
+            }
         }
     }
 
@@ -449,6 +495,15 @@ package(concurrency) final class SubmissionWorkerPool
             total.waitReturns += entry.waitReturns;
             total.skippedParks += entry.skippedParks;
             total.executions += entry.executions;
+            total.waitReturnsStillBlocked += entry.waitReturnsStillBlocked;
+            total.waitExitsInboxPending += entry.waitExitsInboxPending;
+            total.waitExitsGenerationOnly += entry.waitExitsGenerationOnly;
+            total.waitExitsDrained += entry.waitExitsDrained;
+            total.wokeToLocal += entry.wokeToLocal;
+            total.wokeToInbox += entry.wokeToInbox;
+            total.wokeToSteal += entry.wokeToSteal;
+            total.wokeToEmptySearch += entry.wokeToEmptySearch;
+            total.wokeToDrained += entry.wokeToDrained;
         }
         return total;
     }
@@ -476,6 +531,7 @@ package(concurrency) final class SubmissionWorkerPool
     {
         TaskRef[IngressBatchSize] batch;
         WorkerParkingStats counters;
+        bool pendingWakeClassification;
         // The thread owns this slot exclusively. The controlling thread
         // may read it only after joining every worker.
         scope(exit)
@@ -496,6 +552,11 @@ package(concurrency) final class SubmissionWorkerPool
             auto local = _queues[self].pop();
             if (local.found)
             {
+                if (_parkingProfile && pendingWakeClassification)
+                {
+                    ++counters.wokeToLocal;
+                    pendingWakeClassification = false;
+                }
                 executeOne(local.value);
                 if (_parkingProfile)
                     ++counters.executions;
@@ -512,6 +573,11 @@ package(concurrency) final class SubmissionWorkerPool
             const taken = _inbox.takeBatch(batch[]);
             if (taken != 0)
             {
+                if (_parkingProfile && pendingWakeClassification)
+                {
+                    ++counters.wokeToInbox;
+                    pendingWakeClassification = false;
+                }
                 // Publish newly claimed work only into this worker's
                 // owner deque, permitting other workers to steal it.
                 bool enqueued;
@@ -558,6 +624,11 @@ package(concurrency) final class SubmissionWorkerPool
                 if (!stolen.found)
                     continue;
 
+                if (_parkingProfile && pendingWakeClassification)
+                {
+                    ++counters.wokeToSteal;
+                    pendingWakeClassification = false;
+                }
                 executeOne(stolen.value);
                 if (_parkingProfile)
                 {
@@ -572,13 +643,33 @@ package(concurrency) final class SubmissionWorkerPool
                 continue;
 
             if (_inbox.isDrained())
+            {
+                if (_parkingProfile && pendingWakeClassification)
+                {
+                    ++counters.wokeToDrained;
+                    pendingWakeClassification = false;
+                }
                 break;
+            }
+
+            if (_parkingProfile && pendingWakeClassification)
+            {
+                ++counters.wokeToEmptySearch;
+                pendingWakeClassification = false;
+            }
 
             // Condition.wait releases _mutex atomically. If any
             // publication/close happened since observed, this won't sleep.
             if (_parkingProfile)
                 ++counters.parkChecks;
+            const returnsBefore = counters.waitReturns;
             _inbox.parkUnlessChanged(observed, counters);
+            // Some Condition.wait calls may have returned with the
+            // predicate still blocked and immediately re-waited.
+            // Only the final return starts a new worker search.
+            if (_parkingProfile &&
+                counters.waitReturns != returnsBefore)
+                pendingWakeClassification = true;
         }
     }
 }
