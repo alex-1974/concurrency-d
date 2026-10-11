@@ -136,3 +136,105 @@ protocol) and compare at unchanged ownership, dispatch completion,
 fairness, shutdown linearizability, and package-safety rules.
 A higher notification count is *not* evidence by itself to change
 the condition-variable algorithm.
+
+
+## R0.5 follow-up: wake-return outcome attribution
+
+The first worker-counting slice confirmed frequent actual
+`Condition.wait()` entries and failed steals on the XPS
+([five-round evidence](results/xps-worker-parking-review-2026-10-11.md)).
+It did **not** show whether a wait return resulted in useful work.
+
+The follow-up adds **two independent accounting partitions**, only when
+`parkingProfile` is enabled. No wait predicates, generations,
+notifications, victim search order, task/record lifetime or policy have
+been changed.
+
+1. **State under the inbox mutex immediately after wait:** each return
+   where the predicate is *still blocking* is counted in
+   `waitReturnsStillBlocked` and the worker reenters `Condition.wait()`.
+   When the wait loop actually exits, its final return is grouped into
+   `waitExitsInboxPending`, `waitExitsGenerationOnly` (generation
+   changed but no inbox work was queued), or `waitExitsDrained`.
+   An observed generation change may have been caused by ingress
+   publication, a stealable local-work announcement or a close
+   transition. **None of these categories establishes which notify
+   woke the thread.** In particular, "still blocked" does not prove
+   a spurious OS wakeup: a notify could have been consumed by another
+   worker or raced with predicate state.
+2. **The first full search cycle after that final wait return:**
+   `wokeToLocal`, `wokeToInbox`, `wokeToSteal`,
+   `wokeToEmptySearch` (no task found and worker considers parking
+   again), or `wokeToDrained` (shutdown).
+   This is a *post-wait useful-search outcome*, not an attributed
+   notification-to-task causal chain. A worker may acquire a task
+   which was published after it woke; another worker can race to claim
+   a task before the awakened worker searches.
+
+The following conservation equalities MUST hold after worker join:
+
+```text
+conditionWaits == waitReturns
+
+waitReturns ==
+    waitReturnsStillBlocked
+    + waitExitsInboxPending
+    + waitExitsGenerationOnly
+    + waitExitsDrained
+
+waitExitsInboxPending
+    + waitExitsGenerationOnly
+    + waitExitsDrained ==
+    wokeToLocal + wokeToInbox + wokeToSteal
+    + wokeToEmptySearch + wokeToDrained
+```
+
+No counters are accessed while the workers run. There are no
+per-submission clocks, new atomics, additional allocations or
+additional mutex acquisitions in the instrumented search path.
+Additional local increments **do** have overhead and can change
+scheduling. The paired ON/OFF child-process matrix estimates this
+observer effect.
+
+The existing `parking,...` CSV remains byte-schema compatible.
+An extra `wakeup,...` row is emitted only when parking profiling is
+enabled. `tools/research/r05_worker_parking_matrix.py` checks the
+conservation equalities per child, retains the new event classes in
+`raw.csv`, and summarizes **useful post-wait search fraction**,
+**empty-search fraction**, and **generation-only exit fraction**.
+Percentages use the number of final wait-loop exits as denominator,
+rather than all `Condition.wait()` returns (which also include
+immediate re-waits). A zero-denominator case is emitted as zero
+in the diagnostic summary and should not be interpreted as observed
+absence of an event.
+
+DMD/LDC/native ARM64 regression coverage includes multi-producer
+dispatch invariants, zero-task shutdown, and a deterministic
+single-worker idle -> ingress publication -> useful search case.
+A change to condition-variable parking or notification coalescing
+is explicitly **not authorized** by these counters alone.
+
+### Reproduction
+
+The existing XPS runner is sufficient; it automatically captures
+the new `wakeup,...` line and preserves the legacy `parking,...`
+schema:
+
+```bash
+cd ~/Programmiersprachen/dlang/concurrency-d
+git fetch origin
+git switch perf/r05-owned-task-pipeline
+git pull --ff-only
+python3 tools/research/r05_worker_parking_matrix.py \
+  --compiler=ldc2 --workers=4 --tasks=30000 --rounds=5 \
+  --producers 1 4 8 --budget=512 \
+  --policies gc recycle --workloads minimal compute \
+  --counter striped --output=evidence/r05-xps-wake-outcomes
+```
+
+For a narrower first comparison using the accepted GC baseline, pass
+`--policies gc` while retaining the producer/workload split.
+Preserve the `raw.csv`, `summary.csv`, `environment.txt` trio and
+exact source SHA. Do **not** combine old XPS parking CSVs (without
+these categories) with the new output as though missing wake counts
+were measured zeros.
