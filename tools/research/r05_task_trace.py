@@ -132,7 +132,34 @@ def trace_check(rows, blockers, siblings):
             if ev["kind"].startswith("enqueue") and (
                     ev["worker"] != claim["worker"]):
                 raise RuntimeError("enqueue by wrong owner")
-    return events, gate, joined
+    # Link the instrumented scheduler sequence to actual user-callable starts.
+    # The burst has one producer; submission IDs are blocker IDs first,
+    # then sibling IDs. The mapping is independent of recycled addresses.
+    actual = []
+    for tag, task_count, offset in (("task", blockers, 0),
+                                    ("sibling", siblings, blockers)):
+        entries = [r for r in rows if r and r[0] == tag]
+        if len(entries) != task_count:
+            raise RuntimeError(f"incomplete {tag} callable-start rows")
+        seen = set()
+        for row in entries:
+            if len(row) != 5:
+                raise RuntimeError(f"malformed {tag} row")
+            index, started_before, worker, start_ns = map(int, row[1:])
+            if index in seen or not 0 <= index < task_count:
+                raise RuntimeError("duplicate/invalid callable-start index")
+            seen.add(index)
+            task_id = offset + index + 1
+            dispatch = next(e for e in by_task[task_id]
+                            if e["kind"] == "dispatchBegin")
+            if worker != dispatch["worker"] or start_ns < 0:
+                raise RuntimeError("callable start / dispatch worker mismatch")
+            actual.append(dict(task_id=task_id,
+                               category="blocker" if tag == "task"
+                               else "sibling", worker=worker,
+                               started_before_release=started_before,
+                               callable_start_ns=start_ns))
+    return events, actual, gate, joined
 
 
 def write_csv(path, rows):
@@ -174,7 +201,7 @@ def main():
 
     output = args.output
     output.mkdir(parents=True, exist_ok=True)
-    observations, trace_events = [], []
+    observations, trace_events, callable_rows = [], [], []
     for round_id in range(args.rounds):
         for storage in args.policies:
             for blockers in args.blockers:
@@ -189,7 +216,12 @@ def main():
                                              blockers, 8, args.probe_ms)
                         measurements[mode] = wall
                         if mode == "on":
-                            events, gate, joined = trace_check(rows, blockers, 8)
+                            events, actual, gate, joined = trace_check(
+                                rows, blockers, 8)
+                            for row in actual:
+                                row.update(round=round_id, notify=notify,
+                                           storage=storage, blockers=blockers)
+                                callable_rows.append(row)
                             for ev in events:
                                 ev.update(round=round_id, notify=notify,
                                           storage=storage, blockers=blockers)
@@ -210,6 +242,7 @@ def main():
 
     write_csv(output / "cases.csv", observations)
     write_csv(output / "events.csv", trace_events)
+    write_csv(output / "callables.csv", callable_rows)
     medians = []
     for blockers in args.blockers:
         for storage in args.policies:
