@@ -804,7 +804,14 @@ package(concurrency) final class SubmissionWorkerPool
             // queue entirely. A full N-slot sweep visits exactly N-1
             // non-self queues. This opt-in variant changes no dequeue,
             // memory-model or wakeup operation.
-            version (R05FullVictimSweep)
+            version (R05RotatingFullVictimSweep)
+            {
+                version (R05FullVictimSweep)
+                    static assert(false,
+                        "Choose one R0.5 full-victim-sweep research variant");
+                const victimSlots = _queues.length;
+            }
+            else version (R05FullVictimSweep)
                 const victimSlots = _queues.length;
             else
                 const victimSlots = _queues.length - 1;
@@ -855,6 +862,13 @@ package(concurrency) final class SubmissionWorkerPool
 
             if (foundWork)
                 continue;
+
+            // A complete failed N-slot sweep leaves nextVictim unchanged
+            // modulo N. Rotate only the opt-in experiment so subsequent
+            // failed sweeps start at different foreign victims. Successful
+            // steals keep the existing nextVictim = successor behavior.
+            version (R05RotatingFullVictimSweep)
+                nextVictim = (nextVictim + 1) % _queues.length;
 
             version (R05WorkerSearchTrace)
                 _searchTrace.record(WorkerSearchKind.searchEmpty, self);
