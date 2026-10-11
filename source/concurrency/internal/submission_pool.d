@@ -1160,3 +1160,90 @@ unittest
         worker.wokeToSteal + worker.wokeToEmptySearch +
         worker.wokeToDrained);
 }
+
+unittest
+{
+    // In the research variant there are no registered Condition waiters:
+    // publishing does not notify, but still commits the generation/task.
+    auto inbox = new TaskInbox(
+        2, true, NotificationPolicy.waiterAware);
+    shared CountingRecord[1] records;
+    TaskRef[1] tasks;
+    prepareRecords(records[], tasks[]);
+
+    const generation = inbox.wakeGeneration();
+    assert(inbox.trySubmit(tasks[0]) == SubmissionResult.accepted);
+    WorkerParkingStats unused;
+    inbox.parkUnlessChanged(generation, unused); // must NOT wait
+    TaskRef[1] claimed;
+    assert(inbox.takeBatch(claimed[]) == 1);
+    inbox.completeOne();
+    inbox.close();
+    auto profile = inbox.parkingStatsAfterJoin();
+    assert(profile.ingressNotifications == 1);
+    assert(profile.ingressNotifyCalls == 0);
+    assert(profile.ingressNotifySkipped == 1);
+    assert(inbox.isDrained());
+}
+
+unittest
+{
+    // A real waiter is registered before publication; the conditional
+    // notification must deliver exactly one task without a lost wake.
+    auto pool = new SubmissionWorkerPool(
+        1, 2, null, true, NotificationPolicy.waiterAware);
+    waitForPark(pool, 1);
+
+    shared CountingRecord[1] records;
+    TaskRef[1] tasks;
+    prepareRecords(records[], tasks[]);
+    assert(pool.trySubmit(tasks[0]) == SubmissionResult.accepted);
+    waitForExecution(&records[0]);
+    pool.closeAndJoin();
+
+    auto profile = pool.inboxParkingStatsAfterJoin();
+    auto workers = pool.parkingStatsAfterJoin();
+    assert(profile.ingressNotifyCalls == 1);
+    assert(profile.ingressNotifySkipped == 0);
+    assert(profile.closeBroadcasts == 1);
+    assert(workers.executions == 1);
+    assert(workers.conditionWaits == workers.waitReturns);
+}
+
+unittest
+{
+    // Many concurrent publishers and idle->active transitions. An
+    // accepted task must still dispatch exactly once, even when a
+    // notification is skipped because all workers were active.
+    enum size_t TaskCount = 2048;
+    auto records = new shared CountingRecord[TaskCount];
+    auto refs = new TaskRef[TaskCount];
+    prepareRecords(records, refs);
+
+    auto pool = new SubmissionWorkerPool(
+        4, 8, null, true, NotificationPolicy.waiterAware);
+    Thread[4] producerThreads;
+    foreach (i; 0 .. 4)
+    {
+        producerThreads[i] = makeProducer(pool, refs, i, 4);
+        producerThreads[i].start();
+    }
+    foreach (t; producerThreads)
+        t.join();
+    pool.closeAndJoin();
+
+    assert(pool.acceptedCount() == TaskCount);
+    assert(pool.completedCount() == TaskCount);
+    const workers = pool.parkingStatsAfterJoin();
+    const inbox = pool.inboxParkingStatsAfterJoin();
+    assert(workers.executions == TaskCount);
+    assert(inbox.claimedTasks == TaskCount);
+    assert(inbox.ingressNotifications == TaskCount);
+    assert(inbox.ingressNotifyCalls + inbox.ingressNotifySkipped ==
+        TaskCount);
+    assert(inbox.localNotifyCalls + inbox.localNotifySkipped ==
+        inbox.localNotifications);
+    assert(workers.waitReturns == workers.conditionWaits);
+    foreach (ref rec; records)
+        assert(atomicLoad!(MemoryOrder.acq)(rec.executions) == 1u);
+}
