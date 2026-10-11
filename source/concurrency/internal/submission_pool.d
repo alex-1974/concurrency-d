@@ -52,6 +52,36 @@ private alias LocalQueue =
     LocalWorkStealingDeque!(TaskRef, LocalCapacity);
 
 /**
+ * Experimental R0.5 counters. Written by each owning worker and collected
+ * only after join; no per-event atomics and no timing in dispatch/steal.
+ */
+package(concurrency) struct WorkerParkingStats
+{
+    ulong localMisses;
+    ulong ingressMisses;
+    ulong stealAttempts;
+    ulong stealSuccesses;
+    ulong parkChecks;
+    ulong conditionWaits;
+    ulong waitReturns;
+    ulong skippedParks;
+    ulong executions;
+}
+
+/** Events counted under the existing inbox mutex, if profiling is enabled. */
+package(concurrency) struct InboxParkingStats
+{
+    ulong ingressNotifications;
+    ulong localNotifications;
+    ulong closeBroadcasts;
+    ulong drainBroadcasts;
+    ulong claimedBatches;
+    ulong claimedTasks;
+    size_t peakQueued;
+}
+
+
+/**
  * A bounded MPMC inbox. Every state transition is protected by one mutex.
  * `accepted` counts obligations, not queue slots: claiming a TaskRef
  * removes a slot but completion occurs only after dispatchTask returns.
@@ -69,11 +99,15 @@ private final class TaskInbox
     private size_t _parkCount;
     private bool _closed;
 
-    this(size_t capacity)
+    private bool _parkingProfile;
+    private InboxParkingStats _parkingCounters;
+
+    this(size_t capacity, bool parkingProfile = false)
     {
         if (capacity == 0)
             throw new Exception("ingress capacity must be positive");
 
+        _parkingProfile = parkingProfile;
         _mutex = new Mutex();
         _changed = new Condition(_mutex);
         _slots = new TaskRef[capacity];
@@ -99,6 +133,12 @@ private final class TaskInbox
             ++_used;
             ++_accepted;
             ++_generation;
+            if (_parkingProfile)
+            {
+                ++_parkingCounters.ingressNotifications;
+                if (_used > _parkingCounters.peakQueued)
+                    _parkingCounters.peakQueued = _used;
+            }
             _changed.notify();
             return SubmissionResult.accepted;
         }
@@ -131,6 +171,11 @@ private final class TaskInbox
                 ++taken;
             }
 
+            if (_parkingProfile && taken != 0)
+            {
+                ++_parkingCounters.claimedBatches;
+                _parkingCounters.claimedTasks += taken;
+            }
             return taken;
         }
     }
@@ -147,6 +192,8 @@ private final class TaskInbox
             if (_closed && _completed == _accepted)
             {
                 ++_generation;
+                if (_parkingProfile)
+                    ++_parkingCounters.drainBroadcasts;
                 _changed.notifyAll();
             }
         }
@@ -158,6 +205,8 @@ private final class TaskInbox
         {
             _closed = true;
             ++_generation;
+            if (_parkingProfile)
+                ++_parkingCounters.closeBroadcasts;
             _changed.notifyAll();
         }
     }
@@ -184,6 +233,8 @@ private final class TaskInbox
         synchronized (_mutex)
         {
             ++_generation;
+            if (_parkingProfile)
+                ++_parkingCounters.localNotifications;
             _changed.notify();
         }
     }
@@ -193,18 +244,39 @@ private final class TaskInbox
      * release the mutex while sleeping. Any producer that publishes during
      * the search-to-park window changes the generation under this same lock.
      */
-    void parkUnlessChanged(size_t observed)
+    void parkUnlessChanged(size_t observed, ref WorkerParkingStats stats)
     {
         synchronized (_mutex)
         {
+            bool waited;
             while (_generation == observed &&
                    _used == 0 &&
                    !(_closed && _completed == _accepted))
             {
                 ++_parkCount;
+                if (_parkingProfile)
+                {
+                    ++stats.conditionWaits;
+                    waited = true;
+                }
+
+                // wait() may return spuriously. Counting returns is not
+                // the same as counting useful work-producing notifications.
                 _changed.wait();
+                if (_parkingProfile)
+                    ++stats.waitReturns;
             }
+            if (_parkingProfile && !waited)
+                ++stats.skippedParks;
         }
+    }
+
+    InboxParkingStats parkingStatsAfterJoin()
+    {
+        // Stable after workers join; synchronization also permits tests
+        // to inspect an internally consistent inbox snapshot.
+        synchronized (_mutex)
+            return _parkingCounters;
     }
 
     size_t parkCount()
@@ -264,6 +336,9 @@ package(concurrency) final class SubmissionWorkerPool
     private Thread[] _workers;
     private size_t _started;
 
+    private bool _parkingProfile;
+    private WorkerParkingStats[] _workerCounters;
+
     // Optional internal completion hook. Called by the claiming worker only
     // after dispatch and inbox accounting no longer need the TaskRef target.
     // It must not throw or retain the borrowed TaskRef past this invocation.
@@ -272,15 +347,18 @@ package(concurrency) final class SubmissionWorkerPool
     this(
         size_t workerCount,
         size_t ingressCapacity,
-        void function(TaskRef) nothrow afterExecution = null)
+        void function(TaskRef) nothrow afterExecution = null,
+        bool parkingProfile = false)
     {
         if (workerCount == 0)
             throw new Exception("workerCount must be positive");
 
-        _inbox = new TaskInbox(ingressCapacity);
+        _parkingProfile = parkingProfile;
+        _inbox = new TaskInbox(ingressCapacity, parkingProfile);
         _afterExecution = afterExecution;
         _queues = new LocalQueue[workerCount];
         _workers = new Thread[workerCount];
+        _workerCounters = new WorkerParkingStats[workerCount];
 
         try
         {
@@ -351,6 +429,34 @@ package(concurrency) final class SubmissionWorkerPool
         return _inbox.parkCount();
     }
 
+    /**
+     * Aggregate worker-local counters only AFTER closeAndJoin().
+     * Reading during live worker execution would be a data race.
+     */
+    WorkerParkingStats parkingStatsAfterJoin()
+    {
+        WorkerParkingStats total;
+        foreach (entry; _workerCounters)
+        {
+            total.localMisses += entry.localMisses;
+            total.ingressMisses += entry.ingressMisses;
+            total.stealAttempts += entry.stealAttempts;
+            total.stealSuccesses += entry.stealSuccesses;
+            total.parkChecks += entry.parkChecks;
+            total.conditionWaits += entry.conditionWaits;
+            total.waitReturns += entry.waitReturns;
+            total.skippedParks += entry.skippedParks;
+            total.executions += entry.executions;
+        }
+        return total;
+    }
+
+    /** Inbox counts are protected by the existing inbox mutex. */
+    InboxParkingStats inboxParkingStatsAfterJoin()
+    {
+        return _inbox.parkingStatsAfterJoin();
+    }
+
     private void executeOne(TaskRef task)
     {
         dispatchTask(task);
@@ -367,6 +473,11 @@ package(concurrency) final class SubmissionWorkerPool
     private void workerLoop(size_t self)
     {
         TaskRef[IngressBatchSize] batch;
+        WorkerParkingStats counters;
+        // The thread owns this slot exclusively. The controlling thread
+        // may read it only after joining every worker.
+        scope(exit)
+            _workerCounters[self] = counters;
 
         size_t nextVictim =
             _queues.length > 1
@@ -381,8 +492,13 @@ package(concurrency) final class SubmissionWorkerPool
             if (local.found)
             {
                 executeOne(local.value);
+                if (_parkingProfile)
+                    ++counters.executions;
                 continue;
             }
+
+            if (_parkingProfile)
+                ++counters.localMisses;
 
             // Capture the ticket before checking external ingress and
             // attempting steals. Publication after this point changes it.
@@ -404,6 +520,8 @@ package(concurrency) final class SubmissionWorkerPool
                     else
                     {
                         executeOne(task);
+                        if (_parkingProfile)
+                            ++counters.executions;
                     }
                 }
 
@@ -411,9 +529,13 @@ package(concurrency) final class SubmissionWorkerPool
                     _inbox.announceLocalWork();
 
                 executeOne(batch[0]);
+                if (_parkingProfile)
+                    ++counters.executions;
                 continue;
             }
 
+            if (_parkingProfile)
+                ++counters.ingressMisses;
             bool foundWork;
 
             foreach (_; 0 .. _queues.length - 1)
@@ -424,12 +546,19 @@ package(concurrency) final class SubmissionWorkerPool
                 if (victim == self)
                     continue;
 
+                if (_parkingProfile)
+                    ++counters.stealAttempts;
                 auto stolen = _queues[victim].steal();
 
                 if (!stolen.found)
                     continue;
 
                 executeOne(stolen.value);
+                if (_parkingProfile)
+                {
+                    ++counters.stealSuccesses;
+                    ++counters.executions;
+                }
                 foundWork = true;
                 break;
             }
@@ -442,7 +571,9 @@ package(concurrency) final class SubmissionWorkerPool
 
             // Condition.wait releases _mutex atomically. If any
             // publication/close happened since observed, this won't sleep.
-            _inbox.parkUnlessChanged(observed);
+            if (_parkingProfile)
+                ++counters.parkChecks;
+            _inbox.parkUnlessChanged(observed, counters);
         }
     }
 }
