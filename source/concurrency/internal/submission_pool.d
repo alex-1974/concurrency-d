@@ -24,6 +24,12 @@ import concurrency.internal.task_record :
 import concurrency.internal.work_stealing_queue :
     LocalWorkStealingDeque;
 
+version (R05TaskTrace)
+{
+    import concurrency.internal.task_trace :
+        TaskTraceRecorder, TaskTraceSnapshot, TaskTraceKind;
+}
+
 import core.atomic :
     MemoryOrder,
     atomicFetchAdd,
@@ -148,6 +154,16 @@ private final class TaskInbox
     private bool _parkingProfile;
     private InboxParkingStats _parkingCounters;
 
+    version (R05TaskTrace)
+    {
+        private TaskTraceRecorder _taskTrace;
+
+        void attachTrace(TaskTraceRecorder recorder)
+        {
+            _taskTrace = recorder;
+        }
+    }
+
     this(
         size_t capacity,
         bool parkingProfile = false,
@@ -183,6 +199,8 @@ private final class TaskInbox
             ++_used;
             ++_accepted;
             ++_generation;
+            version (R05TaskTrace)
+                _taskTrace.published(task);
             if (_parkingProfile)
             {
                 ++_parkingCounters.ingressNotifications;
@@ -449,6 +467,9 @@ package(concurrency) final class SubmissionWorkerPool
     private bool _parkingProfile;
     private WorkerParkingStats[] _workerCounters;
 
+    version (R05TaskTrace)
+        private TaskTraceRecorder _taskTrace;
+
     // Optional internal completion hook. Called by the claiming worker only
     // after dispatch and inbox accounting no longer need the TaskRef target.
     // It must not throw or retain the borrowed TaskRef past this invocation.
@@ -467,6 +488,11 @@ package(concurrency) final class SubmissionWorkerPool
         _parkingProfile = parkingProfile;
         _inbox = new TaskInbox(
             ingressCapacity, parkingProfile, notificationPolicy);
+        version (R05TaskTrace)
+        {
+            _taskTrace = new TaskTraceRecorder();
+            _inbox.attachTrace(_taskTrace);
+        }
         _afterExecution = afterExecution;
         _queues = new LocalQueue[workerCount];
         _workers = new Thread[workerCount];
@@ -596,10 +622,22 @@ package(concurrency) final class SubmissionWorkerPool
         return _inbox.parkingStatsAfterJoin();
     }
 
-    private void executeOne(TaskRef task)
+    version (R05TaskTrace)
+    TaskTraceSnapshot taskTraceAfterJoin()
     {
+        return _taskTrace.snapshotAfterJoin();
+    }
+
+    private void executeOne(TaskRef task, size_t worker)
+    {
+        version (R05TaskTrace)
+            _taskTrace.record(TaskTraceKind.dispatchBegin, task, worker);
         dispatchTask(task);
+        version (R05TaskTrace)
+            _taskTrace.record(TaskTraceKind.dispatchEnd, task, worker);
         _inbox.completeOne();
+        version (R05TaskTrace)
+            _taskTrace.accounted(task, worker);
 
         // Returning from the record's execute thunk alone is not a
         // lifetime-safe reclamation marker: the worker could still hold
@@ -636,12 +674,14 @@ package(concurrency) final class SubmissionWorkerPool
             auto local = _queues[self].pop();
             if (local.found)
             {
+                version (R05TaskTrace)
+                    _taskTrace.record(TaskTraceKind.ownerPop, local.value, self);
                 if (_parkingProfile && pendingWakeClassification)
                 {
                     ++counters.wokeToLocal;
                     pendingWakeClassification = false;
                 }
-                executeOne(local.value);
+                executeOne(local.value, self);
                 if (_parkingProfile)
                 {
                     ++counters.executions;
@@ -660,6 +700,8 @@ package(concurrency) final class SubmissionWorkerPool
             const taken = _inbox.takeBatch(batch[]);
             if (taken != 0)
             {
+                version (R05TaskTrace)
+                    _taskTrace.claimed(batch[0 .. taken], self);
                 if (_parkingProfile)
                 {
                     ++counters.ingressBatches;
@@ -676,13 +718,21 @@ package(concurrency) final class SubmissionWorkerPool
                 foreach (i; 1 .. taken)
                 {
                     TaskRef task = batch[i];
+                    // A successful push becomes visible to thieves before
+                    // enqueueOk can be recorded. Begin/Ok bracket it.
+                    version (R05TaskTrace)
+                        _taskTrace.record(TaskTraceKind.enqueueBegin, task, self);
                     if (_queues[self].tryPush(task))
                     {
+                        version (R05TaskTrace)
+                            _taskTrace.record(TaskTraceKind.enqueueOk, task, self);
                         enqueued = true;
                     }
                     else
                     {
-                        executeOne(task);
+                        version (R05TaskTrace)
+                            _taskTrace.record(TaskTraceKind.enqueueFull, task, self);
+                        executeOne(task, self);
                         if (_parkingProfile)
                         {
                             ++counters.executions;
@@ -694,7 +744,7 @@ package(concurrency) final class SubmissionWorkerPool
                 if (enqueued)
                     _inbox.announceLocalWork();
 
-                executeOne(batch[0]);
+                executeOne(batch[0], self);
                 if (_parkingProfile)
                 {
                     ++counters.executions;
@@ -727,7 +777,11 @@ package(concurrency) final class SubmissionWorkerPool
                     ++counters.wokeToSteal;
                     pendingWakeClassification = false;
                 }
-                executeOne(stolen.value);
+                version (R05TaskTrace)
+                    _taskTrace.record(
+                        TaskTraceKind.stolen, stolen.value,
+                        self, cast(int) victim);
+                executeOne(stolen.value, self);
                 if (_parkingProfile)
                 {
                     ++counters.stealSuccesses;
