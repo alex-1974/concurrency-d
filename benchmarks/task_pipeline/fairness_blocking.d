@@ -107,18 +107,31 @@ private void blocking(size_t workers, size_t blocked, size_t siblings,
                                       storage, true, notification);
     auto gate = new Semaphore(0);
     shared uint started, ended;
-    foreach (_; 0 .. blocked) {
+    // Admit blockers sequentially, waiting until each one has entered
+    // the OS semaphore. If admitted as a batch, a single worker could
+    // claim multiple blockers, block on the first and temporarily
+    // strand the remainder inside its private deque. That is a
+    // separate head-of-line scenario, not a valid setup for testing
+    // the exact number of occupied worker threads.
+    bool allStarted = true;
+    foreach (i; 0 .. blocked) {
         BlockWork task;
         task.gate = gate;
         task.started = &started;
         task.ended = &ended;
         auto handle = pool.submit(task);
+        if (!waitStarted(&started, cast(uint)(i + 1))) {
+            allStarted = false;
+            break;
+        }
     }
-    const didStart = waitStarted(&started, cast(uint) blocked);
-    if (!didStart) {
+    if (!allStarted) {
+        // Every published blocker must eventually leave the gate.
+        // Releasing as many tokens as requested blockers also covers
+        // those which have not yet reached wait().
         foreach (_; 0 .. blocked) gate.notify();
         pool.closeAndJoin();
-        throw new Exception("blocked task never entered semaphore");
+        throw new Exception("sequential blocker could not start");
     }
     auto hits = new shared uint[siblings];
     foreach (i; 0 .. siblings) {
