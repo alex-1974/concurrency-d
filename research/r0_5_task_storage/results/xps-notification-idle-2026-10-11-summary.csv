@@ -1,0 +1,2 @@
+rounds,workers,idle_ms,samples,gap_ms,baseline_median_idle_cpu_us,waiter_median_idle_cpu_us,paired_idle_cpu_us_delta,baseline_median_p95_ns,waiter_median_p95_ns,paired_p95_ns_delta,baseline_median_p99_ns,waiter_median_p99_ns,paired_p99_ns_delta
+5,4,250,256,1,384.0,278.0,-106.0,122803.0,111623.0,-8142.0,149802.0,164790.0,-10829.0
