@@ -151,6 +151,43 @@ package(concurrency) final class TaskTraceRecorder
         }
     }
 
+    /**
+     * Capture identity BEFORE tryPush exposes the task to thieves.
+     * An arbitrarily fast thief may execute and retire the live TaskRef
+     * before the owning worker can report tryPush's result.
+     */
+    ulong enqueueBegin(TaskRef task, size_t worker)
+    {
+        synchronized (_mutex)
+        {
+            const i = lookup(task);
+            if (i == _live.length)
+            {
+                ++_unmatched;
+                return 0;
+            }
+            const id = _live[i].id;
+            append(TaskTraceKind.enqueueBegin, id, cast(int) worker);
+            return id;
+        }
+    }
+
+    /** Report completion using the captured ID, never a recycled pointer. */
+    void enqueueResult(ulong submissionId, size_t worker, bool pushed)
+    {
+        synchronized (_mutex)
+        {
+            if (submissionId == 0 || submissionId > _nextId)
+            {
+                ++_unmatched;
+                return;
+            }
+            append(pushed ? TaskTraceKind.enqueueOk
+                          : TaskTraceKind.enqueueFull,
+                   submissionId, cast(int) worker);
+        }
+    }
+
     /** Generic scheduler transition. victim is meaningful for steals only. */
     void record(TaskTraceKind kind, TaskRef task, size_t worker,
                 int victim = -1)
@@ -210,12 +247,13 @@ unittest
     trace.published(ref1);
     TaskRef[1] batch = [ref1];
     trace.claimed(batch[], 0);
-    trace.record(TaskTraceKind.enqueueBegin, ref1, 0);
-    trace.record(TaskTraceKind.enqueueOk, ref1, 0);
+    const claimedId = trace.enqueueBegin(ref1, 0);
     trace.record(TaskTraceKind.stolen, ref1, 1, 0);
     trace.record(TaskTraceKind.dispatchBegin, ref1, 1);
     trace.record(TaskTraceKind.dispatchEnd, ref1, 1);
     trace.accounted(ref1, 1);
+    // A thief may finish before the owner records tryPush success.
+    trace.enqueueResult(claimedId, 0, true);
     // Same address can be rearmed; identity must not be reused.
     trace.published(ref1);
     trace.claimed(batch[], 0);
