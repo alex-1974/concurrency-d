@@ -39,10 +39,18 @@ private struct GateTask
 private struct SiblingTask
 {
     shared(uint)* executed;
+    shared(ulong)* threadId;
+    shared(long)* startTicks;
     uint id;
 
     int opCall()
     {
+        auto thread = Thread.getThis();
+        if (thread is null)
+            throw new Exception("unattached sibling worker");
+        atomicStore!(MemoryOrder.rel)(*threadId, cast(ulong) thread.id);
+        atomicStore!(MemoryOrder.rel)(*startTicks,
+                                     cast(long) MonoTime.currTime.ticks);
         atomicFetchAdd!(MemoryOrder.rel)(*executed, 1u);
         return cast(int) id + 733;
     }
@@ -73,6 +81,8 @@ void main(string[] args)
     auto tids = new shared ulong[blockers];
     auto ticks = new shared long[blockers];
     auto siblingCounts = new shared uint[siblings];
+    auto siblingThreads = new shared ulong[siblings];
+    auto siblingTicks = new shared long[siblings];
     auto gate = new Semaphore(0);
     TaskHandle!int[] blockerHandles;
     TaskHandle!int[] siblingHandles;
@@ -97,6 +107,8 @@ void main(string[] args)
         SiblingTask task;
         task.id = cast(uint) i;
         task.executed = &siblingCounts[i];
+        task.threadId = &siblingThreads[i];
+        task.startTicks = &siblingTicks[i];
         siblingHandles ~= pool.submit(task);
     }
 
@@ -111,9 +123,14 @@ void main(string[] args)
             ++startedBefore;
     }
     size_t siblingBefore;
-    foreach (ref count; siblingCounts)
-        if (atomicLoad!(MemoryOrder.acq)(count) != 0)
+    auto siblingPre = new bool[siblings];
+    foreach (i; 0 .. siblings)
+    {
+        siblingPre[i] = atomicLoad!(MemoryOrder.acq)(
+            siblingCounts[i]) != 0;
+        if (siblingPre[i])
             ++siblingBefore;
+    }
 
     // All accepted blockers must be unblocked, including blockers
     // that were still in a deque when the observation ended.
@@ -191,8 +208,40 @@ void main(string[] args)
             ticksToNSecs(taskTicks - begin));
     }
 
-    writefln("burst,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s",
+    // Sibling executions may have happened before the final blocker
+    // began waiting. A raw "siblings before gate release" count does
+    // NOT establish progress by an otherwise fully blocked worker pool.
+    long latestBlockerStart = begin;
+    foreach (i; 0 .. blockers)
+    {
+        const t = atomicLoad!(MemoryOrder.acq)(ticks[i]);
+        if (t > latestBlockerStart)
+            latestBlockerStart = t;
+    }
+    size_t siblingsAfterAllStarts;
+    foreach (i; 0 .. siblings)
+    {
+        const id = atomicLoad!(MemoryOrder.acq)(siblingThreads[i]);
+        const t = atomicLoad!(MemoryOrder.acq)(siblingTicks[i]);
+        if (id == 0 || t < begin)
+            throw new Exception("invalid sibling start attribution");
+        size_t workerSlot;
+        while (workerSlot < perWorker.length &&
+               perWorker[workerSlot].osThreadId != id)
+            ++workerSlot;
+        if (workerSlot == perWorker.length)
+            throw new Exception("sibling did not run on executor worker");
+        if (startedBefore == blockers && siblingPre[i] &&
+            t >= latestBlockerStart)
+            ++siblingsAfterAllStarts;
+        writefln("sibling,%s,%s,%s,%s",
+            i, siblingPre[i] ? 1 : 0, workerSlot,
+            ticksToNSecs(t - begin));
+    }
+
+    writefln("burst,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s",
         notify, storage, workers, blockers, siblings, probeMs,
         startedBefore, siblingBefore, distinctWorkers,
-        claimed, localExecuted, stolenExecuted);
+        claimed, localExecuted, stolenExecuted,
+        siblingsAfterAllStarts);
 }
