@@ -21,6 +21,7 @@ on:
       - "tools/research/r05_batch_size_ab.py"
       - "tools/research/r05_batch_size_sweep.py"
       - "tools/research/r05_worker_search_matrix.py"
+      - "tools/research/r05_victim_sweep_ab.py"
       - ".github/workflows/r05-storage-qualification.yml"
       - "dub.sdl"
   workflow_dispatch:
@@ -215,6 +216,15 @@ jobs:
             --compiler="$DC" --rounds=1 --burst-ms=60 \
             --blockers 3 4 --policies gc --notify always waiter \
             --output="evidence/r05-ci/${{ matrix.label }}/worker-search"
+
+      - name: R0.5 complete foreign-victim sweep paired smoke (diagnostic)
+        shell: bash
+        run: |
+          python3 tools/research/r05_victim_sweep_ab.py \
+            --compiler="$DC" --rounds=1 --burst-ms=60 \
+            --blockers 3 4 --policies gc --notify always \
+            --tasks=384 --producers 1 4 --workloads minimal compute \
+            --output="evidence/r05-ci/${{ matrix.label }}/victim-sweep"
 
       - name: Upload raw evidence and medians
         if: always()
