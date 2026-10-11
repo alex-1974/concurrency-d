@@ -19,6 +19,8 @@ on:
       - "tools/research/r05_burst_head_of_line.py"
       - "tools/research/r05_task_trace.py"
       - "tools/research/r05_batch_size_ab.py"
+      - "tools/research/r05_batch_size_sweep.py"
+      - "tools/research/r05_worker_search_matrix.py"
       - ".github/workflows/r05-storage-qualification.yml"
       - "dub.sdl"
   workflow_dispatch:
@@ -196,6 +198,23 @@ jobs:
             --tasks=384 --producers 1 4 --blockers 3 4 \
             --policies gc recycle --notify always waiter \
             --output="evidence/r05-ci/${{ matrix.label }}/batch-size-ab"
+
+      - name: R0.5 intermediate batch1/2/4/8 sweep smoke (diagnostic)
+        shell: bash
+        run: |
+          python3 tools/research/r05_batch_size_sweep.py \
+            --compiler="$DC" --rounds=1 --burst-ms=60 \
+            --tasks=384 --producers 1 4 --blockers 3 4 \
+            --policies gc recycle --notify always waiter \
+            --output="evidence/r05-ci/${{ matrix.label }}/batch-size-sweep"
+
+      - name: R0.5 worker-local missed-steal and park search (diagnostic)
+        shell: bash
+        run: |
+          python3 tools/research/r05_worker_search_matrix.py \
+            --compiler="$DC" --rounds=1 --burst-ms=60 \
+            --blockers 3 4 --policies gc --notify always waiter \
+            --output="evidence/r05-ci/${{ matrix.label }}/worker-search"
 
       - name: Upload raw evidence and medians
         if: always()
