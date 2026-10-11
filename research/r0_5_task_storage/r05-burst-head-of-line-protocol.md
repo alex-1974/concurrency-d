@@ -39,17 +39,26 @@ every started blocker. The controller sleeps for a fixed
 `probe_ms` using `Thread.sleep` (it does **not** busy-yield),
 then takes release/acquire snapshots of:
 
-- **Per-task:** unique blocker ID; whether its callable
-  began before semaphore release; its **executing worker index**,
-  resolved by matching the attached `Thread.getThis().id`
-  with that worker's after-join profile slot; and its start delay
-  measured against the beginning of the burst.
+- **Per-task blocker and runnable sibling:** unique task ID,
+  whether its callable began before semaphore release,
+  **executing worker index**, resolved by matching
+  `Thread.getThis().id` with that worker's after-join
+  profile slot, and relative start delay from the beginning
+  of the burst.
 - **Per-worker:** ingress batches/tasks claimed, tasks executed
   directly from ingress, executed from own local deque,
   successfully stolen tasks executed, and total executions.
 - **Aggregate:** pre-release started blockers, runnable
   siblings completed, distinct execution worker count,
   post-join total claimed/executed and stolen work.
+  A separate `siblings_after_all_starts` diagnostic counts
+  siblings whose callable started after the last blocker
+  recorded startup **and before release**, only when every
+  blocker had started by the snapshot. Siblings completed
+  earlier are not evidence of progress by already-saturated
+  workers. The blocker start record precedes its call to
+  `Semaphore.wait()`, so this timestamp is an approximation
+  to blocking entry, not a kernel-observed sleep transition.
 
 Task-to-executing-worker mapping is **exact for an observed
 execution**, but per-worker `ingressClaimedTasks` is only an
@@ -107,14 +116,16 @@ It writes:
 - `raw.csv` — one complete burst record per child;
 - `claims.csv` — complete per-worker aggregate claim/execution
   source metrics;
-- `tasks.csv` — exact blocker-to-worker execution mapping,
+- `tasks.csv` — blocker-to-worker execution mapping,
   before-release flag, relative startup timestamp;
+- `siblings.csv` — runnable sibling ID, executing worker,
+  before-release flag, and relative startup timestamp;
 - `summary.csv` — group medians and number of fully started runs;
 - `environment.txt` — Git SHA, compiler, CPU topology, parameters.
 
 Measured start delay is **task publication window -> task callable
 entry**, not queue residency time, OS notify-to-run latency, or
-a generalized p99 scheduling latency. Only blocker tasks have
+a generalized p99 scheduling latency. Both blocker and runnable sibling callables have
 per-task start timestamps. The Python process wall time includes
 startup, blocking delay, release, shutdown and file output; it
 is not a throughput benchmark.
