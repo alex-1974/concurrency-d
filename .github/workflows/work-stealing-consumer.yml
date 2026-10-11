@@ -90,6 +90,8 @@ jobs:
           dub run --config=fairness-blocking-benchmark --build=release --compiler="$DC" --force -- block waiter gc 4 1 32
           dub run --config=fairness-blocking-benchmark --build=release --compiler="$DC" --force -- block always gc 4 4 1
           dub run --config=fairness-blocking-benchmark --build=release --compiler="$DC" --force -- block waiter recycle 4 4 1
+          dub run --config=burst-head-of-line-benchmark --build=release --compiler="$DC" --force -- always gc 4 4 8 60
+          dub run --config=burst-head-of-line-benchmark --build=release --compiler="$DC" --force -- waiter recycle 4 3 8 60
 
   native-arm64:
     name: Consumer / native ARM64 / LDC 1.41
@@ -152,3 +154,5 @@ jobs:
           dub run --config=fairness-blocking-benchmark --build=release --compiler="$DC" --force -- block waiter gc 4 1 32
           dub run --config=fairness-blocking-benchmark --build=release --compiler="$DC" --force -- block always gc 4 4 1
           dub run --config=fairness-blocking-benchmark --build=release --compiler="$DC" --force -- block waiter recycle 4 4 1
+          dub run --config=burst-head-of-line-benchmark --build=release --compiler="$DC" --force -- always gc 4 4 8 60
+          dub run --config=burst-head-of-line-benchmark --build=release --compiler="$DC" --force -- waiter recycle 4 3 8 60
