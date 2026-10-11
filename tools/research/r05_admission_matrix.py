@@ -56,7 +56,7 @@ def run_case(binary, root, workers, producers, tasks, budget,
         _, status, usage = os.wait4(child.pid, 0)
         code = os.waitstatus_to_exitcode(status)
         fd.seek(0)
-        content = fd.read().decode("utf-8", errors="replace")
+        content = fd.read()  # TemporaryFile(mode="w+t") already returns str.
 
     if code != 0:
         raise RuntimeError(
