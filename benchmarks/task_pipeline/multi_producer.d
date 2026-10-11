@@ -12,6 +12,9 @@ import concurrency.internal.owned_task :
     OwnedRecordPolicy,
     OwnedTaskExecutor;
 
+import concurrency.internal.submission_pool :
+    NotificationPolicy;
+
 import concurrency.benchmarks.thread_resource :
     ThreadResourceSnapshot,
     sampleThreadResources,
@@ -270,7 +273,8 @@ private void runCase(
     bool striped,
     bool instrumented,
     uint cpuRounds,
-    bool parkingProfile)
+    bool parkingProfile,
+    NotificationPolicy notifyPolicy)
 {
     GC.collect();
 
@@ -293,7 +297,7 @@ private void runCase(
     auto resources = new ThreadResourceSnapshot[producers];
 
     auto executor = new OwnedTaskExecutor(
-        workers, 64, budget, policy, parkingProfile);
+        workers, 64, budget, policy, parkingProfile, notifyPolicy);
 
     foreach (i; 0 .. producers)
     {
@@ -479,6 +483,24 @@ private void runCase(
             worker.wokeToSteal,
             worker.wokeToEmptySearch,
             worker.wokeToDrained);
+        if (inbox.ingressNotifyCalls + inbox.ingressNotifySkipped !=
+                inbox.ingressNotifications ||
+            inbox.localNotifyCalls + inbox.localNotifySkipped !=
+                inbox.localNotifications)
+            throw new Exception("notification decision accounting mismatch");
+        if (notifyPolicy == NotificationPolicy.always &&
+            (inbox.ingressNotifySkipped != 0 ||
+             inbox.localNotifySkipped != 0))
+            throw new Exception("baseline unexpectedly skipped notification");
+
+        writefln(
+            "notification,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s",
+            policyName(policy),
+            cpuRounds == 0 ? "minimal" : "compute",
+            producers, workers, budget, tasks,
+            notifyPolicy == NotificationPolicy.always ? "always" : "waiter",
+            inbox.ingressNotifyCalls, inbox.ingressNotifySkipped,
+            inbox.localNotifyCalls, inbox.localNotifySkipped);
     }
 
     if (instrumented)
@@ -540,6 +562,7 @@ void main(string[] args)
     string instrumentation = "off";
     string workload = "minimal";
     string parking = "off";
+    string notifyMode = "always";
 
     if (args.length > 1)
         workers = to!size_t(args[1]);
@@ -559,6 +582,8 @@ void main(string[] args)
         workload = args[8];
     if (args.length > 9)
         parking = args[9];
+    if (args.length > 10)
+        notifyMode = args[10];
 
     if (workers == 0 || workers > 64 ||
         producers == 0 || producers > 64 ||
@@ -577,6 +602,8 @@ void main(string[] args)
         throw new Exception("workload must be minimal or compute");
     if (parking != "on" && parking != "off")
         throw new Exception("parking profile must be on or off");
+    if (notifyMode != "always" && notifyMode != "waiter")
+        throw new Exception("notify policy must be always or waiter");
 
     const policy = policyNameArg == "gc"
         ? OwnedRecordPolicy.freshGc
@@ -591,5 +618,8 @@ void main(string[] args)
     runCase(workers, producers, tasks, budget, policy,
         counterMode == "striped", instrumentation == "on",
         workload == "compute" ? 1024u : 0u,
-        parking == "on");
+        parking == "on",
+        notifyMode == "waiter"
+            ? NotificationPolicy.waiterAware
+            : NotificationPolicy.always);
 }
