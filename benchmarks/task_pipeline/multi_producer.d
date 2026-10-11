@@ -8,6 +8,7 @@
 module concurrency.benchmarks.multi_producer;
 
 import concurrency.internal.owned_task :
+    AdmissionProbe,
     OwnedRecordPolicy,
     OwnedTaskExecutor;
 
@@ -96,7 +97,9 @@ private Thread makeProducer(
     shared(ulong)* executions,
     shared(ulong)* admitted,
     shared(ulong)* observed,
-    shared(ulong)* producerBytes)
+    shared(ulong)* producerBytes,
+    AdmissionProbe* profile,
+    bool instrumented)
 {
     return new Thread({
         auto payload = new ProducerPayload();
@@ -114,7 +117,9 @@ private Thread makeProducer(
                     SmallWork work;
                     work.counter = executions;
                     work.value = value;
-                    auto handle = executor.submit(work);
+                    auto handle = instrumented
+                        ? executor.submitObserved(work, *profile)
+                        : executor.submit(work);
 
                     if (taskId % 17 == 0)
                     {
@@ -129,7 +134,9 @@ private Thread makeProducer(
                     work.counter = executions;
                     work.value = value;
                     work.payload = payload;
-                    auto handle = executor.submit(work);
+                    auto handle = instrumented
+                        ? executor.submitObserved(work, *profile)
+                        : executor.submit(work);
 
                     if (taskId % 17 == 0)
                     {
@@ -145,7 +152,9 @@ private Thread makeProducer(
                 case 2:
                     VoidWork work;
                     work.counter = executions;
-                    auto handle = executor.submit(work);
+                    auto handle = instrumented
+                        ? executor.submitObserved(work, *profile)
+                        : executor.submit(work);
 
                     if (taskId % 17 == 0)
                     {
@@ -167,12 +176,38 @@ private Thread makeProducer(
     });
 }
 
+private ulong upperBucketBound(size_t bucket) @safe pure nothrow @nogc
+{
+    if (bucket == 0)
+        return 0;
+    return (1UL << bucket) - 1UL;
+}
+
+private ulong percentileUpper(
+    ref ulong[64] counts, ulong sampleCount, uint percentile)
+{
+    if (sampleCount == 0)
+        return 0;
+
+    const threshold = (sampleCount * percentile + 99) / 100;
+    ulong total;
+    foreach (i, count; counts)
+    {
+        total += count;
+        if (total >= threshold)
+            return upperBucketBound(i);
+    }
+    return upperBucketBound(63);
+}
+
 private void runCase(
     size_t workers,
     size_t producers,
     size_t tasks,
     size_t budget,
-    OwnedRecordPolicy policy)
+    OwnedRecordPolicy policy,
+    bool striped,
+    bool instrumented)
 {
     GC.collect();
 
@@ -186,15 +221,22 @@ private void runCase(
     // Separate counter slot per producer. Read only after its Thread.join.
     auto producerBytes = new shared ulong[producers];
     auto threads = new Thread[producers];
+    // 16 ulong elements = 128 bytes between producer counters.
+    // This reduces cache-line ping-pong between *different* producer
+    // task streams, without removing atomic work from the task body.
+    auto stripes = new shared ulong[producers * 16];
+    auto profiles = new AdmissionProbe[producers];
 
     auto executor = new OwnedTaskExecutor(
         workers, 64, budget, policy);
 
     foreach (i; 0 .. producers)
     {
+        auto target = striped ? &stripes[i * 16] : &executions;
         threads[i] = makeProducer(
-            executor, i, producers, tasks, &executions,
-            &admitted, &observed, &producerBytes[i]);
+            executor, i, producers, tasks, target,
+            &admitted, &observed, &producerBytes[i],
+            &profiles[i], instrumented);
         threads[i].start();
     }
 
@@ -211,9 +253,17 @@ private void runCase(
     const accepted = executor.acceptedCount();
     const completed = executor.completedCount();
 
+    ulong executed = atomicLoad!(MemoryOrder.acq)(executions);
+    if (striped)
+    {
+        executed = 0;
+        foreach (i; 0 .. producers)
+            executed += atomicLoad!(MemoryOrder.acq)(stripes[i * 16]);
+    }
+
     // Runtime error checks survive optimized release builds.
     if (accepted != tasks || completed != tasks ||
-        atomicLoad!(MemoryOrder.acq)(executions) != tasks ||
+        executed != tasks ||
         atomicLoad!(MemoryOrder.acq)(admitted) != tasks ||
         executor.retainedCount() != 0 ||
         executor.spareCount() != 0)
@@ -261,6 +311,53 @@ private void runCase(
         collectedUsedDelta,
         expectedObservations,
         completed);
+
+    if (instrumented)
+    {
+        AdmissionProbe merged;
+        foreach (ref profile; profiles)
+        {
+            merged.attempts += profile.attempts;
+            merged.accepted += profile.accepted;
+            merged.retentionFull += profile.retentionFull;
+            merged.ingressFull += profile.ingressFull;
+            merged.yields += profile.yields;
+            merged.mutexWaitNs += profile.mutexWaitNs;
+            merged.mutexHoldNs += profile.mutexHoldNs;
+            if (profile.maxWaitNs > merged.maxWaitNs)
+                merged.maxWaitNs = profile.maxWaitNs;
+            if (profile.maxHoldNs > merged.maxHoldNs)
+                merged.maxHoldNs = profile.maxHoldNs;
+
+            foreach (i; 0 .. 64)
+            {
+                merged.waitBuckets[i] += profile.waitBuckets[i];
+                merged.holdBuckets[i] += profile.holdBuckets[i];
+            }
+        }
+
+        if (merged.accepted != tasks ||
+            merged.attempts != merged.accepted +
+                merged.retentionFull + merged.ingressFull ||
+            merged.yields != merged.retentionFull + merged.ingressFull)
+            throw new Exception("invalid admission probe accounting");
+
+        writefln(
+            "admission,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s",
+            policyName(policy),
+            striped ? "striped" : "shared",
+            producers, workers, budget, tasks,
+            merged.attempts, merged.accepted,
+            merged.retentionFull, merged.ingressFull,
+            merged.yields, merged.mutexWaitNs, merged.mutexHoldNs,
+            merged.maxWaitNs, merged.maxHoldNs,
+            percentileUpper(merged.waitBuckets, merged.attempts, 50),
+            percentileUpper(merged.waitBuckets, merged.attempts, 95),
+            percentileUpper(merged.waitBuckets, merged.attempts, 99),
+            percentileUpper(merged.holdBuckets, merged.attempts, 50),
+            percentileUpper(merged.holdBuckets, merged.attempts, 95),
+            percentileUpper(merged.holdBuckets, merged.attempts, 99));
+    }
 }
 
 void main(string[] args)
@@ -270,6 +367,8 @@ void main(string[] args)
     size_t tasks = 6000;
     size_t budget = 64;
     string policyNameArg = "gc";
+    string counterMode = "shared";
+    string instrumentation = "off";
 
     if (args.length > 1)
         workers = to!size_t(args[1]);
@@ -281,6 +380,10 @@ void main(string[] args)
         budget = to!size_t(args[4]);
     if (args.length > 5)
         policyNameArg = args[5];
+    if (args.length > 6)
+        counterMode = args[6];
+    if (args.length > 7)
+        instrumentation = args[7];
 
     if (workers == 0 || workers > 64 ||
         producers == 0 || producers > 64 ||
@@ -291,6 +394,10 @@ void main(string[] args)
 
     if (policyNameArg != "gc" && policyNameArg != "recycle")
         throw new Exception("policy must be gc or recycle");
+    if (counterMode != "shared" && counterMode != "striped")
+        throw new Exception("counter mode must be shared or striped");
+    if (instrumentation != "on" && instrumentation != "off")
+        throw new Exception("instrumentation must be on or off");
 
     const policy = policyNameArg == "gc"
         ? OwnedRecordPolicy.freshGc
@@ -302,5 +409,6 @@ void main(string[] args)
         ~ "producer_gc_bytes,used_close_delta,used_after_collect_delta,"
         ~ "observed_handles,completed");
 
-    runCase(workers, producers, tasks, budget, policy);
+    runCase(workers, producers, tasks, budget, policy,
+        counterMode == "striped", instrumentation == "on");
 }
