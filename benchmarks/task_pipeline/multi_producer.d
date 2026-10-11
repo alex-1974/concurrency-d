@@ -12,6 +12,11 @@ import concurrency.internal.owned_task :
     OwnedRecordPolicy,
     OwnedTaskExecutor;
 
+import concurrency.benchmarks.thread_resource :
+    ThreadResourceSnapshot,
+    sampleThreadResources,
+    difference;
+
 import core.atomic :
     MemoryOrder,
     atomicFetchAdd,
@@ -99,9 +104,11 @@ private Thread makeProducer(
     shared(ulong)* observed,
     shared(ulong)* producerBytes,
     AdmissionProbe* profile,
+    ThreadResourceSnapshot* resources,
     bool instrumented)
 {
     return new Thread({
+        const beforeResources = sampleThreadResources();
         auto payload = new ProducerPayload();
         const beforeBytes = GC.allocatedInCurrentThread();
 
@@ -173,6 +180,9 @@ private Thread makeProducer(
         const afterBytes = GC.allocatedInCurrentThread();
         atomicStore!(MemoryOrder.rel)(
             *producerBytes, afterBytes - beforeBytes);
+        // Producer has finished *all* submissions. Save before exiting
+        // its OS thread, since RUSAGE_THREAD is not queryable after join.
+        *resources = difference(sampleThreadResources(), beforeResources);
     });
 }
 
@@ -226,6 +236,7 @@ private void runCase(
     // task streams, without removing atomic work from the task body.
     auto stripes = new shared ulong[producers * 16];
     auto profiles = new AdmissionProbe[producers];
+    auto resources = new ThreadResourceSnapshot[producers];
 
     auto executor = new OwnedTaskExecutor(
         workers, 64, budget, policy);
@@ -236,7 +247,7 @@ private void runCase(
         threads[i] = makeProducer(
             executor, i, producers, tasks, target,
             &admitted, &observed, &producerBytes[i],
-            &profiles[i], instrumented);
+            &profiles[i], &resources[i], instrumented);
         threads[i].start();
     }
 
@@ -311,6 +322,29 @@ private void runCase(
         collectedUsedDelta,
         expectedObservations,
         completed);
+
+    // Resource snapshots are read only after joining their producer
+    // threads. All samples are taken at thread boundaries, not in the
+    // admission hot path, for both profiled and unprofiled modes.
+    ThreadResourceSnapshot producerTotal;
+    foreach (item; resources)
+    {
+        producerTotal.cpuUserUs += item.cpuUserUs;
+        producerTotal.cpuSystemUs += item.cpuSystemUs;
+        producerTotal.voluntarySwitches += item.voluntarySwitches;
+        producerTotal.involuntarySwitches += item.involuntarySwitches;
+        producerTotal.minorFaults += item.minorFaults;
+        producerTotal.majorFaults += item.majorFaults;
+    }
+    writefln(
+        "resource,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s",
+        policyName(policy),
+        striped ? "striped" : "shared",
+        workers, producers, budget, tasks,
+        producerTotal.cpuUserUs, producerTotal.cpuSystemUs,
+        producerTotal.voluntarySwitches,
+        producerTotal.involuntarySwitches,
+        producerTotal.minorFaults, producerTotal.majorFaults);
 
     if (instrumented)
     {
