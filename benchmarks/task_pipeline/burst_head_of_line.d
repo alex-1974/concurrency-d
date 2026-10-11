@@ -166,10 +166,10 @@ void main(string[] args)
         localExecuted + directExecuted + stolenExecuted != totalExecuted)
         throw new Exception("burst claim-vs-execution mismatch");
 
-    // Build transient labels for OS thread IDs: 0..number of distinct
-    // executor threads observed. OS identifiers themselves are not
-    // written to retained evidence.
-    ulong[] distinct;
+    // Match each blocker's actual OS thread to the same worker's
+    // joined private counter slot. Do not persist raw OS identifiers.
+    bool[] used = new bool[workers];
+    size_t distinctWorkers;
     foreach (i; 0 .. blockers)
     {
         const id = atomicLoad!(MemoryOrder.acq)(tids[i]);
@@ -177,19 +177,22 @@ void main(string[] args)
         if (id == 0 || taskTicks < begin)
             throw new Exception("invalid blocker start attribution");
         size_t slot;
-        while (slot < distinct.length && distinct[slot] != id)
+        while (slot < perWorker.length && perWorker[slot].osThreadId != id)
             ++slot;
-        if (slot == distinct.length)
-            distinct ~= id;
+        if (slot == perWorker.length)
+            throw new Exception("blocker did not run on a pool worker");
+        if (!used[slot])
+        {
+            used[slot] = true;
+            ++distinctWorkers;
+        }
         writefln("task,%s,%s,%s,%s",
             i, before[i] ? 1 : 0, slot,
             ticksToNSecs(taskTicks - begin));
     }
-    if (distinct.length > workers)
-        throw new Exception("more blocker threads than executor workers");
 
     writefln("burst,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s",
         notify, storage, workers, blockers, siblings, probeMs,
-        startedBefore, siblingBefore, distinct.length,
+        startedBefore, siblingBefore, distinctWorkers,
         claimed, localExecuted, stolenExecuted);
 }
