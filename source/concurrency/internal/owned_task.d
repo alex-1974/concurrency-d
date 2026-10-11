@@ -17,7 +17,8 @@ import concurrency.internal.submission_pool :
     SubmissionResult,
     SubmissionWorkerPool,
     WorkerParkingStats,
-    InboxParkingStats;
+    InboxParkingStats,
+    NotificationPolicy;
 
 import concurrency.internal.task_record :
     TaskHeader,
@@ -344,13 +345,15 @@ package(concurrency) final class OwnedTaskExecutor
         size_t ingressCapacity,
         size_t maxRetained = 4096,
         OwnedRecordPolicy policy = OwnedRecordPolicy.freshGc,
-        bool parkingProfile = false)
+        bool parkingProfile = false,
+        NotificationPolicy notificationPolicy = NotificationPolicy.always)
     {
         if (maxRetained == 0)
             throw new Exception("maxRetained must be positive");
 
         _pool = new SubmissionWorkerPool(
-            workers, ingressCapacity, &markReturned, parkingProfile);
+            workers, ingressCapacity, &markReturned,
+            parkingProfile, notificationPolicy);
         _mutex = new Mutex();
         _lifecycleChanged = new Condition(_mutex);
         _lifecycle = Lifecycle.running;
