@@ -982,6 +982,17 @@ unittest
     assert(workers.executions == TaskCount);
     assert(workers.stealAttempts >= workers.stealSuccesses);
     assert(workers.conditionWaits == workers.waitReturns);
+    assert(workers.waitReturns ==
+        workers.waitReturnsStillBlocked +
+        workers.waitExitsInboxPending +
+        workers.waitExitsGenerationOnly +
+        workers.waitExitsDrained);
+    assert(workers.waitReturns - workers.waitReturnsStillBlocked ==
+        workers.wokeToLocal +
+        workers.wokeToInbox +
+        workers.wokeToSteal +
+        workers.wokeToEmptySearch +
+        workers.wokeToDrained);
     // Each park check either returned without sleeping or waited at
     // least once (possibly more often after a spurious wake).
     assert(workers.parkChecks <=
@@ -1031,4 +1042,37 @@ unittest
     assert(inbox.claimedTasks == 1);
     assert(inbox.closeBroadcasts == 1);
     assert(inbox.peakQueued <= 2);
+    assert(worker.waitReturns == worker.waitReturnsStillBlocked +
+        worker.waitExitsInboxPending +
+        worker.waitExitsGenerationOnly +
+        worker.waitExitsDrained);
+    assert(worker.waitReturns - worker.waitReturnsStillBlocked ==
+        worker.wokeToLocal + worker.wokeToInbox +
+        worker.wokeToSteal + worker.wokeToEmptySearch +
+        worker.wokeToDrained);
+}
+
+unittest
+{
+    // Idle shutdown has no user work. Every worker wait exit is
+    // classified as drain, or a generation change followed by drain.
+    auto pool = new SubmissionWorkerPool(4, 2, null, true);
+    waitForPark(pool, 1);
+    pool.closeAndJoin();
+
+    const stats = pool.parkingStatsAfterJoin();
+    assert(stats.executions == 0);
+    assert(stats.waitReturns == stats.conditionWaits);
+    assert(stats.waitReturns == stats.waitReturnsStillBlocked +
+        stats.waitExitsInboxPending +
+        stats.waitExitsGenerationOnly +
+        stats.waitExitsDrained);
+    assert(stats.waitReturns - stats.waitReturnsStillBlocked ==
+        stats.wokeToLocal + stats.wokeToInbox +
+        stats.wokeToSteal + stats.wokeToEmptySearch +
+        stats.wokeToDrained);
+    assert(stats.wokeToDrained >= 1);
+    assert(stats.wokeToInbox == 0);
+    assert(stats.wokeToSteal == 0);
+    assert(stats.wokeToLocal == 0);
 }
