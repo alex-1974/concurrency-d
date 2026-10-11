@@ -106,6 +106,25 @@ dub run --config=task-pipeline-mixed-benchmark --build=release \
   --compiler=ldc2 --force -- 4 8 30000 512 gc striped off
 ```
 
+For a **paired uninstrumented** shared-versus-striped benchmark,
+use a separate driver instead of comparing independent single-run times:
+
+```bash
+python3 tools/research/r05_counter_control.py \
+  --compiler=ldc2 --workers=4 --tasks=30000 --rounds=5 \
+  --producers 1 4 8 --budgets 8 512 \
+  --policies gc recycle \
+  --output=evidence/r05-xps-counter-control
+```
+
+This pairs counter layouts within the *same storage policy*, switches
+run order between rounds and writes per-child `raw.csv`, `summary.csv`
+and source/compiler/CPU metadata. The `off` benchmark path does **not**
+call `submitObserved`; it still incurs the one-time mode branch per
+submission in the research-only benchmark wrapper. These results
+therefore test the shared hot atomic effect, not a frictionless
+production API.
+
 The CI research workflow performs a smaller sample on x86-64 and
 native ARM64 using optimized LDC, and the consumer gate instantiates
 the observed path on DMD 2.111/LDC 1.41 on x86-64 and ARM64.
