@@ -182,6 +182,15 @@ configuration "task-pipeline-mixed-full-victim-lookup-probe" {
     targetName "concurrency-task-pipeline-mixed-full-victim-lookup-probe"
 }
 
+configuration "task-pipeline-mixed-full-victim-admission-stages" {
+    targetType "executable"
+    mainSourceFile "benchmarks/task_pipeline/multi_producer.d"
+    sourcePaths "source" "benchmarks/task_pipeline"
+    importPaths "source" "benchmarks/task_pipeline"
+    versions "R05FullVictimSweep" "R05AdmissionStageProbe"
+    targetName "concurrency-task-pipeline-mixed-full-victim-admission-stages"
+}
+
 configuration "burst-head-of-line-search-full-victim-sweep" {
     targetType "executable"
     mainSourceFile "benchmarks/task_pipeline/burst_head_of_line.d"
