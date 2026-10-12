@@ -415,7 +415,10 @@ package(concurrency) final class SubmissionWorkerPool
 
             bool foundWork;
 
-            foreach (_; 0 .. _queues.length - 1)
+            // Scan one complete cycle of candidate indices. Skipping
+            // self within N-1 slots can omit a foreign deque entirely and
+            // allow parking while that deque still contains runnable work.
+            foreach (_; 0 .. _queues.length)
             {
                 const victim = nextVictim;
                 nextVictim = (nextVictim + 1) % _queues.length;
@@ -540,11 +543,71 @@ unittest
 
 unittest
 {
-    // Multiple independent producers, bounded ingress and 1/4 workers.
+    // Regression: a full unsuccessful search must attempt every foreign
+    // deque exactly once before it may park. The historical N-1 candidate
+    // loop could consume one slot on self and omit a foreign queue.
+    enum size_t MaxWorkers = 16;
+    foreach (size_t workers; 1 .. MaxWorkers + 1)
+    {
+        foreach (size_t self; 0 .. workers)
+        {
+            foreach (size_t initial; 0 .. workers)
+            {
+                bool[MaxWorkers] visited;
+                size_t cursor = initial;
+                size_t attempts;
+
+                // Mirror the candidate cursor and self-skip semantics
+                // exercised by workerLoop, including wraparound and N=1.
+                foreach (_; 0 .. workers)
+                {
+                    const victim = cursor;
+                    cursor = (cursor + 1) % workers;
+                    if (victim == self)
+                        continue;
+
+                    assert(!visited[victim],
+                        "foreign victim inspected more than once");
+                    visited[victim] = true;
+                    ++attempts;
+                }
+
+                assert(attempts == workers - 1,
+                    "failed scan omitted a foreign queue");
+                assert(cursor == initial,
+                    "complete scan must traverse exactly one cycle");
+                foreach (size_t victim; 0 .. workers)
+                    assert(visited[victim] == (victim != self),
+                        "foreign deque omitted before parking");
+            }
+        }
+    }
+
+    // Historic failure: self=2, start=1, N=4 previously examined
+    // 1, self(2), 3, but never owner 0. Owner 0 must now be visited.
+    size_t cursor = 1;
+    bool foundVictimZero;
+    foreach (_; 0 .. 4)
+    {
+        const victim = cursor;
+        cursor = (cursor + 1) % 4;
+        if (victim == 2)
+            continue;
+        if (victim == 0)
+            foundVictimZero = true;
+    }
+    assert(foundVictimZero);
+}
+
+unittest
+{
+    // Multiple producers, bounded ingress and uneven/even worker counts.
+    // These exercise the actual concurrent pop/steal/park/close lifecycle,
+    // complementing the deterministic all-start-index coverage regression.
     enum size_t TaskCount = 3072;
     enum size_t ProducerCount = 4;
 
-    foreach (workerCount; [1, 4])
+    foreach (workerCount; [1, 2, 3, 4, 8])
     {
         auto records = new shared CountingRecord[TaskCount];
         auto tasks = new TaskRef[TaskCount];
