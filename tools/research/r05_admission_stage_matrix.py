@@ -28,6 +28,8 @@ STAGE = (
     "metric", "policy", "counter_mode", "producers", "workers", "budget",
     "tasks", "gate_count", "gate_ns", "cell_count", "cell_ns",
     "node_count", "node_ns", "publish_count", "publish_ns",
+    "root_append_count", "root_append_ns",
+    "inbox_submit_count", "inbox_submit_ns",
 )
 
 
@@ -127,9 +129,13 @@ def measure(binary, root, round_id, mode, policy,
                 row["ingress_full"] or
                 row["gate_count"] != row["attempts"] or
                 any(row[k] != tasks for k in (
-                    "cell_count", "node_count", "publish_count"))):
+                    "cell_count", "node_count", "publish_count",
+                    "root_append_count", "inbox_submit_count")) or
+                row["root_append_ns"] > row["publish_ns"] or
+                row["inbox_submit_ns"] > row["publish_ns"]):
             raise RuntimeError("profile stage attempt and rejection mismatch")
-        for stage_name in ("gate", "cell", "node", "publish"):
+        for stage_name in ("gate", "cell", "node", "publish",
+                           "root_append", "inbox_submit"):
             count = row[stage_name + "_count"]
             row[stage_name + "_ns_per_event"] = (
                 row[stage_name + "_ns"] / count if count else 0.0)
@@ -137,6 +143,15 @@ def measure(binary, root, round_id, mode, policy,
                         ("gate", "cell", "node", "publish"))
         row["stage_sum_over_hold_diagnostic"] = (
             stage_sum / row["hold_ns"] if row["hold_ns"] else 0.0)
+        # Aggregate publish bracket contains both substages plus all
+        # intervening measurement overhead. It is NOT an additive
+        # uninstrumented time decomposition.
+        row["root_over_publish_diagnostic"] = (
+            row["root_append_ns"] / row["publish_ns"]
+            if row["publish_ns"] else 0.0)
+        row["inbox_over_publish_diagnostic"] = (
+            row["inbox_submit_ns"] / row["publish_ns"]
+            if row["publish_ns"] else 0.0)
         row["wait_ns_per_attempt"] = (
             row["wait_ns"] / row["attempts"] if row["attempts"] else 0.0)
         row["hold_ns_per_attempt"] = (
@@ -230,6 +245,14 @@ def main():
                                 cell_ns_per_admission=case["cell_ns_per_event"],
                                 node_ns_per_admission=case["node_ns_per_event"],
                                 publish_ns_per_admission=case["publish_ns_per_event"],
+                                root_append_ns_per_admission=case[
+                                    "root_append_ns_per_event"],
+                                inbox_submit_ns_per_admission=case[
+                                    "inbox_submit_ns_per_event"],
+                                root_over_publish_diagnostic=case[
+                                    "root_over_publish_diagnostic"],
+                                inbox_over_publish_diagnostic=case[
+                                    "inbox_over_publish_diagnostic"],
                                 wait_ns_per_attempt=case["wait_ns_per_attempt"],
                                 hold_ns_per_attempt=case["hold_ns_per_attempt"],
                                 retries_per_task=case["retries_per_task"],
@@ -270,6 +293,10 @@ def main():
                 stream.write("unavailable\n")
         stream.write("platform=" + platform.platform() + "\n")
         stream.write("Timing is opt-in; all stages include clock/probe overhead.\n"
+                     "publish includes GC-root append + nested inbox submit; "
+                     "the two substage clocks and counters perturb publish.\n"
+                     "inbox_submit includes inner inbox mutex, enqueue and "
+                     "possible Condition.notify; cannot attribute it further.\n"
                      "gate counts rejections; cell/node/publish count admission"
                      " attempts only. Lock wait includes OS scheduling.\n"
                      "Stage-sum / hold is diagnostic, not causal. "
