@@ -321,6 +321,12 @@ package(concurrency) struct AdmissionProbe
         ulong nodeNs;
         ulong publishCount;
         ulong publishNs;
+        // Research-only nested publication substages. The measured
+        // boundary deliberately leaves both existing mutexes intact.
+        ulong rootAppendCount;
+        ulong rootAppendNs;
+        ulong inboxSubmitCount;
+        ulong inboxSubmitNs;
     }
 
     // Fixed log2 buckets (ns): [0], [1], [2..3], [4..7], ...
@@ -603,8 +609,33 @@ package(concurrency) final class OwnedTaskExecutor
             version (R05AdmissionStageProbe)
                 static if (Observed)
                     const publishStarted = MonoTime.currTime.ticks;
+            version (R05AdmissionStageProbe)
+                static if (Observed)
+                    const rootStarted = MonoTime.currTime.ticks;
             _retained ~= RetainedTask(node, node.returnedFlag());
+            version (R05AdmissionStageProbe)
+            {
+                static if (Observed)
+                {
+                    ++profile.rootAppendCount;
+                    profile.rootAppendNs += cast(ulong) ticksToNSecs(
+                        MonoTime.currTime.ticks - rootStarted);
+                }
+            }
+
+            version (R05AdmissionStageProbe)
+                static if (Observed)
+                    const inboxStarted = MonoTime.currTime.ticks;
             const status = _pool.trySubmit(node.reference());
+            version (R05AdmissionStageProbe)
+            {
+                static if (Observed)
+                {
+                    ++profile.inboxSubmitCount;
+                    profile.inboxSubmitNs += cast(ulong) ticksToNSecs(
+                        MonoTime.currTime.ticks - inboxStarted);
+                }
+            }
             version (R05AdmissionStageProbe)
             {
                 static if (Observed)
