@@ -132,18 +132,16 @@ previous native research. The expected files are:
 | `raw.csv` | 120 process results, all six factors | 120 |
 | `pairs.csv` | within-round striped/shared throughput, CPU/switch diagnostics | 60 |
 | `summary.csv` | 10-round paired ratios/wins by workload/producers/policy | 12 |
-| `producer_scaling.csv` | per-mode 4/1 and 8/1 producer diagnostic ratios | 80 |
-| `producer_scaling_summary.csv` | per-group 4/1 and 8/1 median scaling | 8 |
+| `producer_scaling.csv` | per-mode 4/1 and 8/1 producer diagnostic ratios | 160 |
+| `producer_scaling_summary.csv` | per-group 4/1 and 8/1 median scaling | 16 |
 | `environment.txt` | source/compilation/governor/binary identity and limitations | — |
 
-**Correction to row counts:** The actual combinatorics of this
-default matrix are **60 paired counter comparisons**
+The default matrix includes **60 paired counter comparisons**
 (10 rounds × 2 workloads × 3 producer counts × 2 policies),
-**12 paired-summary groups**, **80 producer-scaling
-comparisons** (10 × 2 × 2 policies × 2 modes × 2 target counts)
-and **16 producer-scaling-summary groups** (2 workloads × 2
-policies × 2 modes × 2 target counts). This paragraph is
-normative where it supersedes the provisional table entry.
+**12 paired-summary groups**, **160 producer-scaling
+comparisons** (10 × 2 workloads × 2 policies × 2 modes ×
+2 target producer counts), and **16 producer-scaling-summary
+groups** (2 workloads × 2 policies × 2 modes × 2 target counts).
 
 For a strict gate all rows must be present with no duplicated
 factor key; in each pair task count, checksum, binary hash,
