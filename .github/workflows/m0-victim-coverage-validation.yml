@@ -75,7 +75,7 @@ jobs:
         shell: bash
         run: |
           python3 tools/validation/m0_victim_coverage_xps.py \
-            --compiler="$DC" --mixed-only --rounds=1 \
+            --compiler="$DC" --mixed-only --cpu-snapshots --rounds=1 \
             --tasks=2048 --workers 1 4 --producers 4 \
             --workloads compute --compute-rounds=128 \
             --budget=128 --cooldown-ms=0 \
