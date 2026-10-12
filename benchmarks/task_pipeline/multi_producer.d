@@ -584,6 +584,51 @@ private void runCase(
             percentileUpper(merged.holdBuckets, merged.attempts, 95),
             percentileUpper(merged.holdBuckets, merged.attempts, 99));
     }
+
+    version (R05AdmissionStageProbe)
+    {
+        if (instrumented)
+        {
+            AdmissionProbe total;
+            foreach (ref profile; profiles)
+            {
+                total.gateCount += profile.gateCount;
+                total.gateNs += profile.gateNs;
+                total.cellCount += profile.cellCount;
+                total.cellNs += profile.cellNs;
+                total.nodeCount += profile.nodeCount;
+                total.nodeNs += profile.nodeNs;
+                total.publishCount += profile.publishCount;
+                total.publishNs += profile.publishNs;
+            }
+            ulong attempts;
+            ulong acceptedAttempts;
+            ulong rejected;
+            foreach (ref profile; profiles)
+            {
+                attempts += profile.attempts;
+                acceptedAttempts += profile.accepted;
+                rejected += profile.retentionFull + profile.ingressFull;
+            }
+            // Any full/closed publication failure remains an error for
+            // this research's deterministic accepted-task scenario.
+            if (attempts != tasks + rejected ||
+                acceptedAttempts != tasks ||
+                total.gateCount != attempts ||
+                total.cellCount != tasks ||
+                total.nodeCount != tasks ||
+                total.publishCount != tasks)
+                throw new Exception("admission stage accounting mismatch");
+
+            writefln("stage,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s",
+                policyName(policy), striped ? "striped" : "shared",
+                producers, workers, budget, tasks,
+                total.gateCount, total.gateNs,
+                total.cellCount, total.cellNs,
+                total.nodeCount, total.nodeNs,
+                total.publishCount, total.publishNs);
+        }
+    }
 }
 
 void main(string[] args)
