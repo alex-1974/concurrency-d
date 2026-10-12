@@ -1,0 +1,107 @@
+name: R0.5 recycle lookup research qualification
+
+on:
+  push:
+    branches:
+      - perf/r05-owned-task-pipeline
+    paths:
+      - "source/concurrency/internal/owned_task.d"
+      - "benchmarks/task_pipeline/multi_producer.d"
+      - "tools/research/r05_recycle_lookup_matrix.py"
+      - "dub.sdl"
+      - ".github/workflows/r05-recycle-lookup-qualification.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  lookup-qualification:
+    name: Full-victim typed lookup / ${{ matrix.label }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: dmd-x86
+            runner: ubuntu-24.04
+            compiler: dmd-2.111.0
+          - label: ldc-x86
+            runner: ubuntu-24.04
+            compiler: ldc-1.41.0
+          - label: ldc-arm64
+            runner: ubuntu-24.04-arm
+            compiler: ldc-1.41.0
+
+    steps:
+      - name: Checkout grandfathered R0.5 research
+        uses: actions/checkout@v7
+
+      - name: Install compiler
+        uses: dlang-community/setup-dlang@v2
+        with:
+          compiler: ${{ matrix.compiler }}
+
+      - name: Verify Python driver syntax
+        shell: bash
+        run: python3 -m py_compile tools/research/r05_recycle_lookup_matrix.py
+
+      - name: Check DMD/LDC and benchmark environment
+        shell: bash
+        run: |
+          "$DC" --version
+          dub --version
+          git rev-parse HEAD
+
+      - name: Paired opt-in lookup and uninstrumented full-victim control
+        shell: bash
+        run: |
+          python3 tools/research/r05_recycle_lookup_matrix.py \
+            --compiler="$DC" --rounds=1 --tasks=384 \
+            --workers=4 --producers 1 4 --budgets 8 512 \
+            --counter-mode=shared --workload=minimal \
+            --output="evidence/r05-lookup/${{ matrix.label }}"
+
+      - name: Strict four-way sample accounting
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import csv
+          from pathlib import Path
+          root = Path("evidence/r05-lookup/${{ matrix.label }}")
+          def read(name):
+              with (root / name).open(newline="") as f:
+                  return list(csv.DictReader(f))
+          raw = read("raw.csv")
+          pairs = read("pairs.csv")
+          diagnostic = read("diagnostics.csv")
+          summary = read("summary.csv")
+          assert len(raw) == 16
+          assert len(pairs) == 8
+          assert len(diagnostic) == 4
+          assert len(summary) == 8
+          assert len({(r["round"],r["producers"],r["budget"],
+                      r["profile"],r["policy"]) for r in raw}) == len(raw)
+          for r in raw:
+              assert int(r["fresh_nodes"]) + int(r["reused_nodes"]) == 384
+              if r["profile"] == "on":
+                  assert int(r["accepted"]) == 384
+                  if r["policy"] == "recycle":
+                      assert int(r["searches"]) == 384
+                      assert (int(r["hits"]) + int(r["misses"])) == 384
+                  else:
+                      assert int(r["searches"]) == 0
+          assert all(float(r["median_recycle_over_gc"]) > 0
+                     for r in summary)
+          print("PASS: full-victim both policies, instrumented/uninstrumented")
+          PY
+
+      - name: Upload raw evidence without hosted speed thresholds
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: r05-lookup-${{ matrix.label }}-${{ github.run_id }}
+          path: evidence/r05-lookup/${{ matrix.label }}/
+          if-no-files-found: warn
+          retention-days: 30
