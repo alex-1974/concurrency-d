@@ -71,6 +71,18 @@ jobs:
             --gap-ms=1 --cooldown-ms=0 \
             --output="evidence/m0-validation/${{ matrix.label }}/idle-followup"
 
+      - name: Isolated compute throughput and one-worker drift control
+        shell: bash
+        run: |
+          python3 tools/validation/m0_victim_coverage_xps.py \
+            --compiler="$DC" --mixed-only --rounds=1 \
+            --tasks=2048 --workers 1 4 --producers 4 \
+            --workloads compute --compute-rounds=128 \
+            --budget=128 --cooldown-ms=0 \
+            --output="evidence/m0-validation/${{ matrix.label }}/compute-only"
+          test -s "evidence/m0-validation/${{ matrix.label }}/compute-only/control_pairs.csv"
+          test ! -f "evidence/m0-validation/${{ matrix.label }}/compute-only/idle.csv"
+
       - name: Upload raw comparison evidence (not a speed gate)
         if: always()
         uses: actions/upload-artifact@v4
