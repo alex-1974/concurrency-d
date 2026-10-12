@@ -87,10 +87,20 @@ jobs:
               else:
                   assert int(r["gate_count"]) == int(r["attempts"])
                   assert all(int(r[f + "_count"]) == 384
-                             for f in ("cell", "node", "publish"))
+                             for f in ("cell", "node", "publish",
+                                       "root_append", "inbox_submit"))
+                  assert 0 <= int(r["root_append_ns"]) <= int(
+                      r["publish_ns"])
+                  assert 0 <= int(r["inbox_submit_ns"]) <= int(
+                      r["publish_ns"])
                   assert int(r["accepted"]) == 384
                   assert int(r["yields"]) == int(r["retention_full"]) + int(
                       r["ingress_full"])
+          assert all(float(r["root_append_ns_per_admission"]) >= 0 and
+                     float(r["inbox_submit_ns_per_admission"]) >= 0 and
+                     0 <= float(r["root_over_publish_diagnostic"]) <= 1 and
+                     0 <= float(r["inbox_over_publish_diagnostic"]) <= 1
+                     for r in diagnostics)
           for r in pairs + summary:
               key = ("recycle_over_gc" if "recycle_over_gc" in r
                      else "median_recycle_over_gc")
