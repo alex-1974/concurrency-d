@@ -236,7 +236,8 @@ def main():
             any(n < 1 or n > 64 for n in a.producers) or
             any(n not in (8, 64, 512, 4096) for n in a.budgets) or
             not 0 <= a.perf_repeats <= 10 or
-            any(n not in a.producers for n in a.perf_producers)):
+            (a.perf_stat != "off" and a.perf_repeats > 0 and
+             any(n not in a.producers for n in a.perf_producers))):
         parser.error("invalid bounded study configuration")
     root = Path(__file__).resolve().parents[2]
     binary = build(root, a.compiler)
