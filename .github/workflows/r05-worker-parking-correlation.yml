@@ -1,0 +1,133 @@
+name: R0.5 worker parking and resource correlation
+
+on:
+  push:
+    branches:
+      - perf/r05-owned-task-pipeline
+    paths:
+      - "tools/research/r05_worker_parking_correlation.py"
+      - "tools/research/r05_worker_parking_matrix.py"
+      - "tools/research/r05_worker_resource_matrix.py"
+      - "tools/research/r05_native_cpu_profile.py"
+      - "source/concurrency/internal/**"
+      - "benchmarks/task_pipeline/**"
+      - "dub.sdl"
+      - ".github/workflows/r05-worker-parking-correlation.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  correlate:
+    name: Existing counters and worker CPU / ${{ matrix.label }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: dmd-x86
+            runner: ubuntu-24.04
+            compiler: dmd-2.111.0
+          - label: ldc-x86
+            runner: ubuntu-24.04
+            compiler: ldc-1.41.0
+          - label: ldc-arm64
+            runner: ubuntu-24.04-arm
+            compiler: ldc-1.41.0
+
+    steps:
+      - name: Checkout grandfathered R0.5 research
+        uses: actions/checkout@v7
+      - name: Set up D compiler
+        uses: dlang-community/setup-dlang@v2
+        with:
+          compiler: ${{ matrix.compiler }}
+      - name: Check driver syntax
+        shell: bash
+        run: |
+          python3 -m py_compile tools/research/r05_worker_parking_correlation.py
+          "$DC" --version
+          dub --version
+      - name: Exercise all three existing counter modes
+        shell: bash
+        run: |
+          python3 tools/research/r05_worker_parking_correlation.py \
+            --compiler="$DC" --workers=4 --tasks=384 --rounds=1 \
+            --producers 1 4 --budget=512 \
+            --policies gc recycle --workloads minimal compute \
+            --counter=shared --cooldown-ms=0 \
+            --output="evidence/r05-parking-correlation/${{ matrix.label }}"
+      - name: Validate independent worker samples and wake conservation
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import csv
+          from pathlib import Path
+          directory = Path("evidence/r05-parking-correlation/${{ matrix.label }}")
+          def get(name):
+              with (directory / name).open(newline="") as f:
+                  return list(csv.DictReader(f))
+          rows = get("raw.csv")
+          workers = get("worker.csv")
+          pairs = get("pairs.csv")
+          summary = get("summary.csv")
+          assert (len(rows), len(workers), len(pairs), len(summary)) == (24, 64, 8, 8)
+          assert len({(r["round"], r["workload"], r["producers"],
+                      r["policy"], r["mode"]) for r in rows}) == 24
+          checksums = {}
+          hashes = {"plain": set(), "worker": set(), "combined": set()}
+          for r in rows:
+              mode = r["mode"]
+              hashes[mode].add(r["binary_sha256"])
+              checksums.setdefault(r["workload"], set()).add(r["checksum"])
+              assert int(r["completed"]) == int(r["tasks"]) == 384
+              assert int(r["fresh_nodes"]) + int(r["reused_nodes"]) == 384
+              assert int(r["observed_handles"]) > 0
+              assert r["notify_policy"] == "always"
+              assert float(r["throughput_per_s"]) > 0
+              if mode == "plain":
+                  assert r["worker_count"] == ""
+                  assert r["condition_waits"] == ""
+              else:
+                  assert int(r["worker_count"]) == 4
+                  assert int(r["worker_cpu_us"]) >= 0
+                  assert int(r["worker_voluntary"]) >= 0
+                  if mode == "worker":
+                      assert r["condition_waits"] == ""
+                  else:
+                      assert int(r["condition_waits"]) == int(r["wait_returns"])
+                      assert int(r["executions"]) == 384
+                      assert int(r["claimed_tasks"]) == 384
+                      assert int(r["ingress_notifications"]) == 384
+                      assert int(r["ingress_calls"]) == 384
+                      assert int(r["ingress_skipped"]) == 0
+                      assert int(r["local_skipped"]) == 0
+                      assert int(r["final_wait_exits"]) == (
+                          int(r["exit_inbox"]) + int(r["exit_generation"]) +
+                          int(r["exit_drained"]))
+                      assert int(r["final_wait_exits"]) == (
+                          int(r["useful_first_search"]) + int(r["no_work"]) +
+                          int(r["drained"]))
+          assert all(len(v) == 1 for v in checksums.values())
+          assert all(len(v) == 1 for v in hashes.values())
+          assert hashes["worker"] == hashes["combined"]
+          assert hashes["plain"] != hashes["worker"]
+          assert len({(w["round"], w["workload"], w["producers"], w["policy"],
+                      w["mode"], w["worker_index"]) for w in workers}) == 64
+          assert all(float(p["worker_over_plain"]) > 0 and
+                     float(p["combined_over_worker"]) > 0 for p in pairs)
+          assert all(int(s["rounds"]) == 1 for s in summary)
+          env = (directory / "environment.txt").read_text()
+          assert "NotificationPolicy.always in every child" in env
+          print("PASS: 24 children, 64 worker samples, exact wake conservation")
+          PY
+      - name: Preserve hosted correctness evidence (not performance gate)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: r05-parking-worker-${{ matrix.label }}-${{ github.run_id }}
+          path: evidence/r05-parking-correlation/${{ matrix.label }}/
+          if-no-files-found: warn
+          retention-days: 30
