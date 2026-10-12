@@ -309,6 +309,20 @@ package(concurrency) struct AdmissionProbe
     ulong maxWaitNs;
     ulong maxHoldNs;
 
+    version (R05AdmissionStageProbe)
+    {
+        // Each producer owns its AdmissionProbe. The counters below
+        // are absent in ordinary DMD/LDC builds and in older probes.
+        ulong gateCount;
+        ulong gateNs;
+        ulong cellCount;
+        ulong cellNs;
+        ulong nodeCount;
+        ulong nodeNs;
+        ulong publishCount;
+        ulong publishNs;
+    }
+
     // Fixed log2 buckets (ns): [0], [1], [2..3], [4..7], ...
     // No allocation or atomics in the measured critical section.
     ulong[64] waitBuckets;
@@ -441,6 +455,22 @@ package(concurrency) final class OwnedTaskExecutor
             if (_lifecycle != Lifecycle.running)
                 throw new Exception("executor is closed");
 
+            // Admission gate counts even rejected, allocation-free retries.
+            // The nested scope fires its exit timer on every early return.
+            {
+                version (R05AdmissionStageProbe)
+                {
+                    static if (Observed)
+                    {
+                        const gateStarted = MonoTime.currTime.ticks;
+                        scope(exit)
+                        {
+                            ++profile.gateCount;
+                            profile.gateNs += cast(ulong) ticksToNSecs(
+                                MonoTime.currTime.ticks - gateStarted);
+                        }
+                    }
+                }
             if (_retained.length >= _maxRetained)
             {
                 // O(capacity) cold path. This is intentionally deferred
@@ -467,8 +497,30 @@ package(concurrency) final class OwnedTaskExecutor
                 return TaskHandle!R.init;
             }
 
+            } // gate / rejection-before-allocation
+
+            version (R05AdmissionStageProbe)
+            {
+                static if (Observed)
+                    const cellStarted = MonoTime.currTime.ticks;
+            }
             auto cell = new ResultCell!R();
             handle = new TaskHandle!R(cell);
+            version (R05AdmissionStageProbe)
+            {
+                static if (Observed)
+                {
+                    ++profile.cellCount;
+                    profile.cellNs += cast(ulong) ticksToNSecs(
+                        MonoTime.currTime.ticks - cellStarted);
+                }
+            }
+
+            version (R05AdmissionStageProbe)
+            {
+                static if (Observed)
+                    const nodeStarted = MonoTime.currTime.ticks;
+            }
             OwnedNode!(F, R) node;
             if (_recordPolicy == OwnedRecordPolicy.recycleTyped)
             {
@@ -525,10 +577,34 @@ package(concurrency) final class OwnedTaskExecutor
                 ++_freshNodes;
             }
 
+            version (R05AdmissionStageProbe)
+            {
+                static if (Observed)
+                {
+                    ++profile.nodeCount;
+                    profile.nodeNs += cast(ulong) ticksToNSecs(
+                        MonoTime.currTime.ticks - nodeStarted);
+                }
+            }
+
             // Install the strong GC root before any worker can claim the
             // record. If admission fails, clear the tail GC slot too.
+            version (R05AdmissionStageProbe)
+            {
+                static if (Observed)
+                    const publishStarted = MonoTime.currTime.ticks;
+            }
             _retained ~= RetainedTask(node, node.returnedFlag());
             const status = _pool.trySubmit(node.reference());
+            version (R05AdmissionStageProbe)
+            {
+                static if (Observed)
+                {
+                    ++profile.publishCount;
+                    profile.publishNs += cast(ulong) ticksToNSecs(
+                        MonoTime.currTime.ticks - publishStarted);
+                }
+            }
 
             if (status != SubmissionResult.accepted)
             {
