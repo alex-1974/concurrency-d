@@ -25,15 +25,32 @@ COLUMNS = (
 )
 
 
-def build(root, compiler):
+SCHEDULER_CONFIGS = {
+    # Same full N-slot, self-skipping search accepted into develop by
+    # PR #37. Keep this as the default for NEW storage measurements.
+    "full": (
+        "task-pipeline-mixed-full-victim-sweep",
+        "concurrency-task-pipeline-mixed-full-victim-sweep",
+    ),
+    # Historical R0.5 N-1 slot baseline. Existing published research CSVs
+    # were measured against it and must not be silently reinterpreted.
+    "legacy": (
+        "task-pipeline-mixed-benchmark",
+        "concurrency-task-pipeline-mixed",
+    ),
+}
+
+
+def build(root, compiler, victim_sweep):
+    config, name = SCHEDULER_CONFIGS[victim_sweep]
     subprocess.run(
         [
-            "dub", "build", "--config=task-pipeline-mixed-benchmark",
+            "dub", "build", "--config=" + config,
             "--build=release", "--compiler=" + compiler, "--force",
         ],
         cwd=root, check=True,
     )
-    target = root / "concurrency-task-pipeline-mixed"
+    target = root / name
     if not target.is_file():
         raise RuntimeError("DUB did not produce " + str(target))
     return target
@@ -89,6 +106,11 @@ def run_one(binary, root, workers, producers, tasks, budget, policy, round_id):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--compiler", default="ldc2")
+    parser.add_argument(
+        "--victim-sweep", choices=tuple(SCHEDULER_CONFIGS), default="full",
+        help="full matches develop after PR #37; legacy is the historical "
+             "N-1 candidate sweep for reproducing pre-merge R0.5 evidence",
+    )
     parser.add_argument("--workers", type=int, default=4)
     parser.add_argument("--tasks", type=int, default=12000)
     parser.add_argument("--rounds", type=int, default=5)
@@ -110,7 +132,7 @@ def main():
         parser.error("invalid worker/producer/task/round/budget")
 
     root = Path(__file__).resolve().parents[2]
-    binary = build(root, args.compiler)
+    binary = build(root, args.compiler, args.victim_sweep)
     args.output.mkdir(parents=True, exist_ok=True)
 
     rows = []
@@ -123,9 +145,10 @@ def main():
                     row = run_one(
                         binary, root, args.workers, producers, args.tasks,
                         budget, policy, round_id)
+                    row["victim_sweep"] = args.victim_sweep
                     rows.append(row)
                     print(
-                        f"R05 mixed producers={producers} budget={budget} "
+                        f"R05 mixed sweep={args.victim_sweep} producers={producers} budget={budget} "
                         f"policy={policy} round={round_id} "
                         f"tasks_per_s={float(row['throughput_per_s']):.1f} "
                         f"rss_kib={row['peak_rss_kib']} "
@@ -168,6 +191,7 @@ def main():
                 )
 
             summaries.append({
+                "victim_sweep": args.victim_sweep,
                 "producers": producers,
                 "budget": budget,
                 "workers": args.workers,
@@ -202,6 +226,20 @@ def main():
 
     with (args.output / "environment.txt").open("w") as stream:
         stream.write("compiler=" + args.compiler + "\n")
+        stream.write("victim_sweep=" + args.victim_sweep + "\n")
+        stream.write("scheduler_dub_config=" + SCHEDULER_CONFIGS[
+            args.victim_sweep][0] + "\n")
+        stream.write("develop_reference_fix=7af4409a2e09a303dfbc6c54033d28c92eb67581\n")
+        stream.write("research_head=" + subprocess.run(
+            ["git", "rev-parse", "HEAD"], cwd=root, text=True,
+            capture_output=True, check=True,
+        ).stdout.strip() + "\n")
+        stream.write("research_dirty_status_begin\n")
+        stream.write(subprocess.run(
+            ["git", "status", "--short", "--untracked-files=no"],
+            cwd=root, text=True, capture_output=True, check=True,
+        ).stdout)
+        stream.write("research_dirty_status_end\n")
         stream.write("platform=" + platform.platform() + "\n")
         stream.write("machine=" + platform.machine() + "\n")
         stream.write(
@@ -216,7 +254,8 @@ def main():
         except (OSError, subprocess.CalledProcessError):
             stream.write("lscpu unavailable\n")
 
-    print("R05 MIXED PAIRED MEDIANS (recycle throughput / gc throughput)")
+    print("R05 MIXED PAIRED MEDIANS (recycle throughput / gc throughput), "
+          "victim_sweep=" + args.victim_sweep)
     for row in summaries:
         print(
             f"producers={row['producers']} budget={row['budget']} "
