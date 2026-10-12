@@ -322,6 +322,27 @@ private void runCase(
     const reused = executor.reusedNodeCount();
     const accepted = executor.acceptedCount();
     const completed = executor.completedCount();
+    version (R05RecycleLookupProbe)
+    {
+        const lookup = executor.recycleLookupStatsAfterJoin();
+        if (policy == OwnedRecordPolicy.freshGc)
+        {
+            if (lookup.searches != 0 || lookup.attemptedCasts != 0 ||
+                lookup.hits != 0 || lookup.misses != 0 ||
+                lookup.lookupNs != 0)
+                throw new Exception("fresh GC unexpectedly ran typed lookup");
+        }
+        else if (lookup.searches != tasks ||
+                 lookup.hits + lookup.misses != lookup.searches ||
+                 lookup.hits != reused ||
+                 lookup.emptySearches > lookup.misses ||
+                 lookup.attemptedCasts < lookup.hits ||
+                 lookup.attemptedCasts > lookup.searches * budget ||
+                 lookup.hitIndexSum > lookup.attemptedCasts)
+        {
+            throw new Exception("typed lookup metrics inconsistent");
+        }
+    }
 
     ulong executed = atomicLoad!(MemoryOrder.acq)(executions);
     if (striped)
@@ -421,6 +442,20 @@ private void runCase(
         cpuRounds == 0 ? "minimal" : "compute",
         cpuRounds,
         atomicLoad!(MemoryOrder.acq)(computeChecksum));
+
+    version (R05RecycleLookupProbe)
+    {
+        // The optional timing bracket covers the heterogeneous spare scan
+        // and rearm bookkeeping, not the duration of RTTI cast alone.
+        // This output is parsed only by the specialized research driver.
+        writefln(
+            "lookup,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s",
+            policyName(policy), workers, producers, budget, tasks,
+            lookup.searches, lookup.emptySearches,
+            lookup.attemptedCasts, lookup.hits, lookup.misses,
+            lookup.hitIndexSum, lookup.maxHitIndex,
+            lookup.maxCandidates, lookup.lookupNs, lookup.maxLookupNs);
+    }
 
     if (parkingProfile)
     {
