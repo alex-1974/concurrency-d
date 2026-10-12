@@ -128,15 +128,13 @@ producer stripes and does not need to be repeated here.
 The driver (only on Linux) records and checks per-process:
 `raw.csv` 120 rows, `worker.csv` 240, `pairs.csv` 60
 paired worker-profile/off observations, `summary.csv` 12
-five-round factor summaries, `producer_scaling.csv` 40 within-round
+five-round factor summaries, `producer_scaling.csv` 80 within-round
 4/1 and 8/1 producer throughput ratios (when 1 is selected),
 plus `environment.txt` source SHA, both executable hashes,
 toolchain and governor snapshot.
 
-**Row-count qualification:** The scaling file contains
-5 rounds × 2 workloads × 2 policies × 2 modes ×
-2 non-single producer counts = **80 rows**. This value is
-normative; it supersedes the provisional 40 above.
+The scaling file contains 5 rounds × 2 workloads × 2 policies
+× 2 modes × 2 non-single producer counts = **80 rows**.
 
 Every benchmark process performs D release-runtime
 accepted/executed/completed checks, typed results, GC-visible
