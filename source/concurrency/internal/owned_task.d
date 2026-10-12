@@ -792,6 +792,24 @@ package(concurrency) final class OwnedTaskExecutor
         }
     }
 
+    version (R05WorkerThreadResources)
+    {
+        /**
+         * Research-only per-worker getrusage deltas.
+         * The controlling thread reads worker slots only after all workers
+         * join, preserving task/root lifetime and existing lock ordering.
+         */
+        auto workerResourceStatsAfterJoin()
+        {
+            synchronized (_mutex)
+            {
+                if (_lifecycle != Lifecycle.stopped)
+                    throw new Exception("worker resources require joined executor");
+                return _pool.workerResourceStatsAfterJoin();
+            }
+        }
+    }
+
     /** R0.5 inbox notification and occupancy counts after shutdown. */
     InboxParkingStats inboxParkingStatsAfterJoin()
     {
