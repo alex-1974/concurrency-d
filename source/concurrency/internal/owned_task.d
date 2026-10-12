@@ -455,22 +455,11 @@ package(concurrency) final class OwnedTaskExecutor
             if (_lifecycle != Lifecycle.running)
                 throw new Exception("executor is closed");
 
-            // Admission gate counts even rejected, allocation-free retries.
-            // The nested scope fires its exit timer on every early return.
-            {
-                version (R05AdmissionStageProbe)
-                {
-                    static if (Observed)
-                    {
-                        const gateStarted = MonoTime.currTime.ticks;
-                        scope(exit)
-                        {
-                            ++profile.gateCount;
-                            profile.gateNs += cast(ulong) ticksToNSecs(
-                                MonoTime.currTime.ticks - gateStarted);
-                        }
-                    }
-                }
+            // The gate is always timed once, including allocation-free
+            // capacity/retention rejections. It excludes mutex acquisition.
+            version (R05AdmissionStageProbe)
+                static if (Observed)
+                    const gateStarted = MonoTime.currTime.ticks;
             if (_retained.length >= _maxRetained)
             {
                 // O(capacity) cold path. This is intentionally deferred
@@ -482,6 +471,15 @@ package(concurrency) final class OwnedTaskExecutor
                 {
                     static if (Observed)
                         ++profile.retentionFull;
+                    version (R05AdmissionStageProbe)
+                    {
+                        static if (Observed)
+                        {
+                            ++profile.gateCount;
+                            profile.gateNs += cast(ulong) ticksToNSecs(
+                                MonoTime.currTime.ticks - gateStarted);
+                        }
+                    }
                     return TaskHandle!R.init;
                 }
             }
@@ -494,16 +492,31 @@ package(concurrency) final class OwnedTaskExecutor
             {
                 static if (Observed)
                     ++profile.ingressFull;
+                version (R05AdmissionStageProbe)
+                {
+                    static if (Observed)
+                    {
+                        ++profile.gateCount;
+                        profile.gateNs += cast(ulong) ticksToNSecs(
+                            MonoTime.currTime.ticks - gateStarted);
+                    }
+                }
                 return TaskHandle!R.init;
             }
-
-            } // gate / rejection-before-allocation
 
             version (R05AdmissionStageProbe)
             {
                 static if (Observed)
-                    const cellStarted = MonoTime.currTime.ticks;
+                {
+                    ++profile.gateCount;
+                    profile.gateNs += cast(ulong) ticksToNSecs(
+                        MonoTime.currTime.ticks - gateStarted);
+                }
             }
+
+            version (R05AdmissionStageProbe)
+                static if (Observed)
+                    const cellStarted = MonoTime.currTime.ticks;
             auto cell = new ResultCell!R();
             handle = new TaskHandle!R(cell);
             version (R05AdmissionStageProbe)
@@ -517,10 +530,8 @@ package(concurrency) final class OwnedTaskExecutor
             }
 
             version (R05AdmissionStageProbe)
-            {
                 static if (Observed)
                     const nodeStarted = MonoTime.currTime.ticks;
-            }
             OwnedNode!(F, R) node;
             if (_recordPolicy == OwnedRecordPolicy.recycleTyped)
             {
@@ -590,10 +601,8 @@ package(concurrency) final class OwnedTaskExecutor
             // Install the strong GC root before any worker can claim the
             // record. If admission fails, clear the tail GC slot too.
             version (R05AdmissionStageProbe)
-            {
                 static if (Observed)
                     const publishStarted = MonoTime.currTime.ticks;
-            }
             _retained ~= RetainedTask(node, node.returnedFlag());
             const status = _pool.trySubmit(node.reference());
             version (R05AdmissionStageProbe)
