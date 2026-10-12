@@ -1,0 +1,135 @@
+name: R0.5 inbox mutex and notify research
+
+on:
+  push:
+    branches:
+      - perf/r05-owned-task-pipeline
+    paths:
+      - "source/concurrency/internal/owned_task.d"
+      - "benchmarks/task_pipeline/multi_producer.d"
+      - "tools/research/r05_inbox_submit_matrix.py"
+      - "dub.sdl"
+      - ".github/workflows/r05-inbox-submit-qualification.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  stages:
+    name: Inbox submit / ${{ matrix.label }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: dmd-x86
+            runner: ubuntu-24.04
+            compiler: dmd-2.111.0
+          - label: ldc-x86
+            runner: ubuntu-24.04
+            compiler: ldc-1.41.0
+          - label: ldc-arm64
+            runner: ubuntu-24.04-arm
+            compiler: ldc-1.41.0
+
+    steps:
+      - name: Checkout grandfathered research
+        uses: actions/checkout@v7
+
+      - name: Set up compiler
+        uses: dlang-community/setup-dlang@v2
+        with:
+          compiler: ${{ matrix.compiler }}
+
+      - name: Verify driver syntax and compiler
+        shell: bash
+        run: |
+          python3 -m py_compile tools/research/r05_inbox_submit_matrix.py
+          "$DC" --version
+          dub --version
+          git rev-parse HEAD
+
+      - name: Full-victim baseline and admission-stage paired smoke
+        shell: bash
+        run: |
+          python3 tools/research/r05_inbox_submit_matrix.py \
+            --compiler="$DC" --workers=4 --tasks=384 --rounds=1 \
+            --producers 1 4 --budgets 8 512 --workload=minimal \
+            --counter=shared \
+            --output="evidence/r05-inbox/${{ matrix.label }}"
+
+      - name: Strict inbox enqueue notification and stage accounting
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import csv
+          from pathlib import Path
+          root = Path("evidence/r05-inbox/${{ matrix.label }}")
+          def read(name):
+              with (root / name).open(newline="") as stream:
+                  return list(csv.DictReader(stream))
+          raw = read("raw.csv")
+          pairs = read("pairs.csv")
+          diagnostics = read("diagnostics.csv")
+          summary = read("summary.csv")
+          assert len(raw) == 16
+          assert len(pairs) == 8
+          assert len(diagnostics) == 8
+          assert len(summary) == 8
+          assert len({(r["round"], r["profile"], r["policy"],
+                      r["producers"], r["budget"]) for r in raw}) == 16
+          for r in raw:
+              assert int(r["fresh_nodes"]) + int(r["reused_nodes"]) == 384
+              if r["profile"] == "off":
+                  assert r["gate_count"] == ""
+              else:
+                  assert int(r["gate_count"]) == int(r["attempts"])
+                  assert all(int(r[f + "_count"]) == 384
+                             for f in ("cell", "node", "publish",
+                                       "root_append", "inbox_submit"))
+                  assert 0 <= int(r["root_append_ns"]) <= int(
+                      r["publish_ns"])
+                  assert 0 <= int(r["inbox_submit_ns"]) <= int(
+                      r["publish_ns"])
+                  assert int(r["accepted"]) == 384
+                  assert int(r["yields"]) == int(r["retention_full"]) + int(
+                      r["ingress_full"])
+                  assert int(r["inbox_attempts"]) == 384
+                  assert int(r["inbox_accepted"]) == 384
+                  assert int(r["inbox_enqueue_count"]) == 384
+                  assert int(r["inbox_notify_calls"]) == 384
+                  assert int(r["inbox_notify_skipped"]) == 0
+                  assert int(r["inbox_rejected_full"]) == 0
+                  assert int(r["inbox_rejected_closed"]) == 0
+                  assert int(r["inbox_hold_ns"]) >= int(r["inbox_enqueue_ns"])
+                  assert int(r["inbox_hold_ns"]) >= int(r["inbox_notify_ns"])
+                  assert int(r["inbox_wait_ns"]) >= 0
+          assert all(float(r["root_append_ns_per_admission"]) >= 0 and
+                     float(r["inbox_submit_ns_per_admission"]) >= 0 and
+                     0 <= float(r["root_over_publish_diagnostic"]) <= 1 and
+                     0 <= float(r["inbox_over_publish_diagnostic"]) <= 1
+                     for r in diagnostics)
+          assert all(float(r["inbox_wait_ns_per_attempt"]) >= 0 and
+                     float(r["inbox_hold_ns_per_attempt"]) > 0 and
+                     float(r["inbox_enqueue_ns_per_task"]) >= 0 and
+                     float(r["inbox_notify_ns_per_call"]) >= 0
+                     for r in diagnostics)
+          for r in pairs + summary:
+              key = ("recycle_over_gc" if "recycle_over_gc" in r
+                     else "median_recycle_over_gc")
+              assert float(r[key]) > 0
+          assert "benchmark=full-victim-inbox-submit-research" in (
+              root / "environment.txt").read_text()
+          print("PASS: inbox mutex/enqueue/notify accounting and off control")
+          PY
+
+      - name: Preserve hosted diagnostics; not a speed gate
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: r05-inbox-${{ matrix.label }}-${{ github.run_id }}
+          path: evidence/r05-inbox/${{ matrix.label }}/
+          if-no-files-found: warn
+          retention-days: 30
