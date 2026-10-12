@@ -1,0 +1,108 @@
+name: R0.5 post-PR37 storage baseline smoke
+
+on:
+  push:
+    branches:
+      - perf/r05-owned-task-pipeline
+    paths:
+      - "tools/research/r05_mixed_producer_matrix.py"
+      - "source/concurrency/internal/**"
+      - "benchmarks/task_pipeline/multi_producer.d"
+      - "dub.sdl"
+      - ".github/workflows/r05-post-pr37-storage-smoke.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  scheduler-baseline:
+    name: R0.5 full and legacy storage / ${{ matrix.label }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: dmd-x86
+            runner: ubuntu-24.04
+            compiler: dmd-2.111.0
+          - label: ldc-x86
+            runner: ubuntu-24.04
+            compiler: ldc-1.41.0
+          - label: ldc-arm64
+            runner: ubuntu-24.04-arm
+            compiler: ldc-1.41.0
+
+    steps:
+      - name: Checkout original grandfathered research branch
+        uses: actions/checkout@v7
+
+      - name: Set up compiler
+        uses: dlang-community/setup-dlang@v2
+        with:
+          compiler: ${{ matrix.compiler }}
+
+      - name: Environment
+        shell: bash
+        run: |
+          "$DC" --version
+          dub --version
+          uname -m
+          git rev-parse HEAD
+
+      - name: Default full-sweep GC/recycle paired smoke
+        shell: bash
+        run: |
+          python3 tools/research/r05_mixed_producer_matrix.py \
+            --compiler="$DC" --victim-sweep=full \
+            --workers=4 --tasks=384 --rounds=1 \
+            --producers 1 4 --budgets 8 512 \
+            --output="evidence/r05-post-pr37/${{ matrix.label }}/full"
+
+      - name: Explicit historical legacy-sweep paired smoke
+        shell: bash
+        run: |
+          python3 tools/research/r05_mixed_producer_matrix.py \
+            --compiler="$DC" --victim-sweep=legacy \
+            --workers=4 --tasks=384 --rounds=1 \
+            --producers 1 --budgets 512 \
+            --output="evidence/r05-post-pr37/${{ matrix.label }}/legacy"
+
+      - name: Verify baseline labels and paired accounting
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import csv
+          from pathlib import Path
+          root = Path("evidence/r05-post-pr37/${{ matrix.label }}")
+          for kind, expect_rows in (("full", 8), ("legacy", 2)):
+              p = root / kind
+              with (p / "raw.csv").open(newline="") as stream:
+                  rows = list(csv.DictReader(stream))
+              with (p / "summary.csv").open(newline="") as stream:
+                  summary = list(csv.DictReader(stream))
+              assert len(rows) == expect_rows
+              assert all(row["victim_sweep"] == kind for row in rows)
+              assert all(int(row["completed"]) == 384 for row in rows)
+              assert all(row["victim_sweep"] == kind for row in summary)
+              assert all(float(row["median_paired_speedup_recycle"]) > 0
+                         for row in summary)
+              groups = {}
+              for r in rows:
+                  key = (r["matrix_round"], r["producers"], r["budget"])
+                  groups.setdefault(key, set()).add(r["policy"])
+              assert all(v == {"gc", "recycle"} for v in groups.values())
+              assert "victim_sweep=" + kind in (
+                  p / "environment.txt").read_text()
+          print("PASS: full/default and legacy explicit paired storage modes")
+          PY
+
+      - name: Preserve diagnostic evidence (not a speed gate)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: r05-post-pr37-${{ matrix.label }}-${{ github.run_id }}
+          path: evidence/r05-post-pr37/${{ matrix.label }}/
+          if-no-files-found: warn
+          retention-days: 30
