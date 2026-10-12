@@ -1,0 +1,120 @@
+name: R0.5 shared vs striped counter qualification
+
+on:
+  push:
+    branches:
+      - perf/r05-owned-task-pipeline
+    paths:
+      - "tools/research/r05_counter_contention_matrix.py"
+      - "tools/research/r05_native_cpu_profile.py"
+      - "benchmarks/task_pipeline/multi_producer.d"
+      - "source/concurrency/internal/**"
+      - "dub.sdl"
+      - ".github/workflows/r05-counter-contention-qualification.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  counter-qualification:
+    name: Single-binary shared-striped control / ${{ matrix.label }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: dmd-x86
+            runner: ubuntu-24.04
+            compiler: dmd-2.111.0
+          - label: ldc-x86
+            runner: ubuntu-24.04
+            compiler: ldc-1.41.0
+          - label: ldc-arm64
+            runner: ubuntu-24.04-arm
+            compiler: ldc-1.41.0
+
+    steps:
+      - name: Checkout grandfathered R0.5 source
+        uses: actions/checkout@v7
+
+      - name: Set up D compiler
+        uses: dlang-community/setup-dlang@v2
+        with:
+          compiler: ${{ matrix.compiler }}
+
+      - name: Verify Python syntax and active compiler
+        shell: bash
+        run: |
+          python3 -m py_compile \
+            tools/research/r05_native_cpu_profile.py \
+            tools/research/r05_counter_contention_matrix.py
+          "$DC" --version
+          dub --version
+
+      - name: Single-release-binary shared-striped smoke
+        shell: bash
+        run: |
+          python3 tools/research/r05_counter_contention_matrix.py \
+            --compiler="$DC" --workers=4 --tasks=384 --rounds=1 \
+            --producers 1 4 --budgets 512 \
+            --workloads minimal compute --policies gc recycle \
+            --cooldown-ms=0 \
+            --output="evidence/r05-counter/${{ matrix.label }}"
+
+      - name: Audit exact paired matrix, checksums and worker resource data
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import csv
+          from pathlib import Path
+          root = Path("evidence/r05-counter/${{ matrix.label }}")
+          def records(filename):
+              with (root / filename).open(newline="") as stream:
+                  return list(csv.DictReader(stream))
+          raw = records("raw.csv")
+          pairs = records("pairs.csv")
+          summary = records("summary.csv")
+          scaling = records("producer_scaling.csv")
+          scaling_summary = records("producer_scaling_summary.csv")
+          assert (len(raw), len(pairs), len(summary),
+                  len(scaling), len(scaling_summary)) == (16, 8, 8, 8, 8)
+          assert len({(r["round"], r["workload"], r["producers"],
+                      r["budget"], r["policy"], r["counter"])
+                     for r in raw}) == 16
+          assert len({r["binary_sha256"] for r in raw}) == 1
+          checksums = {}
+          for r in raw:
+              assert r["profile_mode"] == "plain"
+              assert int(r["completed"]) == int(r["tasks"]) == 384
+              assert int(r["fresh_nodes"]) + int(r["reused_nodes"]) == 384
+              assert int(r["observed_handles"]) > 0
+              assert float(r["throughput_per_s"]) > 0
+              assert float(r["peak_rss_kib"]) > 0
+              assert float(r["child_cpu_over_external_wall"]) >= 0
+              assert int(r["child_voluntary_switches"]) >= 0
+              checksums.setdefault(r["workload"], set()).add(r["checksum"])
+          assert all(len(values) == 1 for values in checksums.values())
+          assert all(float(r["striped_over_shared"]) > 0 for r in pairs)
+          assert all(float(r["median_striped_over_shared"]) > 0
+                     and int(r["rounds"]) == 1 for r in summary)
+          assert all(float(r["target_over_one_throughput"]) > 0
+                     for r in scaling)
+          assert all(float(r["median_target_over_one_throughput"]) > 0
+                     for r in scaling_summary)
+          env = (root / "environment.txt").read_text()
+          assert "compiled_versions=R05FullVictimSweep only" in env
+          assert "instrumentation=off; parking=off; notify=always" in env
+          assert "counter_modes=shared striped (same executable)" in env
+          print("PASS: single release binary, checksum and 16-case A/B")
+          PY
+
+      - name: Preserve correctness evidence, not performance claims
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: r05-counter-${{ matrix.label }}-${{ github.run_id }}
+          path: evidence/r05-counter/${{ matrix.label }}/
+          if-no-files-found: warn
+          retention-days: 30
