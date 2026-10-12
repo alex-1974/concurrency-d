@@ -66,13 +66,27 @@ def csv_save(path, records):
         writer.writerows(records)
 
 
-def run_child(executable, cwd, args, fields):
+def cpu_clock_snapshot_khz():
+    """Optional CPU-frequency snapshot; NOT a workload average or control."""
+    observed = []
+    for path in Path("/sys/devices/system/cpu").glob(
+            "cpu[0-9]*/cpufreq/scaling_cur_freq"):
+        try:
+            observed.append(int(path.read_text().strip()))
+        except (OSError, ValueError):
+            pass
+    return int(statistics.median(observed)) if observed else ""
+
+
+def run_child(executable, cwd, args, fields, cpu_snapshots=False):
+    freq_before = cpu_clock_snapshot_khz() if cpu_snapshots else ""
     before = resource.getrusage(resource.RUSAGE_CHILDREN)
     t0 = time.perf_counter_ns()
     child = subprocess.run([str(executable), *map(str, args)], cwd=cwd,
                            capture_output=True, text=True, timeout=180)
     outer_ns = time.perf_counter_ns() - t0
     after = resource.getrusage(resource.RUSAGE_CHILDREN)
+    freq_after = cpu_clock_snapshot_khz() if cpu_snapshots else ""
     if child.returncode:
         raise RuntimeError("bad benchmark exit: " +
                            (child.stdout + child.stderr)[-7000:])
@@ -89,7 +103,11 @@ def run_child(executable, cwd, args, fields):
         process_sys_cpu_us=round((after.ru_stime - before.ru_stime) * 1e6),
         process_voluntary_cs=after.ru_nvcsw - before.ru_nvcsw,
         process_involuntary_cs=after.ru_nivcsw - before.ru_nivcsw,
-        process_peak_rss_kib=after.ru_maxrss)
+        # ru_maxrss with RUSAGE_CHILDREN is a cumulative maximum, so its
+        # value is not a reliable per-child RSS delta.
+        process_peak_rss_kib=after.ru_maxrss,
+        cpu_snapshot_median_khz_before=freq_before,
+        cpu_snapshot_median_khz_after=freq_after)
     return result
 
 
@@ -147,6 +165,9 @@ def main():
                    help="Run paired idle/wake tests without mixed throughput")
     p.add_argument("--mixed-only", action="store_true",
                    help="Run paired mixed throughput without idle/wake probes")
+    p.add_argument("--cpu-snapshots", action="store_true",
+                   help="Record available CPU frequency snapshots around "
+                        "each case (diagnostic only, no clock control)")
     p.add_argument("--output", type=Path,
                    default=Path("evidence/m0-victim-coverage-xps"))
     a = p.parse_args()
@@ -223,7 +244,8 @@ def main():
                                 r = run_child(
                                     binaries[mode], dirs[mode],
                                     ["mixed", workers, producers, a.tasks,
-                                     a.budget, rounds], MIXED)
+                                     a.budget, rounds], MIXED,
+                                    cpu_snapshots=a.cpu_snapshots)
                                 if (r["workers"] != workers or
                                         r["producers"] != producers or
                                         r["tasks"] != a.tasks or
@@ -369,7 +391,8 @@ def main():
                   f"rounds={a.rounds} tasks={a.tasks} budget={a.budget}\n"
                   f"workers={a.workers} producers={a.producers} "
                   f"workloads={a.workloads} compute_rounds={a.compute_rounds}\n"
-                  f"idle_only={a.idle_only} mixed_only={a.mixed_only}\n"
+                  f"idle_only={a.idle_only} mixed_only={a.mixed_only} "
+                  f"cpu_snapshots={a.cpu_snapshots}\n"
                   f"idle_ms={a.idle_ms} wake_samples={a.wake_samples} "
                   f"gap_ms={a.gap_ms} cooldown_ms={a.cooldown_ms}\n"
                   "Both detached worktrees receive the identical benchmark "
@@ -380,7 +403,11 @@ def main():
                   "nearest rank, not a long-term tail SLA.\n"
                   "Throughput ratios use exact same-round pairs. "
                   "One-worker control ratios are diagnostic only; "
-                  "do not replace absolute changes or infer causality.\n")
+                  "do not replace absolute changes or infer causality.\n"
+                  "CPU clock snapshots are instantaneous multi-CPU "
+                  "medians, not measured workload frequency; no governor "
+                  "or thermal policy is changed. RUSAGE_CHILDREN ru_maxrss "
+                  "is cumulative across children.\n")
         for cmd in (["git", "status", "--short", "--branch"],
                     [a.compiler, "--version"], ["dub", "--version"],
                     ["lscpu"],
