@@ -29,7 +29,7 @@ FIELDS = (
     "used_after_collect_delta", "observed_handles", "completed",
 )
 RESOURCE = (
-    "metric", "counter_mode", "workers", "producers", "budget", "tasks",
+    "metric", "policy", "counter_mode", "workers", "producers", "budget", "tasks",
     "producer_user_us", "producer_system_us", "producer_voluntary",
     "producer_involuntary", "producer_minor_faults", "producer_major_faults",
 )
@@ -118,6 +118,7 @@ def run_child(root, binary, round_no, producers, budget, policy, workload,
             other["workload"] != workload or
             int(other["compute_rounds"]) !=
             (1024 if workload == "compute" else 0) or
+            producer["policy"] != policy or
             producer["counter_mode"] != counter or
             producer["workers"] != str(workers) or
             producer["producers"] != str(producers)):
