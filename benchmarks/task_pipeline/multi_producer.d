@@ -600,6 +600,10 @@ private void runCase(
                 total.nodeNs += profile.nodeNs;
                 total.publishCount += profile.publishCount;
                 total.publishNs += profile.publishNs;
+                total.rootAppendCount += profile.rootAppendCount;
+                total.rootAppendNs += profile.rootAppendNs;
+                total.inboxSubmitCount += profile.inboxSubmitCount;
+                total.inboxSubmitNs += profile.inboxSubmitNs;
             }
             ulong attempts;
             ulong acceptedAttempts;
@@ -617,16 +621,23 @@ private void runCase(
                 total.gateCount != attempts ||
                 total.cellCount != tasks ||
                 total.nodeCount != tasks ||
-                total.publishCount != tasks)
+                total.publishCount != tasks ||
+                total.rootAppendCount != tasks ||
+                total.inboxSubmitCount != tasks ||
+                total.rootAppendNs > total.publishNs ||
+                total.inboxSubmitNs > total.publishNs)
                 throw new Exception("admission stage accounting mismatch");
 
-            writefln("stage,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s",
+            writefln(
+                "stage,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s",
                 policyName(policy), striped ? "striped" : "shared",
                 producers, workers, budget, tasks,
                 total.gateCount, total.gateNs,
                 total.cellCount, total.cellNs,
                 total.nodeCount, total.nodeNs,
-                total.publishCount, total.publishNs);
+                total.publishCount, total.publishNs,
+                total.rootAppendCount, total.rootAppendNs,
+                total.inboxSubmitCount, total.inboxSubmitNs);
         }
     }
 }
