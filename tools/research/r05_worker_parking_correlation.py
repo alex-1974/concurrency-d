@@ -27,6 +27,14 @@ from r05_worker_resource_matrix import WORKER, WORKER_NUMERIC, CONFIGS
 from r05_worker_parking_matrix import PARK, WAKE, read_metric
 
 MODES = ("plain", "worker", "combined")
+
+
+def median_defined(rows, key):
+    """Preserve missing first-search ratios when no worker exited a wait."""
+    values = [row[key] for row in rows if row[key] != ""]
+    return statistics.median(values) if values else ""
+
+
 NOTIFY = (
     "metric", "policy", "workload", "producers", "workers",
     "budget", "tasks", "notify_policy", "ingress_calls",
@@ -358,12 +366,10 @@ def main():
                         r["condition_waits_per_task"] for r in series),
                     median_failed_steals_per_task=statistics.median(
                         r["failed_steals_per_task"] for r in series),
-                    median_empty_first_search_fraction=statistics.median(
-                        r["empty_first_search_fraction"] for r in series
-                        if r["empty_first_search_fraction"] != ""),
-                    median_useful_first_search_fraction=statistics.median(
-                        r["useful_first_search_fraction"] for r in series
-                        if r["useful_first_search_fraction"] != ""),
+                    median_empty_first_search_fraction=median_defined(
+                        series, "empty_first_search_fraction"),
+                    median_useful_first_search_fraction=median_defined(
+                        series, "useful_first_search_fraction"),
                     median_worker_voluntary_per_30k=statistics.median(
                         r["worker_voluntary"] for r in series),
                     median_producer_voluntary_per_30k=statistics.median(
