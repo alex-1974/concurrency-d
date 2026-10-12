@@ -803,6 +803,24 @@ package(concurrency) final class OwnedTaskExecutor
         }
     }
 
+    version (R05InboxSubmitProbe)
+    {
+        /**
+         * Research-only inbox submit timings, safe after close/join.
+         * The executor mutex serializes lifecycle against this snapshot,
+         * preserving outer-admission -> inner-inbox lock order.
+         */
+        auto inboxSubmitStatsAfterJoin()
+        {
+            synchronized (_mutex)
+            {
+                if (_lifecycle != Lifecycle.stopped)
+                    throw new Exception("inbox submit stats require joined executor");
+                return _pool.inboxSubmitStatsAfterJoin();
+            }
+        }
+    }
+
     version (R05TaskTrace)
     {
         /** Research-only snapshot. Not readable during worker execution. */
