@@ -443,6 +443,30 @@ private void runCase(
         cpuRounds,
         atomicLoad!(MemoryOrder.acq)(computeChecksum));
 
+    version (R05WorkerThreadResources)
+    {
+        // The scheduler records exactly two thread-local resource samples:
+        // before workerLoop and after its final return. Slots are only
+        // read after closeAndJoin(), never concurrently with the workers.
+        auto workerResources = executor.workerResourceStatsAfterJoin();
+        if (workerResources.length != workers)
+            throw new Exception("worker resource count mismatch");
+
+        foreach (index, resource; workerResources)
+        {
+            if (!resource.sampled)
+                throw new Exception("worker failed to record thread resources");
+            writefln(
+                "worker-resource,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s",
+                policyName(policy), striped ? "striped" : "shared",
+                workers, producers, budget, tasks, index,
+                resource.cpuUserUs, resource.cpuSystemUs,
+                resource.voluntarySwitches, resource.involuntarySwitches,
+                resource.minorFaults, resource.majorFaults,
+                cast(int) resource.sampled);
+        }
+    }
+
     version (R05RecycleLookupProbe)
     {
         // The optional timing bracket covers the heterogeneous spare scan
