@@ -272,6 +272,26 @@ package(concurrency) enum OwnedRecordPolicy
     recycleTyped
 }
 
+// Opt-in research counter. Only compiled with -version=R05RecycleLookupProbe.
+// The owning executor's admission mutex protects every write, and readers
+// obtain a snapshot only after its workers/producers have been joined.
+version (R05RecycleLookupProbe)
+{
+    package(concurrency) struct RecycleLookupStats
+    {
+        ulong searches;
+        ulong emptySearches;
+        ulong attemptedCasts;
+        ulong hits;
+        ulong misses;
+        ulong hitIndexSum;
+        ulong maxHitIndex;
+        ulong maxCandidates;
+        ulong lookupNs;
+        ulong maxLookupNs;
+    }
+}
+
 /**
  * Per-producer R0.5 instrumentation, exclusively owned by its calling
  * producer thread. No sharing or synchronization is needed for the sample
@@ -340,6 +360,8 @@ package(concurrency) final class OwnedTaskExecutor
     private OwnedRecordPolicy _recordPolicy;
     private size_t _freshNodes;
     private size_t _reusedNodes;
+    version (R05RecycleLookupProbe)
+        private RecycleLookupStats _lookupStats;
 
     // _mutex serializes admission against shutdown. Exactly one caller
     // performs the worker join; other closers wait for the same outcome.
@@ -450,14 +472,33 @@ package(concurrency) final class OwnedTaskExecutor
             OwnedNode!(F, R) node;
             if (_recordPolicy == OwnedRecordPolicy.recycleTyped)
             {
+                version (R05RecycleLookupProbe)
+                {
+                    const searchStarted = MonoTime.currTime.ticks;
+                    ++_lookupStats.searches;
+                    const candidateCount = _spare.length;
+                    if (candidateCount == 0)
+                        ++_lookupStats.emptySearches;
+                    if (candidateCount > _lookupStats.maxCandidates)
+                        _lookupStats.maxCandidates = candidateCount;
+                }
                 // Exact type-match is essential: a node can be rearmed only
                 // for the identical concrete F/R layout. Different closure
                 // shapes use independent nodes and cannot alias old handles.
                 foreach (i; 0 .. _spare.length)
                 {
+                    version (R05RecycleLookupProbe)
+                        ++_lookupStats.attemptedCasts;
                     node = cast(OwnedNode!(F, R)) _spare[i].node;
                     if (node !is null)
                     {
+                        version (R05RecycleLookupProbe)
+                        {
+                            ++_lookupStats.hits;
+                            _lookupStats.hitIndexSum += i;
+                            if (i > _lookupStats.maxHitIndex)
+                                _lookupStats.maxHitIndex = i;
+                        }
                         _spare[i] = _spare[$ - 1];
                         _spare[$ - 1] = RetainedTask.init;
                         _spare.length = _spare.length - 1;
@@ -465,6 +506,16 @@ package(concurrency) final class OwnedTaskExecutor
                         ++_reusedNodes;
                         break;
                     }
+                }
+                version (R05RecycleLookupProbe)
+                {
+                    if (node is null)
+                        ++_lookupStats.misses;
+                    const lookupNs = cast(ulong) ticksToNSecs(
+                        MonoTime.currTime.ticks - searchStarted);
+                    _lookupStats.lookupNs += lookupNs;
+                    if (lookupNs > _lookupStats.maxLookupNs)
+                        _lookupStats.maxLookupNs = lookupNs;
                 }
             }
 
@@ -577,6 +628,24 @@ package(concurrency) final class OwnedTaskExecutor
     {
         synchronized (_mutex)
             return _spare.length;
+    }
+
+    version (R05RecycleLookupProbe)
+    {
+        /**
+         * Research-only lookup totals, read only after the sole join.
+         * Values include probe overhead and time inside the admission
+         * critical section; lookupNs is NOT isolated RTTI cast latency.
+         */
+        RecycleLookupStats recycleLookupStatsAfterJoin()
+        {
+            synchronized (_mutex)
+            {
+                if (_lifecycle != Lifecycle.stopped)
+                    throw new Exception("lookup stats require joined executor");
+                return _lookupStats;
+            }
+        }
     }
 
     /**
