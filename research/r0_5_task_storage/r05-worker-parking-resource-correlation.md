@@ -138,6 +138,10 @@ All output is created by fresh Linux child processes and includes:
 - `environment.txt` — exact research HEAD, both executable SHA-256s,
   LDC and DUB versions, snapshot governor/CPU, mode and protocol warnings.
 
+If no final wait-loop exit was observed in a short scenario, the
+useful/empty search ratio is preserved as **missing (blank)** rather
+than represented as 0%. This is distinct from an observed 0% rate.
+
 **Expected default matrix:** 5 rounds × 2 workloads × 3 producer counts
 (1/4/8) × 2 record policies × **3** modes = **180 independent fresh
 processes, 30,000 completed Tasks/process = 5.4 million Tasks**.
