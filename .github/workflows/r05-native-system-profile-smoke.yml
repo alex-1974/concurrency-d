@@ -1,0 +1,110 @@
+name: R0.5 native-system profiler smoke
+
+on:
+  push:
+    branches:
+      - perf/r05-owned-task-pipeline
+    paths:
+      - "tools/research/r05_native_cpu_profile.py"
+      - "benchmarks/task_pipeline/multi_producer.d"
+      - "source/concurrency/internal/**"
+      - "dub.sdl"
+      - ".github/workflows/r05-native-system-profile-smoke.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  native-system:
+    name: Uninstrumented R0.5 resource audit / ${{ matrix.label }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: dmd-x86
+            runner: ubuntu-24.04
+            compiler: dmd-2.111.0
+          - label: ldc-x86
+            runner: ubuntu-24.04
+            compiler: ldc-1.41.0
+          - label: ldc-arm64
+            runner: ubuntu-24.04-arm
+            compiler: ldc-1.41.0
+
+    steps:
+      - name: Checkout grandfathered R0.5 branch
+        uses: actions/checkout@v7
+
+      - name: Install D compiler
+        uses: dlang-community/setup-dlang@v2
+        with:
+          compiler: ${{ matrix.compiler }}
+
+      - name: Verify runner syntax and compiler
+        shell: bash
+        run: |
+          python3 -m py_compile tools/research/r05_native_cpu_profile.py
+          "$DC" --version
+          dub --version
+
+      - name: Run paired tiny uninstrumented full-victim workloads
+        shell: bash
+        run: |
+          python3 tools/research/r05_native_cpu_profile.py \
+            --compiler="$DC" --rounds=1 --tasks=384 --workers=4 \
+            --producers 1 4 --budgets 8 512 \
+            --workloads minimal compute --policies gc recycle \
+            --counter=shared --perf-stat=off --perf-repeats=0 \
+            --output="evidence/r05-native-system/${{ matrix.label }}"
+
+      - name: Check exact cases, completion, child resource and paired ratios
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import csv
+          from pathlib import Path
+          d = Path("evidence/r05-native-system/${{ matrix.label }}")
+          def load(filename):
+              with (d / filename).open(newline="") as handle:
+                  return list(csv.DictReader(handle))
+          raw = load("raw.csv")
+          pairs = load("pairs.csv")
+          summary = load("summary.csv")
+          assert len(raw) == 16, len(raw)
+          assert len(pairs) == 8, len(pairs)
+          assert len(summary) == 8, len(summary)
+          assert len({(r["round"], r["workload"], r["producers"],
+                      r["budget"], r["policy"]) for r in raw}) == 16
+          for r in raw:
+              assert r["profile_mode"] == "plain"
+              assert r["counter"] == "shared"
+              assert int(r["completed"]) == int(r["tasks"]) == 384
+              assert int(r["fresh_nodes"]) + int(r["reused_nodes"]) == 384
+              assert int(r["observed_handles"]) > 0
+              assert float(r["throughput_per_s"]) > 0
+              assert float(r["external_wall_ms"]) > 0
+              assert float(r["peak_rss_kib"]) > 0
+              assert float(r["child_cpu_over_external_wall"]) >= 0
+              assert int(r["child_voluntary_switches"]) >= 0
+              assert int(r["producer_voluntary_switches"]) >= 0
+          assert all(float(x["recycle_over_gc"]) > 0 for x in pairs)
+          assert all(int(x["recycle_wins"]) in (0, 1) for x in summary)
+          env = (d / "environment.txt").read_text()
+          assert "compiled_versions=R05FullVictimSweep only" in env
+          assert "perf_available=False" in env
+          assert "instrumentation=off; parking=off; notify=always" in env
+          assert not (d / "perf.csv").exists()
+          print("PASS: 16 exact uninstrumented cases and resource accounting")
+          PY
+
+      - name: Archive correctness evidence (no hosted perf claims)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: r05-native-system-${{ matrix.label }}-${{ github.run_id }}
+          path: evidence/r05-native-system/${{ matrix.label }}/
+          if-no-files-found: warn
+          retention-days: 30
