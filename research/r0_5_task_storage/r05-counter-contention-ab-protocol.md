@@ -89,8 +89,8 @@ It deliberately reuses the externally verified
 
 The default native matrix has **10 rounds × 2 workloads ×
 3 producer counts × 1 budget × 2 storage policies × 2 counter
-modes = 120 independent child processes**, **30,000 completed
-Tasks per child = 3.6 million actual Tasks**. This gives
+modes = 240 independent child processes**, **30,000 completed
+Tasks per child = 7.2 million actual Tasks**. This gives
 10 within-round counter pairs per factor group (12 factor groups),
 and per-mode 4/1 and 8/1 controls, double the previous
 five-round sampling depth. The original XPS campaign (shared-only)
@@ -129,14 +129,14 @@ previous native research. The expected files are:
 
 | File | Meaning | Expected row count |
 |---|---|---:|
-| `raw.csv` | 120 process results, all six factors | 120 |
-| `pairs.csv` | within-round striped/shared throughput, CPU/switch diagnostics | 60 |
+| `raw.csv` | 240 process results, all six factors | 240 |
+| `pairs.csv` | within-round striped/shared throughput, CPU/switch diagnostics | 120 |
 | `summary.csv` | 10-round paired ratios/wins by workload/producers/policy | 12 |
 | `producer_scaling.csv` | per-mode 4/1 and 8/1 producer diagnostic ratios | 160 |
 | `producer_scaling_summary.csv` | per-group 4/1 and 8/1 median scaling | 16 |
 | `environment.txt` | source/compilation/governor/binary identity and limitations | — |
 
-The default matrix includes **60 paired counter comparisons**
+The default matrix includes **120 paired counter comparisons**
 (10 rounds × 2 workloads × 3 producer counts × 2 policies),
 **12 paired-summary groups**, **160 producer-scaling
 comparisons** (10 × 2 workloads × 2 policies × 2 modes ×
@@ -151,6 +151,15 @@ accepted = completed = tasks`, all observed typed results and
 GC-visible/void tasks. The Python driver checks agreement of
 the returned deterministic checksum across all modes and
 scenarios of a given workload.
+
+
+**Protocol accounting correction (2026-10-12):** Earlier versions of
+this document mistakenly counted only one counter mode per scenario
+and claimed 120 children / 3.6M Tasks and 60 striped/shared pairs.
+The executable driver and original user evidence actually run **both**
+shared and striped in a separate fresh process for every scenario:
+**240 children / 7.2M Tasks and 120 pairs**. The source data and
+runner were not altered by this documentation correction.
 
 ## How to decide
 
