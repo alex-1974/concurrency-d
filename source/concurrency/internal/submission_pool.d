@@ -50,6 +50,12 @@ import core.sync.condition :
 import core.thread :
     Thread;
 
+version (R05InboxSubmitProbe)
+{
+    import core.time :
+        MonoTime, ticksToNSecs;
+}
+
 /**
  * R0.5 research-only notification selection. The baseline always calls
  * notify after publishing, even if there are no actual Condition waiters.
@@ -156,6 +162,33 @@ package(concurrency) struct InboxParkingStats
     size_t peakQueued;
 }
 
+/**
+ * Research-only cumulative inbox submission timings. All fields are
+ * modified under TaskInbox._mutex; snapshot only after closeAndJoin().
+ * Version-gated: ordinary production and research executables have
+ * no additional per-submission counters, clocks or data members.
+ */
+version (R05InboxSubmitProbe)
+{
+    package(concurrency) struct InboxSubmitStats
+    {
+        ulong attempts;
+        ulong accepted;
+        ulong rejectedFull;
+        ulong rejectedClosed;
+        ulong waitNs;
+        ulong holdNs;
+        ulong maxWaitNs;
+        ulong maxHoldNs;
+        ulong enqueueCount;
+        ulong enqueueNs;
+        ulong notifyCalls;
+        ulong notifySkipped;
+        ulong notifyNs;
+        ulong maxNotifyNs;
+    }
+}
+
 
 /**
  * A bounded MPMC inbox. Every state transition is protected by one mutex.
@@ -179,6 +212,9 @@ private final class TaskInbox
 
     private bool _parkingProfile;
     private InboxParkingStats _parkingCounters;
+
+    version (R05InboxSubmitProbe)
+        private InboxSubmitStats _submitProbe;
 
     version (R05TaskTrace)
     {
@@ -210,14 +246,44 @@ private final class TaskInbox
         if (task.ptr is null)
             throw new Exception("cannot submit a null TaskRef");
 
+        version (R05InboxSubmitProbe)
+            const beforeLock = MonoTime.currTime.ticks;
         synchronized (_mutex)
         {
+            version (R05InboxSubmitProbe)
+            {
+                const entered = MonoTime.currTime.ticks;
+                const wait = cast(ulong) ticksToNSecs(entered - beforeLock);
+                ++_submitProbe.attempts;
+                _submitProbe.waitNs += wait;
+                if (wait > _submitProbe.maxWaitNs)
+                    _submitProbe.maxWaitNs = wait;
+                scope(exit)
+                {
+                    const hold = cast(ulong) ticksToNSecs(
+                        MonoTime.currTime.ticks - entered);
+                    _submitProbe.holdNs += hold;
+                    if (hold > _submitProbe.maxHoldNs)
+                        _submitProbe.maxHoldNs = hold;
+                }
+            }
+
             if (_closed)
+            {
+                version (R05InboxSubmitProbe)
+                    ++_submitProbe.rejectedClosed;
                 return SubmissionResult.closed;
+            }
 
             if (_used == _slots.length)
+            {
+                version (R05InboxSubmitProbe)
+                    ++_submitProbe.rejectedFull;
                 return SubmissionResult.full;
+            }
 
+            version (R05InboxSubmitProbe)
+                const enqueueStarted = MonoTime.currTime.ticks;
             // Commit the execution obligation and make the record visible
             // under the same mutex. A failed submission changes neither.
             const tail = (_head + _used) % _slots.length;
@@ -233,6 +299,13 @@ private final class TaskInbox
                 if (_used > _parkingCounters.peakQueued)
                     _parkingCounters.peakQueued = _used;
             }
+            version (R05InboxSubmitProbe)
+            {
+                ++_submitProbe.enqueueCount;
+                _submitProbe.enqueueNs += cast(ulong) ticksToNSecs(
+                    MonoTime.currTime.ticks - enqueueStarted);
+            }
+
             // _sleepers is changed under this exact mutex around
             // Condition.wait. With zero sleepers no thread can need
             // an actual notification: a future parker must observe
@@ -242,12 +315,28 @@ private final class TaskInbox
             {
                 if (_parkingProfile)
                     ++_parkingCounters.ingressNotifyCalls;
+                version (R05InboxSubmitProbe)
+                    const notifyStarted = MonoTime.currTime.ticks;
                 _changed.notify();
+                version (R05InboxSubmitProbe)
+                {
+                    const notify = cast(ulong) ticksToNSecs(
+                        MonoTime.currTime.ticks - notifyStarted);
+                    ++_submitProbe.notifyCalls;
+                    _submitProbe.notifyNs += notify;
+                    if (notify > _submitProbe.maxNotifyNs)
+                        _submitProbe.maxNotifyNs = notify;
+                }
             }
-            else if (_parkingProfile)
+            else
             {
-                ++_parkingCounters.ingressNotifySkipped;
+                if (_parkingProfile)
+                    ++_parkingCounters.ingressNotifySkipped;
+                version (R05InboxSubmitProbe)
+                    ++_submitProbe.notifySkipped;
             }
+            version (R05InboxSubmitProbe)
+                ++_submitProbe.accepted;
             return SubmissionResult.accepted;
         }
     }
@@ -433,6 +522,15 @@ private final class TaskInbox
             return _parkingCounters;
     }
 
+    version (R05InboxSubmitProbe)
+    {
+        InboxSubmitStats submitStatsAfterJoin()
+        {
+            synchronized (_mutex)
+                return _submitProbe;
+        }
+    }
+
     size_t parkCount()
     {
         synchronized (_mutex)
@@ -564,6 +662,14 @@ package(concurrency) final class SubmissionWorkerPool
     SubmissionResult trySubmit(TaskRef task)
     {
         return _inbox.trySubmit(task);
+    }
+
+    version (R05InboxSubmitProbe)
+    {
+        InboxSubmitStats inboxSubmitStatsAfterJoin()
+        {
+            return _inbox.submitStatsAfterJoin();
+        }
     }
 
     /** Optional fast rejection before constructing a costly owned record. */
