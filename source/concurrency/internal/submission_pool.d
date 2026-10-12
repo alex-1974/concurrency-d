@@ -56,6 +56,14 @@ version (R05InboxSubmitProbe)
         MonoTime, ticksToNSecs;
 }
 
+version (R05WorkerThreadResources)
+{
+    import concurrency.internal.worker_thread_resource :
+        WorkerThreadResource,
+        sampleWorkerThreadResource,
+        workerResourceDifference;
+}
+
 /**
  * R0.5 research-only notification selection. The baseline always calls
  * notify after publishing, even if there are no actual Condition waiters.
@@ -591,6 +599,9 @@ package(concurrency) final class SubmissionWorkerPool
     private bool _parkingProfile;
     private WorkerParkingStats[] _workerCounters;
 
+    version (R05WorkerThreadResources)
+        private WorkerThreadResource[] _workerResources;
+
     version (R05TaskTrace)
         private TaskTraceRecorder _taskTrace;
     version (R05WorkerSearchTrace)
@@ -627,6 +638,8 @@ package(concurrency) final class SubmissionWorkerPool
         // The default unprofiled path does not allocate an extra array.
         if (parkingProfile)
             _workerCounters = new WorkerParkingStats[workerCount];
+        version (R05WorkerThreadResources)
+            _workerResources = new WorkerThreadResource[workerCount];
 
         try
         {
@@ -655,7 +668,18 @@ package(concurrency) final class SubmissionWorkerPool
     private Thread makeWorker(size_t workerIndex)
     {
         return new Thread({
-            workerLoop(workerIndex);
+            version (R05WorkerThreadResources)
+            {
+                // Worker owns this slot. Start/stop samples only; none
+                // of the additional resource calls enter workerLoop.
+                const before = sampleWorkerThreadResource();
+                workerLoop(workerIndex);
+                const after = sampleWorkerThreadResource();
+                _workerResources[workerIndex] =
+                    workerResourceDifference(after, before);
+            }
+            else
+                workerLoop(workerIndex);
         });
     }
 
@@ -750,6 +774,15 @@ package(concurrency) final class SubmissionWorkerPool
     WorkerParkingStats[] workerStatsAfterJoin()
     {
         return _workerCounters.dup;
+    }
+
+    version (R05WorkerThreadResources)
+    {
+        /** Diagnostic snapshot only after joining ALL worker threads. */
+        WorkerThreadResource[] workerResourceStatsAfterJoin()
+        {
+            return _workerResources.dup;
+        }
     }
 
     /** Inbox counts are protected by the existing inbox mutex. */
