@@ -1,0 +1,130 @@
+name: R0.5 worker thread resource qualification
+
+on:
+  push:
+    branches:
+      - perf/r05-owned-task-pipeline
+    paths:
+      - "source/concurrency/internal/worker_thread_resource.d"
+      - "source/concurrency/internal/submission_pool.d"
+      - "source/concurrency/internal/owned_task.d"
+      - "benchmarks/task_pipeline/multi_producer.d"
+      - "tools/research/r05_worker_resource_matrix.py"
+      - "tools/research/r05_native_cpu_profile.py"
+      - "dub.sdl"
+      - ".github/workflows/r05-worker-resource-qualification.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  worker-resource:
+    name: Worker lifecycle resources / ${{ matrix.label }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: dmd-x86
+            runner: ubuntu-24.04
+            compiler: dmd-2.111.0
+          - label: ldc-x86
+            runner: ubuntu-24.04
+            compiler: ldc-1.41.0
+          - label: ldc-arm64
+            runner: ubuntu-24.04-arm
+            compiler: ldc-1.41.0
+
+    steps:
+      - name: Checkout grandfathered R0.5 research
+        uses: actions/checkout@v7
+
+      - name: Set up D compiler
+        uses: dlang-community/setup-dlang@v2
+        with:
+          compiler: ${{ matrix.compiler }}
+
+      - name: Confirm compiler and Python driver syntax
+        shell: bash
+        run: |
+          python3 -m py_compile \
+            tools/research/r05_native_cpu_profile.py \
+            tools/research/r05_worker_resource_matrix.py
+          "$DC" --version
+          dub --version
+
+      - name: Paired plain baseline and worker-lifecycle resources
+        shell: bash
+        run: |
+          python3 tools/research/r05_worker_resource_matrix.py \
+            --compiler="$DC" --workers=4 --tasks=384 --rounds=1 \
+            --producers 1 4 --budget=512 \
+            --policies gc recycle --workloads minimal compute \
+            --counter=shared --cooldown-ms=0 \
+            --output="evidence/r05-worker/${{ matrix.label }}"
+
+      - name: Validate exact task checksum and worker attribution
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import csv
+          from pathlib import Path
+          root = Path("evidence/r05-worker/${{ matrix.label }}")
+          def read(name):
+              with (root / name).open(newline="") as file:
+                  return list(csv.DictReader(file))
+          raw = read("raw.csv")
+          workers = read("worker.csv")
+          pairs = read("pairs.csv")
+          summary = read("summary.csv")
+          scaling = read("producer_scaling.csv")
+          assert (len(raw), len(workers), len(pairs),
+                  len(summary), len(scaling)) == (16, 32, 8, 8, 8)
+          assert len({(r["round"], r["workload"], r["producers"],
+                      r["policy"], r["mode"]) for r in raw}) == 16
+          assert len({(r["round"], r["workload"], r["producers"],
+                      r["policy"], r["worker_index"])
+                     for r in workers}) == 32
+          binary = {}
+          checksums = {}
+          for r in raw:
+              binary.setdefault(r["mode"], set()).add(r["binary_sha256"])
+              checksums.setdefault(r["workload"], set()).add(r["checksum"])
+              assert r["counter"] == "shared"
+              assert int(r["completed"]) == int(r["tasks"]) == 384
+              assert int(r["fresh_nodes"]) + int(r["reused_nodes"]) == 384
+              assert int(r["observed_handles"]) > 0
+              assert float(r["throughput_per_s"]) > 0
+              assert float(r["external_wall_ms"]) >= float(
+                  r["timed_elapsed_ms"])
+              if r["mode"] == "off":
+                  assert r["worker_cpu_us"] == ""
+                  assert r["worker_count"] == ""
+              else:
+                  assert int(r["worker_count"]) == 4
+                  assert int(r["worker_cpu_us"]) >= 0
+                  assert int(r["worker_voluntary_switches"]) >= 0
+          assert set(binary) == {"off", "worker"}
+          assert all(len(value) == 1 for value in binary.values())
+          assert all(len(value) == 1 for value in checksums.values())
+          assert all(float(r["worker_profile_over_off"]) > 0
+                     for r in pairs)
+          assert all(int(r["rounds"]) == 1 for r in summary)
+          assert all(float(r["ratio_vs_one"]) > 0 for r in scaling)
+          env = (root / "environment.txt").read_text()
+          assert "submit_instrumentation=off; parking=off; notify=always" in env
+          assert "off_binary_sha256=" in env
+          assert "worker_binary_sha256=" in env
+          print("PASS: exact 16-case matrix and four joined worker snapshots")
+          PY
+
+      - name: Preserve hosted diagnostic evidence, not a speed gate
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: r05-worker-${{ matrix.label }}-${{ github.run_id }}
+          path: evidence/r05-worker/${{ matrix.label }}/
+          if-no-files-found: warn
+          retention-days: 30
