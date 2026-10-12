@@ -191,6 +191,15 @@ configuration "task-pipeline-mixed-full-victim-admission-stages" {
     targetName "concurrency-task-pipeline-mixed-full-victim-admission-stages"
 }
 
+configuration "task-pipeline-mixed-full-victim-inbox-probe" {
+    targetType "executable"
+    mainSourceFile "benchmarks/task_pipeline/multi_producer.d"
+    sourcePaths "source" "benchmarks/task_pipeline"
+    importPaths "source" "benchmarks/task_pipeline"
+    versions "R05FullVictimSweep" "R05AdmissionStageProbe" "R05InboxSubmitProbe"
+    targetName "concurrency-task-pipeline-mixed-full-victim-inbox-probe"
+}
+
 configuration "burst-head-of-line-search-full-victim-sweep" {
     targetType "executable"
     mainSourceFile "benchmarks/task_pipeline/burst_head_of_line.d"
