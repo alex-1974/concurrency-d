@@ -145,6 +145,8 @@ def main():
     p.add_argument("--cooldown-ms", type=int, default=25)
     p.add_argument("--idle-only", action="store_true",
                    help="Run paired idle/wake tests without mixed throughput")
+    p.add_argument("--mixed-only", action="store_true",
+                   help="Run paired mixed throughput without idle/wake probes")
     p.add_argument("--output", type=Path,
                    default=Path("evidence/m0-victim-coverage-xps"))
     a = p.parse_args()
@@ -162,6 +164,8 @@ def main():
             not 1 <= a.gap_ms <= 100 or
             not 0 <= a.cooldown_ms <= 1000):
         p.error("invalid bounded production M0 benchmark setting")
+    if a.idle_only and a.mixed_only:
+        p.error("--mixed-only and --idle-only are mutually exclusive")
     for f in (a.workers, a.producers, a.workloads):
         if len(f) != len(set(f)):
             p.error("duplicate independent factor")
@@ -172,7 +176,8 @@ def main():
     original_head = git(root, "rev-parse", "HEAD")
     for sha in (a.baseline, a.fix):
         git(root, "cat-file", "-e", sha + "^{commit}")
-    if git(root, "rev-parse", a.baseline) != a.baseline or        git(root, "rev-parse", a.fix) != a.fix:
+    if (git(root, "rev-parse", a.baseline) != a.baseline or
+            git(root, "rev-parse", a.fix) != a.fix):
         raise RuntimeError("commit SHA resolution mismatch")
 
     source = root / "benchmarks/m0_victim_coverage/main.d"
@@ -225,8 +230,12 @@ def main():
                                         r["budget"] != a.budget or
                                         r["rounds"] != rounds or
                                         r["accepted"] != a.tasks or
-                                        r["completed"] != a.tasks):
+                                        r["completed"] != a.tasks or
+                                        r["elapsed_ns"] <= 0):
                                     raise RuntimeError("mixed accounting failed")
+                                r["throughput_per_s"] = (
+                                    a.tasks * 1_000_000_000.0 /
+                                    r["elapsed_ns"])
                                 r.update(mode=mode, round=rnd,
                                          workload=workload)
                                 mixed.append(r)
@@ -238,15 +247,16 @@ def main():
                             key = dict(round=rnd, workers=workers,
                                        producers=producers, workload=workload)
                             comparisons += pairs_for("mixed", key, rows,
-                                ("elapsed_ns", "process_user_cpu_us",
-                                 "process_sys_cpu_us", "process_voluntary_cs",
+                                ("throughput_per_s", "elapsed_ns",
+                                 "process_user_cpu_us", "process_sys_cpu_us",
+                                 "process_voluntary_cs",
                                  "process_involuntary_cs"))
                             print("mixed", key,
                                   "fix/base throughput:",
                                   round(rows["baseline"]["elapsed_ns"] /
                                         rows["fix"]["elapsed_ns"], 4),
                                   flush=True)
-                for workers in a.workers:
+                for workers in ([] if a.mixed_only else a.workers):
                     rows = {}
                     for mode in order(rnd, workers):
                         r = run_child(binaries[mode], dirs[mode],
@@ -281,8 +291,49 @@ def main():
                                    capture_output=True, text=True)
     if mixed:
         csv_save(output / "mixed.csv", mixed)
-    csv_save(output / "idle.csv", idle)
+    if idle:
+        csv_save(output / "idle.csv", idle)
     csv_save(output / "pairs.csv", comparisons)
+
+    # A true one-worker no-stealing control can reveal common environment
+    # drift in matching same-round, same-producer, same-workload pairs.
+    # Keep absolute throughput ratios: normalization is diagnostic only.
+    mixed_index = {
+        (r["round"], r["workers"], r["producers"], r["workload"], r["mode"]): r
+        for r in mixed
+    }
+    controls = []
+    if 1 in a.workers:
+        for rnd in range(a.rounds):
+            for producers in a.producers:
+                for workload in a.workloads:
+                    base = mixed_index.get(
+                        (rnd, 1, producers, workload, "baseline"))
+                    fix = mixed_index.get(
+                        (rnd, 1, producers, workload, "fix"))
+                    if base is None or fix is None:
+                        continue
+                    control_ratio = (fix["throughput_per_s"] /
+                                     base["throughput_per_s"])
+                    for workers in a.workers:
+                        if workers == 1:
+                            continue
+                        target_base = mixed_index.get(
+                            (rnd, workers, producers, workload, "baseline"))
+                        target_fix = mixed_index.get(
+                            (rnd, workers, producers, workload, "fix"))
+                        if target_base is None or target_fix is None:
+                            raise RuntimeError("missing paired target control")
+                        target_ratio = (target_fix["throughput_per_s"] /
+                                        target_base["throughput_per_s"])
+                        controls.append(dict(
+                            round=rnd, workers=workers,
+                            producers=producers, workload=workload,
+                            target_fix_over_baseline=target_ratio,
+                            worker1_fix_over_baseline=control_ratio,
+                            relative_to_worker1=target_ratio / control_ratio))
+    if controls:
+        csv_save(output / "control_pairs.csv", controls)
 
     groups = {}
     for r in comparisons:
@@ -292,7 +343,8 @@ def main():
     summary = []
     for (kind, workers, producers, workload, metric), group in sorted(
             groups.items(), key=lambda item: str(item[0])):
-        if len(group) != a.rounds or                 len({r["round"] for r in group}) != a.rounds:
+        if (len(group) != a.rounds or
+                len({r["round"] for r in group}) != a.rounds):
             raise RuntimeError("incomplete M0 paired evidence")
         valid_ratios = [r["ratio"] for r in group if r["ratio"] != ""]
         summary.append(dict(
@@ -317,15 +369,18 @@ def main():
                   f"rounds={a.rounds} tasks={a.tasks} budget={a.budget}\n"
                   f"workers={a.workers} producers={a.producers} "
                   f"workloads={a.workloads} compute_rounds={a.compute_rounds}\n"
-                  f"idle_only={a.idle_only}\n"
+                  f"idle_only={a.idle_only} mixed_only={a.mixed_only}\n"
                   f"idle_ms={a.idle_ms} wake_samples={a.wake_samples} "
                   f"gap_ms={a.gap_ms} cooldown_ms={a.cooldown_ms}\n"
                   "Both detached worktrees receive the identical benchmark "
                   "source/config. DUB dependency locks must agree.\n"
                   "Measured mixed ns excludes record verification and builds.\n"
                   "Idle CPU is whole process during quiet interval, "
-                  "not per-worker energy use. p99 of 64 wake samples "
-                  "is the observed maximum, not SLA.\n")
+                  "not per-worker energy use. Wake percentiles use per-run "
+                  "nearest rank, not a long-term tail SLA.\n"
+                  "Throughput ratios use exact same-round pairs. "
+                  "One-worker control ratios are diagnostic only; "
+                  "do not replace absolute changes or infer causality.\n")
         for cmd in (["git", "status", "--short", "--branch"],
                     [a.compiler, "--version"], ["dub", "--version"],
                     ["lscpu"],
