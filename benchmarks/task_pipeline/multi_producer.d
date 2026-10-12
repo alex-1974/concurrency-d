@@ -585,6 +585,36 @@ private void runCase(
             percentileUpper(merged.holdBuckets, merged.attempts, 99));
     }
 
+    version (R05InboxSubmitProbe)
+    {
+        if (instrumented)
+        {
+            auto stats = executor.inboxSubmitStatsAfterJoin();
+            if (stats.attempts != tasks ||
+                stats.accepted != tasks ||
+                stats.rejectedFull != 0 ||
+                stats.rejectedClosed != 0 ||
+                stats.enqueueCount != tasks ||
+                stats.notifyCalls + stats.notifySkipped != tasks ||
+                (notifyPolicy == NotificationPolicy.always &&
+                 (stats.notifyCalls != tasks ||
+                  stats.notifySkipped != 0)))
+                throw new Exception("inbox submit probe accounting mismatch");
+
+            writefln(
+                "inbox,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s",
+                policyName(policy), striped ? "striped" : "shared",
+                producers, workers, budget, tasks,
+                stats.attempts, stats.accepted,
+                stats.rejectedFull, stats.rejectedClosed,
+                stats.waitNs, stats.holdNs,
+                stats.maxWaitNs, stats.maxHoldNs,
+                stats.enqueueCount, stats.enqueueNs,
+                stats.notifyCalls, stats.notifySkipped,
+                stats.notifyNs, stats.maxNotifyNs);
+        }
+    }
+
     version (R05AdmissionStageProbe)
     {
         if (instrumented)
