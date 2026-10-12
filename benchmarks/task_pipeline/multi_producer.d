@@ -449,7 +449,7 @@ private void runCase(
         // and rearm bookkeeping, not the duration of RTTI cast alone.
         // This output is parsed only by the specialized research driver.
         writefln(
-            "lookup,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s",
+            "lookup,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s",
             policyName(policy), workers, producers, budget, tasks,
             lookup.searches, lookup.emptySearches,
             lookup.attemptedCasts, lookup.hits, lookup.misses,
