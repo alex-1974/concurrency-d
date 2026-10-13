@@ -170,17 +170,17 @@ private final class WorkerBatch
                 firstWorkerFailure = failure;
         }
 
-        synchronized (mutex)
-        {
-            assert(pending == 0);
-            assert(accepted == completed);
-            joined = true;
-        }
         version (M1P06Fatal)
         {
             p06LastJoined = started;
             p06LastAccepted = accepted;
             p06LastCompleted = completed;
+        }
+        synchronized (mutex)
+        {
+            assert(pending == 0);
+            assert(accepted == completed);
+            joined = true;
         }
         if (firstWorkerFailure !is null)
             throw firstWorkerFailure;
@@ -401,7 +401,14 @@ unittest
     try
         evaluateScalars(inputs[], &p05Identity);
     catch (Error ex)
+    {
         caughtWorkerError = true;
+        import std.stdio : writeln;
+        writeln("P06 caught Error: ", ex.msg,
+            ", joined=", p06LastJoined,
+            ", accepted=", p06LastAccepted,
+            ", completed=", p06LastCompleted);
+    }
     assert(caughtWorkerError, "P06 worker Error did not propagate");
     assert(p06LastJoined == WorkerCount);
     assert(p06LastAccepted == inputs.length);
