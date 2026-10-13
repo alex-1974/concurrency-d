@@ -7,6 +7,7 @@ on:
     paths:
       - "research/m1_task_lifetime/**"
       - "tools/research/m1_lifetime_compile_probes.sh"
+      - "tools/research/m1_scoped_join_prototype.sh"
       - ".github/workflows/m1-task-lifetime-probes.yml"
   pull_request:
     branches:
@@ -14,6 +15,7 @@ on:
     paths:
       - "research/m1_task_lifetime/**"
       - "tools/research/m1_lifetime_compile_probes.sh"
+      - "tools/research/m1_scoped_join_prototype.sh"
       - ".github/workflows/m1-task-lifetime-probes.yml"
   workflow_dispatch:
 
@@ -43,3 +45,7 @@ jobs:
       - name: Language and compile-negative contract gate
         shell: bash
         run: bash tools/research/m1_lifetime_compile_probes.sh "$DC"
+
+      - name: P01 scoped join prototype runtime (research only)
+        shell: bash
+        run: bash tools/research/m1_scoped_join_prototype.sh "$DC"
