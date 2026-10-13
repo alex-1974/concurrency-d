@@ -1,7 +1,7 @@
 # M1 P16.1 — Lower-intrusion completion-call sampling and null-clock control
 
 **Research date:** 2026-10-13  
-**Status:** separate exact-M0 three-arm correctness and native evidence apparatus; final compiler qualification is tracked by the research CI (do not state PASS until its final HEAD run is green). **No P16 Dell-XPS results are available yet.**  
+**Status:** separate exact-M0 three-arm correctness apparatus **PASS DMD 2.111.0 and LDC 1.41.0**, including LDC optimized debug and release ([pinned CI #38453547267](https://github.com/alex-1974/concurrency-d/actions/runs/38453547267)). **No P16 Dell-XPS results are available yet.**  
 **Decision class:** research/diagnostic only, not a public scheduler/API optimization.  
 **References:** [P15 complete XPS lock timing evidence](../p15_mutex_timing/evidence/xps-2026-10-13-analysis.md), [P14 native events](../p14_scheduler_events/evidence/xps-2026-10-13-analysis.md), [P13 workload](../p13_worker_scaling/README.md), [ADR-0001 PROPOSED](../../../../docs/adr/ADR-0001-task-lifetime-families.md), [Issue #17](https://github.com/alex-1974/concurrency-d/issues/17), [Draft PR #38](https://github.com/alex-1974/concurrency-d/pull/38).
 
@@ -48,7 +48,7 @@ The independent [P16 three-way CSV validator](../../../../tools/research/m1_p16_
 
 ## Matrix, CI and compiler policy
 
-The [P16 compiler runner](../../../../tools/research/m1_p16_sampling_probe.sh) compiles the same source for all three modes under DMD **2.111.0** and LDC **1.41.0**, with the research-only DIP1000 preview enabled in its private DUB manifest.
+**Compiler-qualified evidence:** [GitHub Actions #38453547267](https://github.com/alex-1974/concurrency-d/actions/runs/38453547267) **SUCCESS DMD and LDC**, including earlier P01–P15 research and negative gates. The [P16 compiler runner](../../../../tools/research/m1_p16_sampling_probe.sh) compiles the same source for all three modes under DMD **2.111.0** and LDC **1.41.0**, with the research-only DIP1000 preview enabled in its private DUB manifest.
 
 - Two smoke kernel settings (0/128 iterations), ingress 64 and 1/2/4 workers, count 128, waves 3, with two measured randomized sweeps and one warm-up.
 - All **45 target combinations** are tested on **both** pinned compilers with 32 tasks per wave × two waves, covering the full native case list but no meaningful performance sampling.
