@@ -1,7 +1,7 @@
 # M1 P13 — Worker-count scaling on the unchanged M0 work-stealing pool
 
 **Date:** 2026-10-13  
-**Status:** working DMD/LDC research harness; **native XPS scaling result PENDING**.  
+**Status:** working DMD/LDC research harness; **P13 summary-level native XPS evidence received**, with full original manifest/per-sweep raw archive **still pending**.  
 **Tracking:** [Issue #17](https://github.com/alex-1974/concurrency-d/issues/17), [ADR-0001 PROPOSED](../../../../docs/adr/ADR-0001-task-lifetime-families.md), [Draft PR #38](https://github.com/alex-1974/concurrency-d/pull/38).  
 **Input evidence:** [P12 independently reviewed XPS data](../p12_matched_pool/evidence/xps-2026-10-13-analysis.md).
 
@@ -72,3 +72,16 @@ The script refuses to overwrite an existing output directory or archive. It save
 - **If 4w/2w < 1 reproducibly only after pool reuse:** P12's total-time regression may have been dominated by per-batch startup/teardown, but that requires the *corresponding P12 phase data* to establish; do not assume.
 
 **P13 decision now:** KEEP research test apparatus, DEFER scheduler changes. Preserve P12 native evidence unchanged and do not modify `source/`, the production build, `develop`, or R0.5 PR #35. The next candidate P14 (only after XPS evidence) would isolate steal/park/ingress event counts and correlate with verified scaling distributions or improve liveness fault protocols separately.
+
+
+## Native scaling summary uploaded — 2026-10-13
+
+The user supplied P13's **`summary.csv` only**, not its source archive/manifest or seven individual observations per configuration. We therefore qualified the **summary's completeness and internal consistency**, not the full physical-core, frequency, runtime or provenance controls.
+
+See the [XPS summary review](evidence/xps-2026-10-13-summary-review.md), with uploaded source CSV SHA-256 `b5da24cb95adab3bcc06a23c741bb38ac9efcf5b0ec3d430d5de42ff4e3171dc`. All **135 expected rows** (3 named sessions × 5 kernel sizes × 3 inbox sizes × 3 worker counts) are present, each reporting seven measurements, three waves of 2,048 tasks and a checksum consistent across equivalent work.
+
+The ratio of 4-worker/2-worker **configuration medians**, aggregated as the median of nine session×ingress comparisons for each kernel size, was **1.676× at 0 iterations**, **1.620× at 8**, **1.349× at 32**, **1.167× at 128**, and **0.899× at 512**. At 0–128 iterations **none of nine** session×ingress comparisons per kernel favored 4 workers; at 512 iterations **eight of nine** did. This is a workload-granularity crossover under reused M0 workers, *not* a measured cause or a general scheduler parameter recommendation.
+
+Ingress 8 tended to be substantially slower than ingress 64 for very small tasks, accompanied by more reported `parkCount` and producer retry events. These are diagnostic associations, not instrumentation that identifies bottleneck cause. Within-row min–max spans remain broad; original per-sweep measurements and run order have **not** been supplied, so no true paired, order-adjusted ratio/confidence claim is made.
+
+**Updated disposition:** KEEP P13 as a credible summary-level scaling signal; DEFER production tuning or public `@safe` claims. Prioritize a bounded P14 scheduler path/event instrumentation experiment plus the original P13 archive if possible.
