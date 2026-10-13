@@ -13,3 +13,8 @@ configuration "optimized" {
     mainSourceFile "consumer/main.d"
     dflags "-O3"
 }
+
+configuration "release-mode" {
+    mainSourceFile "consumer/main.d"
+    // Used with DUB --build=release to qualify the full dependency graph.
+}
