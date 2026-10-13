@@ -9,6 +9,7 @@ on:
       - "tools/research/m1_lifetime_compile_probes.sh"
       - "tools/research/m1_scoped_join_prototype.sh"
       - "tools/research/m1_lexical_batch_prototype.sh"
+      - "tools/research/m1_dynamic_scope_prototype.sh"
       - ".github/workflows/m1-task-lifetime-probes.yml"
   pull_request:
     branches:
@@ -18,6 +19,7 @@ on:
       - "tools/research/m1_lifetime_compile_probes.sh"
       - "tools/research/m1_scoped_join_prototype.sh"
       - "tools/research/m1_lexical_batch_prototype.sh"
+      - "tools/research/m1_dynamic_scope_prototype.sh"
       - ".github/workflows/m1-task-lifetime-probes.yml"
   workflow_dispatch:
 
@@ -55,3 +57,7 @@ jobs:
       - name: P02 lexical batch prototype runtime (research only)
         shell: bash
         run: bash tools/research/m1_lexical_batch_prototype.sh "$DC"
+
+      - name: P03 bounded dynamic lexical scope (research only)
+        shell: bash
+        run: bash tools/research/m1_dynamic_scope_prototype.sh "$DC"
