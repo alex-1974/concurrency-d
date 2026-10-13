@@ -151,7 +151,11 @@ private void testActualOwnedExecutorParity()
 
     TaskHandle!int[RealPoolCapacity] handles;
     foreach (i, value; input)
-        handles[i] = executor.submit(OwnedCallable(value));
+    {
+        OwnedCallable job;
+        job.input = value;
+        handles[i] = executor.submit(job);
+    }
 
     foreach (i; 0 .. handles.length)
     {
