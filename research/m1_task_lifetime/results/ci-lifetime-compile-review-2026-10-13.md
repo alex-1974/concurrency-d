@@ -31,3 +31,20 @@ This confirms only these **specific** compiler rules under the stated toolchain/
 **Next gate:** design a small explicitly joined scope prototype with address-stable records and no detach; verify capture lifetime, structured unwind and worker completion before any `@safe` claim. Preserve M0's `@system` general callable submission and its strong GC-root semantics. No scheduler code was changed or benchmarked by this research.
 
 **Change discipline:** keep the ADR at **PROPOSED**, PR #38 **Draft**, Issue #17 **open**; Draft PR #35 and `develop` remain unchanged. This results file is evidence, not production acceptance.
+
+## Extension: captured `scope delegate` — both compilers PASS
+
+The focused callback/capture pair was added **after** the initial seven-fixture run. Source HEAD containing the two fixtures and updated runner/README: **`70d4c4fab1662fd239be2777c0a281d6e874d126`**.
+
+**Exact-source CI:** [M1 task lifetime compile probes — Run #38373354672](https://github.com/alex-1974/concurrency-d/actions/runs/38373354672).
+
+- DMD 2.111.0, job **115215505062**: **PASS — 4 positive + 5 negative**.
+- LDC 1.41.0, job **115215505618**: **PASS — 4 positive + 5 negative**.
+
+Both logs explicitly record:
+- `PASS positive: positive_scope_delegate` — a captured `@safe` delegate passed to a `scope` argument for synchronous local invocation compiled.
+- `PASS negative rejected: negative_scope_delegate_escape` — diagnostic: assigning `scope` variable `action` to global `escaped` is forbidden inside `@safe`.
+
+The other seven fixtures also continued to PASS at this source commit. This is **not** evidence that storing, enqueueing or invoking an arbitrary closure across worker threads is safe; only lexical/scope parameter escape behavior is tested.
+
+**Current language gate:** **4 positive / 5 negative, DMD and LDC PASS**. The outcome is narrower than Issue #17's full scope/ownership acceptance conditions; leave ADR status PROPOSED and PR #38 Draft.
