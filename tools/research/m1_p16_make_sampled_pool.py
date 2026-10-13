@@ -21,7 +21,7 @@ def replace_once(s, old, new):
 
 def generate(source, dest):
     raw = source.read_bytes()
-    sha = hashlib.sha1(f"blob {len(raw)}\\0".encode() + raw).hexdigest()
+    sha = hashlib.sha1(f"blob {len(raw)}\0".encode() + raw).hexdigest()
     if sha != EXPECTED:
         raise RuntimeError(f"P16 M0 changed, manual review required: {sha}")
     s = raw.decode("utf8")
