@@ -52,4 +52,30 @@ for variant in M1P07StartFault M1P07JoinFault; do
     echo "P07 $variant: PASS (simulated uncertain native return -> fail-stop SIGABRT)"
 done
 
+# The optimized LDC path keeps assertions enabled and repeats both
+# fail-stop signals, rather than merely compiling an optimized binary.
+if [[ "$(basename -- "$DC")" == ldc2* ]]; then
+    for variant in M1P07StartFault M1P07JoinFault; do
+        name="P07_FAILSTOP_START"
+        if [[ "$variant" == M1P07JoinFault ]]; then
+            name="P07_FAILSTOP_JOIN"
+        fi
+
+        "$DC" -O3 -unittest -main "${V}M1P07FailStop" "${V}$variant" \
+            -preview=dip1000 "-I$ROOT/source" "-I$BASE" \
+            "-of=$TMP/$variant-O3" "${SRC[@]}"
+        set +e
+        ( timeout --signal=TERM --kill-after=2s 15s "$TMP/$variant-O3" ) \
+            >"$TMP/$variant-O3.log" 2>&1
+        status=$?
+        set -e
+        if [[ "$status" -ne 134 ]] || ! grep -Fq "$name" "$TMP/$variant-O3.log"; then
+            echo "FAIL: LDC -O3 $variant expected SIGABRT(134) and marker $name; got $status" >&2
+            cat "$TMP/$variant-O3.log" >&2
+            exit 1
+        fi
+        echo "P07 $variant LDC -O3 assertions-on: PASS (fail-stop SIGABRT)"
+    done
+fi
+
 echo "P07 fail-stop research gate PASS (no native join corruption invoked)"
