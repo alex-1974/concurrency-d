@@ -26,6 +26,11 @@ on:
       - "tools/research/m1_p14_compare.py"
       - "tools/research/m1_p14_scheduler_trace.sh"
       - "tools/research/m1_p14_xps.sh"
+      - "tools/research/m1_p15_make_mutex_probe.py"
+      - "tools/research/m1_p15_make_fixture.py"
+      - "tools/research/m1_p15_compare.py"
+      - "tools/research/m1_p15_mutex_timing.sh"
+      - "tools/research/m1_p15_xps.sh"
       - ".github/workflows/m1-task-lifetime-probes.yml"
   pull_request:
     branches:
@@ -52,6 +57,11 @@ on:
       - "tools/research/m1_p14_compare.py"
       - "tools/research/m1_p14_scheduler_trace.sh"
       - "tools/research/m1_p14_xps.sh"
+      - "tools/research/m1_p15_make_mutex_probe.py"
+      - "tools/research/m1_p15_make_fixture.py"
+      - "tools/research/m1_p15_compare.py"
+      - "tools/research/m1_p15_mutex_timing.sh"
+      - "tools/research/m1_p15_xps.sh"
       - ".github/workflows/m1-task-lifetime-probes.yml"
   workflow_dispatch:
 
@@ -133,3 +143,7 @@ jobs:
       - name: P14 exact M0 scheduler instrumentation and same-work control
         shell: bash
         run: bash tools/research/m1_p14_scheduler_trace.sh "$DC"
+
+      - name: P15 exact M0 mutex acquisition and hold timing (research diagnostic)
+        shell: bash
+        run: bash tools/research/m1_p15_mutex_timing.sh "$DC"
