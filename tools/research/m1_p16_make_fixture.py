@@ -61,7 +61,8 @@ else
     long prepareNs;""")
     metric_check = """        auto snap = pool.p16Snapshot();
         if (snap.workerCount != workers || snap.calls != all ||
-            snap.clockAnomalies != 0 || snap.samples == 0 ||
+            snap.clockAnomalies != 0 ||
+            (all >= 64 * workers && snap.samples == 0) ||
             snap.maxNs > snap.durationNs)
             throw new Exception("P16 sampled completion accounting failure");
         ulong totalWorkerCalls;
