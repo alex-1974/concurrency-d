@@ -2,7 +2,7 @@
 
 **Date:** 2026-10-13  
 **Branch:** `research/m1-task-lifetime-boundaries`, [Draft PR #38](https://github.com/alex-1974/concurrency-d/pull/38).  
-**Status:** P17 research-only source and CI probe; **native Dell-XPS P17 results NOT AVAILABLE**. The earlier P16.2 evidence is [published as a qualified analysis](../p16_2_atomic_completion/evidence/xps-2026-10-13-analysis.md). No production API or scheduler changed.
+**Status:** P17 research-only source and CI probe; **complete native Dell-XPS P17 results received and audited**. The earlier P16.2 evidence is [published as a qualified analysis](../p16_2_atomic_completion/evidence/xps-2026-10-13-analysis.md). No production API or scheduler changed.
 
 ## Question
 
@@ -71,3 +71,16 @@ P17 will test whether the additional P16.2 park events occur predominantly when 
 Neither result, alone, proves that the atomic completion path **causes** more parking; the variants may simply change scheduling interleavings. Any proposed fix must alter **one mechanism at a time** and preserve exact admission/completion, Condition generation/no-lost-wake, TaskRef lifetime and real native joins.
 
 **No production promotion** of P16.2, no weaker memory orders, no new public `@safe` contract, no optimized-release superiority claim from a hot machine, and no C++/Rust parity assertion. ADR-0001 stays PROPOSED, Issue #17 OPEN, Draft PR #38 DRAFT, original `source/`, `develop` and grandfathered R0.5 PR #35 untouched.
+
+
+## Native Dell-XPS result (2026-10-13)
+
+The [complete P17 original-archive review](evidence/xps-2026-10-13-analysis.md) records SHA-256 `ee96d2f1d9b5d903de3ec667d5d0e3e4e8637b61932cf2c652aceef6afaff6aa`, source commit `331c35cb`, LDC 1.41.0 release and four process-affined physical cores. All 16 raw logs agree with their corresponding CSVs; **5,040 rows** comprise **1,440 warm-ups plus 900 measured rows per arm**. Same-work TaskRef, checksum, stage-time and trace event-conservation gates PASS. Raw files containing user/host/path details have not been published.
+
+In **900 matched UNINSTRUMENTED atomic/original comparisons**, the median was **0.9308× overall**, but **0.8205× / 1.0216× / 1.0430×** at 1/2/4 workers respectively. For four workers with 0/8/32/128/512 kernel iterations, median ratios were **1.131 / 1.143 / 1.133 / 0.967 / 0.668×**. The candidate remains slower on very short four-worker tasks.
+
+In **60 four-worker/zero-iteration TRACE runs per arm**, median `Condition.wait` entries were **148.5 original / 305 atomic**. No-outstanding parks: **85 / 215**; outstanding parks: **69.5 / 93.5**. Median within-run unsuccessful steals: **950 / 1,864.5**; successful steals: **275 / 280**. Instrumented paths change scheduling and do not measure event cost; uninstrumented park counts belong to different runs and must not be combined algebraically with the trace bins. Additional idle transitions and steal searches are explanatory **hypotheses**, not causal proof.
+
+**Thermal gate:** `P17_ALLOW_HOT=0`. Recorded 500-ms temperatures span **53–93°C**; **15 of 16 traces** passed the limited screen, and **session-1 trace-atomic** showed one thermal-throttle-counter increment. All eight uninstrumented arms passed their limited screen, but the supplied full-run thermal verdict is **PERFORMANCE NOT QUALIFIED**. Per-thread effective clock stability is unproven; no general production speed claim follows.
+
+**Decision:** KEEP P17 evidence and P16.2 as research. Do not change production M0, weaken seq-cst wake ordering, promote general `@safe`, or claim C++ parity. Any next one-variable park/search experiment requires adversarial no-lost-wake, close/join and same-work controls. ADR remains proposed, Issue #17 open, PR #38 draft, `develop` and grandfathered R0.5 unchanged.
