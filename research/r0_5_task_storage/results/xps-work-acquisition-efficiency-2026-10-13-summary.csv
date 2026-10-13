@@ -1,0 +1,7 @@
+workload,producers,runs,median_local_misses_per_task,median_ingress_misses_per_task,median_steal_attempts_per_task,median_failed_steals_per_task,median_steal_success_fraction,median_failed_per_successful_steal,median_park_checks_per_task,median_condition_waits_per_task,median_tasks_per_claimed_batch,median_first_search_empty_fraction
+compute,1,10,1.19953,0.74388,1.89618,1.59380,0.15960,5.26933,0.44137,0.38460,2.19474,0.18669
+compute,4,10,1.62600,0.94047,2.60193,2.39240,0.08199,11.19778,0.73003,0.56552,1.46983,0.33544
+compute,8,10,1.70440,1.00052,2.78980,2.58180,0.07382,12.55004,0.79238,0.60497,1.42066,0.33313
+minimal,1,10,1.44037,0.95892,2.72793,2.53823,0.06951,13.39556,0.76908,0.59290,2.04477,0.38878
+minimal,4,10,1.85092,1.20290,3.50258,3.38047,0.03486,27.68749,1.08065,0.81520,1.55115,0.42240
+minimal,8,10,1.88138,1.22150,3.56138,3.44587,0.03238,29.88640,1.10585,0.82862,1.52567,0.42385
