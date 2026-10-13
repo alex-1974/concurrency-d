@@ -159,14 +159,19 @@ private final class Supervisor
         return leases[index];
     }
 
-    void releaseJoined(size_t index)
+    bool tryReleaseJoined(size_t index)
     {
         assert(index < leases.length);
-        assert(leases[index].isJoinedStopped());
+        // The uncertain/ongoing worker state is a retained obligation.
+        // Refuse early release instead of merely relying on the caller.
+        if (!leases[index].isJoinedStopped())
+            return false;
+
         leases[index].discardRoot();
         leases[index] = leases[$ - 1];
         leases[$ - 1] = null;
         leases.length = leases.length - 1;
+        return true;
     }
 }
 
@@ -194,11 +199,13 @@ private void testControllerAbandonment()
         assert(supervisor.outstanding() == 1);
         assert(supervisor.lease(0).isUncertain());
         assert(supervisor.lease(0).hasValueRoot());
+        assert(!supervisor.tryReleaseJoined(0));
+        assert(supervisor.outstanding() == 1);
     }
 
     supervisor.lease(0).proveQuiescence();
     assert(supervisor.lease(0).result() == 52);
-    supervisor.releaseJoined(0);
+    assert(supervisor.tryReleaseJoined(0));
     assert(supervisor.outstanding() == 0);
 }
 
@@ -216,9 +223,10 @@ private void testFreshLeases()
         catch (Exception ex)
             sawFailure = true;
         assert(sawFailure);
+        assert(!supervisor.tryReleaseJoined(0));
         lease.proveQuiescence();
         assert(lease.result() == n * 4);
-        supervisor.releaseJoined(0);
+        assert(supervisor.tryReleaseJoined(0));
     }
     assert(supervisor.outstanding() == 0);
 }
