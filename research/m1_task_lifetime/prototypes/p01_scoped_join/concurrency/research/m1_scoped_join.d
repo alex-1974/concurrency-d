@@ -11,7 +11,7 @@ module concurrency.research.m1_scoped_join;
 import concurrency.internal.task_record :
     TaskHeader, TaskRef, dispatchTask;
 import core.atomic :
-    MemoryOrder, atomicLoad, atomicStore;
+    MemoryOrder, atomicLoad, atomicStore, atomicOp;
 import core.sync.condition : Condition;
 import core.sync.mutex : Mutex;
 import core.thread : Thread;
@@ -294,8 +294,7 @@ private void testPinnedQueueAndDrain() @system
     foreach (i; 2 .. 4)
         records[i].prepare(() @safe
         {
-            atomicStore!(MemoryOrder.rel)(finished,
-                atomicLoad!(MemoryOrder.acq)(finished) + 1u);
+            atomicOp!"+="(finished, 1u);
         });
 
     kernel.start();
@@ -321,6 +320,14 @@ private void testPinnedQueueAndDrain() @system
     assert(!kernel.trySubmit(records[0]));
 }
 
+// Each factory invocation creates its own closure frame for the pointer.
+// Capturing a mutable loop-local slot directly is NOT equivalent and caused
+// a reproducible wrong-target assertion under both pinned compilers.
+private void delegate() @safe borrowedAdd(int* address) @system
+{
+    return () @safe { *address += 10; };
+}
+
 private void testBorrowedStackReference() @system
 {
     int[3] stackValues = [3, 5, 7];
@@ -328,10 +335,7 @@ private void testBorrowedStackReference() @system
     ScopeKernel kernel = new ScopeKernel();
 
     foreach (i; 0 .. records.length)
-    {
-        int* borrowed = &stackValues[i];
-        records[i].prepare(() @safe { *borrowed += 10; });
-    }
+        records[i].prepare(borrowedAdd(&stackValues[i]));
 
     kernel.start();
     try
