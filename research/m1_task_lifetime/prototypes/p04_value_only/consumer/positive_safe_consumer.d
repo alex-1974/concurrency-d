@@ -16,6 +16,22 @@ private void safeConsumer() @safe
     auto result = evaluateScalars(inputs[], &twice);
     assert(result.count == 4);
     assert(result.values[0 .. 4] == [2, 4, 8, 16]);
+
+    // P05: the singleton is evaluated from @safe code without passing
+    // through the trusted worker lifecycle.
+    int[1] singleton = [-17];
+    auto one = evaluateScalars(singleton[], &twice);
+    assert(one.count == 1);
+    assert(one.values[0] == -34);
+    foreach (i; 1 .. ValueCapacity)
+        assert(one.values[i] == 0);
+
+    // Exercise the complete bounded worker batch, not only 4/8 entries.
+    int[ValueCapacity] full = [1, 2, 3, 4, 5, 6, 7, 8];
+    auto all = evaluateScalars(full[], &twice);
+    assert(all.count == ValueCapacity);
+    foreach (i, value; full)
+        assert(all.values[i] == 2 * value);
     // Repeated scopes must not retain any TaskRef to the old stack frame.
     foreach (round; 0 .. 32)
     {
@@ -46,5 +62,5 @@ private void safeConsumer() @safe
 void main()
 {
     safeConsumer();
-    writeln("P04 safe scalar consumer: PASS (safe entry, copy, 32 cycles, rejection)");
+    writeln("P04/P05 safe scalar consumer: PASS (singleton, full batch, 32 cycles, rejection)");
 }
