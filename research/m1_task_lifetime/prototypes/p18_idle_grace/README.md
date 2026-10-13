@@ -3,7 +3,7 @@
 **Research date:** 2026-10-13  
 **Scope:** one scheduling transition, not a new executor family.  
 **Branch:** `research/m1-task-lifetime-boundaries`, [Draft PR #38](https://github.com/alex-1974/concurrency-d/pull/38).  
-**Status:** generated exact-source candidate and original-M0 control, DMD/LDC CI qualification in progress; **no native P18 XPS performance evidence yet**. Do not promote this candidate to production.
+**Status:** exact-source candidate and original-M0 control **CORRECTNESS-QUALIFIED** on DMD 2.111.0 / LDC 1.41.0 ([CI #38469074496](https://github.com/alex-1974/concurrency-d/actions/runs/38469074496), including LDC `-O3` and full release); **no native P18 XPS performance evidence yet**. Do not promote this candidate to production.
 
 ## Evidence motivating P18
 
@@ -46,6 +46,9 @@ The [P18 fixture generator](../../../../tools/research/m1_p18_make_fixture.py) p
 4. Additional **LDC assertions-on `-O3`** and full DUB **release**, including actual race and result-oracle checks. No CI threshold on performance.
 
 The [independent CSV validator](../../../../tools/research/m1_p18_compare.py) requires exact workload/phase/order/seed/checksum equality and nonnegative, properly summed stage durations, while allowing parks/retries to vary as natural consequences of changed scheduling. It prints `grace/original` and comparative parks only as **CI diagnostics**.
+
+
+**Recorded compiler evidence:** [GitHub Actions run #38469074496](https://github.com/alex-1974/concurrency-d/actions/runs/38469074496) **PASS** DMD and LDC, including source-drift negative checks, duplicated control/candidate race scenarios, all 45 small-native-profile configurations, LDC assertions-on optimized debug and LDC release. The earlier run [#38468584407](https://github.com/alex-1974/concurrency-d/actions/runs/38468584407) failed on an incorrect *CI CSV filename alias* for the optimized configuration; the candidate compiled and ran, and the alias was corrected without changing the scheduler semantics. Shared-CI timing ratios are deliberately non-gating.
 
 ## Native Dell-XPS protocol
 
