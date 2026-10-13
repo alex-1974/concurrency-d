@@ -48,7 +48,7 @@ if [[ "$(basename -- "$DC")" == ldc2* ]]; then
 fi
 
 # Check comparable work, paired samples, deterministic checksum and order.
-python3 - "$TMP/smoke.csv" "$TMP/optimized.csv" <<'PY'
+python3 - "$TMP/smoke.csv" "$TMP/optimized.csv" "$TMP/release.csv" <<'PY'
 import csv
 import statistics
 import sys
