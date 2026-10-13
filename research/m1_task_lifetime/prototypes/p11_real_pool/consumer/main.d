@@ -8,6 +8,7 @@ import concurrency.research.m1_real_pool :
     evaluateWithRealPool, RealPoolCapacity;
 import concurrency.internal.owned_task :
     OwnedTaskExecutor, TaskHandle;
+import concurrency.research.m1_steal_probe : qualifyRealSteal;
 import std.stdio : writeln;
 
 private struct Point2
@@ -172,6 +173,7 @@ void main()
 {
     testBoundedTyped();
     testActualOwnedExecutorParity();
+    qualifyRealSteal();
     writeln("P11 real M0 work stealing: PASS (typed P/R, 1/2/4 workers, ",
-        "bounded backpressure, 16 repeated scopes, actual owned parity)");
+        "bounded backpressure, 16 scopes, owned parity, seven real steals)");
 }
