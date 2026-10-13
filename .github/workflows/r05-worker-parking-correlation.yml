@@ -73,7 +73,10 @@ jobs:
           workers = get("worker.csv")
           pairs = get("pairs.csv")
           summary = get("summary.csv")
+          acquisition = get("acquisition.csv")
+          acquisition_summary = get("acquisition_summary.csv")
           assert (len(rows), len(workers), len(pairs), len(summary)) == (24, 64, 8, 8)
+          assert (len(acquisition), len(acquisition_summary)) == (8, 8)
           assert len({(r["round"], r["workload"], r["producers"],
                       r["policy"], r["mode"]) for r in rows}) == 24
           checksums = {}
@@ -119,6 +122,13 @@ jobs:
           assert all(float(p["worker_over_plain"]) > 0 and
                      float(p["combined_over_worker"]) > 0 for p in pairs)
           assert all(int(s["rounds"]) == 1 for s in summary)
+          assert all(float(x["failed_steals_per_task"]) >= 0 and
+                     float(x["local_misses_per_task"]) >= 0 and
+                     float(x["tasks_per_claimed_batch"]) > 0
+                     for x in acquisition)
+          assert all(int(x["runs"]) == 1 and
+                     float(x["median_failed_steals_per_task"]) >= 0
+                     for x in acquisition_summary)
           env = (directory / "environment.txt").read_text()
           assert "NotificationPolicy.always in every child" in env
           print("PASS: 24 children, 64 worker samples, exact wake conservation")
