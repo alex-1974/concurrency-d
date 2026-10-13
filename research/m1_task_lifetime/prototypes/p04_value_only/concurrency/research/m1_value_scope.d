@@ -36,7 +36,7 @@ private struct Record
 
     static assert(header.offsetof == 0);
 
-    void prepare(ScalarOperation action, int value) @system
+    void prepare(ScalarOperation action, int value) @safe
     {
         operation = action;
         argument = value;
@@ -178,6 +178,11 @@ private ScalarBatchResult executeCopied(
     size_t count,
     ScalarOperation operation) @trusted
 {
+    // Defence in depth: the @trusted bridge validates its own complete
+    // preconditions, rather than relying only on evaluateScalars().
+    if (count < 2 || count > ValueCapacity || operation is null)
+        throw new Exception("P05 invalid trusted dispatch arguments");
+
     ScalarBatchResult answer;
     answer.count = count;
     Record[ValueCapacity] records;
@@ -220,8 +225,18 @@ ScalarBatchResult evaluateScalars(
     foreach (i, value; inputs)
         snapshot[i] = value;
 
+    // P05: zero/singleton work is performed entirely in compiler-checked
+    // @safe code: no worker, cast, handoff or @trusted dispatcher needed.
     if (inputs.length == 0)
         return ScalarBatchResult.init;
+
+    if (inputs.length == 1)
+    {
+        ScalarBatchResult answer;
+        answer.count = 1;
+        answer.values[0] = operation(snapshot[0]);
+        return answer;
+    }
 
     return executeCopied(snapshot, inputs.length, operation);
 }
