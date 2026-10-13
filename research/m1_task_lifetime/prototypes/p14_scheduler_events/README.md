@@ -1,7 +1,7 @@
 # M1 P14 — Exact-source scheduler event instrumentation and matched M0 control
 
 **Date:** 2026-10-13  
-**Status:** P14 research instrumentation and DMD/LDC correctness QUALIFIED. **Native Dell-XPS event/performance conclusions PENDING.** No production scheduler change, API freeze or public `@safe` promotion.
+**Status:** P14 research instrumentation and DMD/LDC correctness QUALIFIED; **complete native Dell-XPS P14 archive RECEIVED and analyzed**, while causal bottleneck attribution and any performance optimization remain DEFERRED. No production scheduler change, API freeze or public `@safe` promotion.
 
 **Context:** [P13 XPS summary review](../p13_worker_scaling/evidence/xps-2026-10-13-summary-review.md), [P13 workload](../p13_worker_scaling/README.md), [ADR-0001 PROPOSED](../../../../docs/adr/ADR-0001-task-lifetime-families.md), [Issue #17](https://github.com/alex-1974/concurrency-d/issues/17), [Draft PR #38](https://github.com/alex-1974/concurrency-d/pull/38).
 
@@ -112,3 +112,28 @@ Artifacts: `manifest.txt` with compiler/version/commit/topology/mask, `raw/sessi
 **DEFER:** production optimization, automatic worker-count/grainsize heuristics, per-task batching changes, public `@safe` or reliable native OS failure recovery, or a C++/Rust parity verdict. The pool's `closeAndJoin` failure and post-native-start errors remain the P06/P07 unresolved lifetime contract. P14 retains P13's deliberately `@system` and research fail-stop behavior; no production `source/`, root package manifest, `develop` or grandfathered R0.5 PR #35 change is warranted.
 
 **Next:** analyze actual P14 native event distributions, then isolate **one** candidate mechanism against the unchanged-source control (e.g. an explicit per-task central completion synchronization policy) in a separate research clone. Reject any “optimization” that reduces admission/completion/lifetime guarantees.
+
+
+## Native XPS evidence received and independently reviewed (2026-10-13)
+
+**[Full P14 XPS data-quality, real-control scaling and scheduler-event analysis](evidence/xps-2026-10-13-analysis.md).** The user supplied the complete six-CSV/raw-log native archive, **SHA-256 `586d567c62c5f9eb0d99b755fa17fe2597b4265316b785f24ec1c5f089fa0f39`**, measured at source commit `f4da54539e161c775cb99aa50eb9ed926de0a27e`. We have **not published that archive to public GitHub** because raw logs/manifest include local machine and filesystem identifiers.
+
+**Integrity:** LDC 1.41.0 release, Intel Core i7-9750H, process affinity CPUs 0–3 mapping to **four distinct physical cores** in the saved CPU topology. Three sessions × 45 configurations × (two warm-ups + seven measured sweeps) for **both** unchanged M0 and event-instrumented M0 gives 2,430 total rows and 1,890 measured rows (945 per mode). All task-result checksums, matching seeds/configuration order, complete 45-case sweeps, per-worker execution totals, event conservation and time-segment sums were verified.
+
+**UNINSTRUMENTED control within-sweep 4-worker/2-worker median `waves_ns` ratios**: **1.788× / 1.643× / 1.483× / 1.195× / 0.931×** for task kernels **0 / 8 / 32 / 128 / 512 iterations**, respectively; each median uses **63** within-sweep, same-work comparisons across three sessions and three ingress settings. Four workers were faster in **0 / 1 / 0 / 9 / 46** of those 63 comparisons. This independently confirms P13's task-granularity crossover in active multi-wave pools without asserting a general worker-count optimum.
+
+**TRACE path data**, 6,144 zero-iteration jobs and 4 workers, median of 21 samples per ingress:
+
+| Event | Ingress 8 | Ingress 64 | Ingress 256 |
+|---|---:|---:|---:|
+| Steal attempts | 4,785 | 1,189 | 1,012 |
+| Successful steals | 850 | 288 | 236 |
+| Actual park waits | 642 | 145 | 123 |
+| Producer full-ingress retries | 877 | 34 | 1 |
+| Mean tasks/nonempty ingress batch | 4.2 | 6.4 | 6.5 |
+
+Every configured worker executed some of the 6,144 tasks in **every one of the 945 traced measured configurations**. The short-task four-worker slowdown is thus not simply caused by idle workers receiving no tasks. One-worker/zero-iteration/ingress-8 workloads still incurred around **404 waits and 1,239 retries** with **zero stealing**, strengthening the case to investigate ingress/backpressure/parking separately from thief scheduling.
+
+**Instrumentation perturbation:** the median trace/control ratios across sessions were **0.973 / 1.030 / 0.914**, with process ordering alternated. The trace sometimes measures *faster* than control due to uncontrolled timing variability, so we reject any claimed calibrated overhead or subtraction. Native temperature snapshots were around 76–81°C but not continuous frequency/thermal traces. The source analysis distinguishes real-control scaling from traced event counts.
+
+**Disposition:** KEEP the P14 counters and completed native evidence. **DEFER** modifications to production M0, batching/wake/steal/worker policies, full `@safe` scheduler promotion or any C++ speed claim. For the next bounded experiment, compare an unchanged uninstrumented M0 against **one** equivalent-semantics research variant, and first measure/calibrate central completion/ingress lock contention separately from failed steals and park/wake transitions. P14 remains research only; P06/P07 native join failure remains unresolved.
