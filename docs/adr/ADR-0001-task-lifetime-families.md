@@ -117,3 +117,14 @@ Compiler/runtime evidence at exact source commit `d0b6dfceb66398f93ecb4a60543216
 The experiment also showed that allowing a nested-worker call by wrapping a whole `@system` nested task runner in `@trusted` was **not justified** by the test; this wrapper and the misleading nested test were removed. Nested structured task execution stays OPEN.
 
 **Interpretation:** keep P02 as a proof of a small synchronous batch regime, **not** a general public `TaskScope`, `@safe` cross-thread borrow contract, performance superiority, or a replacement for independent owned tasks. Specifically, `scope` does not prove callback captures are transitively thread-safe. Issue #17 remains OPEN; the original qualification checklist still applies to any dynamic scope design. ADR status remains PROPOSED.
+
+
+## P03 bounded dynamic lexical-scoped admission — 2026-10-13
+
+[P03 implementation, CI results, and safety boundaries](../../research/m1_task_lifetime/prototypes/p03_dynamic_lexical_scope/README.md) demonstrate that an *internal* `@system` builder can dynamically publish multiple tasks via a private portal into a two-worker, eight-inbox FIFO while retaining 24 distinct pinned records in the lexical caller frame. The builder's scope driver joins every accepted task in a `finally` before returning or propagating a builder `Exception`.
+
+[CI run #38377974746](https://github.com/alex-1974/concurrency-d/actions/runs/38377974746) confirms P03 normal DMD 2.111.0 and LDC 1.41.0 correctness plus optimized `-O3` LDC correctness, *with asserts enabled*. It covers full-inbox rejection, dynamically interleaved completion and submission, no record-slot reuse, builder exception unwind, child Exception isolation, a GC-visible captured object, destructor-after-join ordering, and compile-time exclusion of direct `Portal.trySpawn` calls from `@safe` functions. This is not a production/benchmark gate.
+
+**Substantive safety finding:** an outer lexical join is not sufficient to protect **every inner-block borrow**. A builder can capture the address of a shorter-lived local variable, publish an asynchronous callback, then leave that local's block before the outer `runScoped` finally joins. The producer callback/submission therefore stay `@system`. The `scope` annotation on the builder does not statically certify transitive closure captures or safe cross-thread mutable access. This excludes claiming a general `@safe` dynamic TaskScope from P03.
+
+**Research decision:** KEEP bounded lexical dynamic join as a demonstrable internal mechanism; NO-GO for promoting the current portal as a public `@safe` scoped borrowing API. Keep Issue #17 OPEN and this ADR PROPOSED. Future API research must decide how to bind each borrowed referent to a verified quiescence point, not just the outer join, before adding nested worker spawn, concurrent producers, cancellation or native performance claims.
