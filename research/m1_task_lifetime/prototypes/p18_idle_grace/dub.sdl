@@ -11,7 +11,7 @@ configuration "control" {
 }
 configuration "grace" {
     mainSourceFile "generated/consumer/main.d"
-    dflags "-version=P18Grace"
+    versions "P18Grace"
 }
 configuration "control-optimized" {
     mainSourceFile "generated/consumer/main.d"
@@ -19,12 +19,13 @@ configuration "control-optimized" {
 }
 configuration "grace-optimized" {
     mainSourceFile "generated/consumer/main.d"
-    dflags "-O3" "-version=P18Grace"
+    dflags "-O3"
+    versions "P18Grace"
 }
 configuration "race-control" {
     mainSourceFile "generated/race/main.d"
 }
 configuration "race-grace" {
     mainSourceFile "generated/race/main.d"
-    dflags "-version=P18Grace"
+    versions "P18Grace"
 }
