@@ -306,12 +306,13 @@ private void testPinnedQueueAndDrain() @system
         assert(kernel.trySubmit(records[0]));
         assert(kernel.trySubmit(records[1]));
         gate.waitUntil(2); // both workers busy
-        foreach (i; 2 .. 10)
+        assert(kernel.trySubmit(records[2]));
+        assert(!kernel.trySubmit(records[2])); // duplicate, still free slots
+        foreach (i; 3 .. 10)
             assert(kernel.trySubmit(records[i]));
         // 2 active blockers + 8 pending = 10 accepted.
         assert(!kernel.trySubmit(records[10])); // bounded inbox full
         assert(!records[10].submitted); // rejected record remains caller-owned
-        assert(!kernel.trySubmit(records[2])); // reject second publication
         foreach (i; 2 .. 10)
             assert(!records[i].hasReturned());
         gate.release();
