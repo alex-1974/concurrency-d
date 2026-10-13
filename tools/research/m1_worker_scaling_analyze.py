@@ -113,7 +113,7 @@ def analyze(path: Path, required_rounds: int, expected_profile: str) -> list[dic
                 for run in measured_runs
             )
             print(f"P13 DIAGNOSTIC {path.name} iterations={it} ingress={ingress} "
-                  f"4w/2w paired-wave median={median(ratios):.3f} "
+                  f"4w/2w within-sweep median={median(ratios):.3f} "
                   f"min={ratios[0]:.3f} max={ratios[-1]:.3f} "
                   f"samples={len(ratios)}")
     print(f"P13 correctness PASS {path.name}: "
