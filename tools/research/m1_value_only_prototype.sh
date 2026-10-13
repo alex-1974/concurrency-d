@@ -52,6 +52,16 @@ echo "P04 scalar-only language gate: PASS (safe consumer + 3 negative sources)"
 "$TMP/m1-p05-defensive-unittests"
 echo "P05 trusted-entry invalid count/null guards: PASS"
 
+# Test-only injected failure after 0, 1 and 3 accepted TaskRefs.
+# closeAndJoin must drain/return before executeCopied rethrows.
+"$DC" -unittest -main -version=M1P05Fault -preview=dip1000 \
+    "-I$ROOT/source" "-I$BASE" \
+    "-of=$TMP/m1-p05-partial-enqueue-unittests" \
+    "$ROOT/source/concurrency/internal/task_record.d" \
+    "$BASE/concurrency/research/m1_value_scope.d"
+"$TMP/m1-p05-partial-enqueue-unittests"
+echo "P05 partial enqueue failure and join: PASS"
+
 # QUALITY_GATES.md requires a compilation challenge for each @trusted
 # marker. Change each marker individually to @safe, leaving the rest of
 # the actual module identical. The expected result is a frontend rejection
