@@ -1,0 +1,47 @@
+name: R0.5 admission close linearization research
+
+on:
+  push:
+    branches:
+      - perf/r05-owned-task-pipeline
+    paths:
+      - "tools/research/r05_admission_close_linearization_model.py"
+      - ".github/workflows/r05-admission-close-linearization.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  bounded-model:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - name: Checkout grandfathered R0.5 research
+        uses: actions/checkout@v7
+      - name: Validate Python syntax and all bounded histories
+        shell: bash
+        run: |
+          python3 -m py_compile tools/research/r05_admission_close_linearization_model.py
+          python3 tools/research/r05_admission_close_linearization_model.py
+      - name: Verify rejected shortcuts separately
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import importlib.util
+          import sys
+          path = "tools/research/r05_admission_close_linearization_model.py"
+          spec = importlib.util.spec_from_file_location("close_model", path)
+          model = importlib.util.module_from_spec(spec)
+          sys.modules[spec.name] = model
+          spec.loader.exec_module(model)
+          model.counterexamples()
+          s = model.State("running", (model.BUILT,))
+          after = dict(model.steps(s, 1, 1, 1))["close_begin"]
+          assert after.revoked_after_build == 1
+          assert not any(action == "commit" for action, _ in
+                         model.steps(after, 1, 1, 1))
+          states, edges = model.explore(3, 2, 2, 2)
+          assert states > 100 and edges > states
+          print("PASS: close cut, revocation and built-work rejection exposed")
+          PY
