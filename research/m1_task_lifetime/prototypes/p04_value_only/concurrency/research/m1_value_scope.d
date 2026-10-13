@@ -173,6 +173,12 @@ private final class WorkerBatch
  start and publication unwind through closeAndJoin. Fatal Errors are not
  generally recoverable, and this prototype is not a production proof.
 +/
+// Test-only fault injection is NOT built into the ordinary P04/P05 consumer.
+// The producer alone reads this hook, never a worker; it tests whether an
+// exception after accepting some tasks still closes and joins every worker.
+version (M1P05Fault)
+    private size_t faultBeforeEnqueue = size_t.max;
+
 private ScalarBatchResult executeCopied(
     int[ValueCapacity] inputs,
     size_t count,
@@ -194,7 +200,14 @@ private ScalarBatchResult executeCopied(
     try
     {
         foreach (i; 0 .. count)
+        {
+            version (M1P05Fault)
+            {
+                if (i == faultBeforeEnqueue)
+                    throw new Exception("P05 injected enqueue failure");
+            }
             batch.enqueue(records[i].reference());
+        }
     }
     finally
         batch.closeAndJoin();
@@ -270,4 +283,28 @@ unittest
     catch (Exception ex)
         nullRejected = ex.msg == "P05 invalid trusted dispatch arguments";
     assert(nullRejected, "null trusted operation was not rejected");
+}
+
+
+version (M1P05Fault)
+unittest
+{
+    int[ValueCapacity] data = [2, 3, 5, 7, 11, 13, 17, 19];
+    // Failure happens after 0, 1, or 3 published records. All accepted
+    // jobs must run to completion and all workers must join before rethrow.
+    foreach (faultIndex; [0, 1, 3])
+    {
+        faultBeforeEnqueue = faultIndex;
+        bool injected;
+        try
+            executeCopied(data, 4, &p05Identity);
+        catch (Exception ex)
+            injected = ex.msg == "P05 injected enqueue failure";
+        assert(injected, "injected failure did not unwind through join");
+    }
+
+    faultBeforeEnqueue = size_t.max;
+    auto success = executeCopied(data, 4, &p05Identity);
+    assert(success.count == 4);
+    assert(success.values[0 .. 4] == data[0 .. 4]);
 }
