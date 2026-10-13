@@ -1,7 +1,7 @@
 # M1 P15 — Exact-M0 TaskInbox mutex acquisition and hold-time probes
 
 **Research date:** 2026-10-13  
-**Status:** compiler-qualified DMD/LDC, including optimized LDC and release. **Native XPS lock cost evidence pending.** No source/production changes; no performance or `@safe` promotion.  
+**Status:** compiler-qualified DMD/LDC, including optimized LDC and release. **Complete native XPS P15 archive received, inspected and documented**; precise uninstrumented lock costs and causal bottlenecks **remain unproven**. No source/production changes; no performance or `@safe` promotion.  
 **Context:** [P14 full XPS event analysis](../p14_scheduler_events/evidence/xps-2026-10-13-analysis.md), [P13 multi-wave work](../p13_worker_scaling/README.md), [ADR-0001 PROPOSED](../../../../docs/adr/ADR-0001-task-lifetime-families.md), [Issue #17](https://github.com/alex-1974/concurrency-d/issues/17), [Draft PR #38](https://github.com/alex-1974/concurrency-d/pull/38).
 
 ## Research question and a strict non-goal
@@ -87,3 +87,16 @@ Output: `/tmp/p15-xps-2026-10-13.tar.gz` containing `manifest.txt`, control/time
 **DEFER:** identification of a causal lock bottleneck, conversion of probe wait to uninstrumented mutex contention costs, completion batching/lock-free atomic changes, worker-count/ingress defaults, a C++ performance comparison or an arbitrary public `@safe TaskScope`. P06/P07 native failing-join/start-after-launch concerns remain outstanding; the research batch's `@system` plus fail-stop-on-uncertain-join boundary is unchanged.
 
 **P16 candidates after native P15:** either a *separately calibrated lower-impact lock-wait experiment* (clock microcost, high-sample latency distributions, optional OS profiling on uninstrumented M0) or a single isolated **matched-lifetime completion policy** that preserves all final-shutdown and task-completion predicates. Do **not** replace mutex accounting merely on the basis of self-instrumented timings.
+
+
+## Native Dell-XPS evidence received — 2026-10-13
+
+**[Full native P15 archive integrity, unchanged-control scaling and invasive timed-lock analysis](evidence/xps-2026-10-13-analysis.md).** The original user's `p15-xps-2026-10-13.tar.gz` has SHA-256 `5423ea7385445f5487fa289b24a59fe5f3e0719ae3a2200e41f845376c2910d0` and was produced at source commit **`fb0147d6f44183b0eae7e3ccfbc48cf4c7e0c734`** using LDC 1.41.0 release on Dell XPS i7-9750H. CPU affinity 0–3 corresponds to four distinct physical cores; it is not per-worker pinning. The full archive was **not published** to GitHub because manifest/raw logs include local system identifiers.
+
+**Archive verification:** three sessions × 45 configurations × 2 warm-up + 7 measured sweeps × 2 modes: **2,430 rows**, of which **945 matched control and 945 matched timed** (540 warm-ups). Equal randomized case order and checksum in each paired control/timed row, no missing/duplicate configurations, exact stage-sum accounting, zero control timings, `submit.calls=6144+retries`, and `complete.calls=6144` in *every timed sample* all PASS.
+
+**Only UNINSTRUMENTED control should be used for scaling:** within-sweep 4w/2w `waves_ns` ratio medians across 63 comparisons per kernel are **1.696× at 0**, **1.612× at 8**, **1.501× at 32**, **1.176× at 128** and **0.912× at 512** iterations. Four workers win **0/0/0/9/46** of the 63 cases respectively. This reproduces P13/P14's task-granularity crossover.
+
+**The TIMED research clone shows considerable self-perturbation:** paired `timed/control` median **2.145×** over 945 samples; at 0 iterations **2.747×**, at 512 **1.732×**. With 6,144 zero-iteration tasks and ingress 64, observed **completion acquisition/hold intervals per call** had medians **781/97 ns** (1w), **964/87 ns** (2w), **2662/107 ns** (4w). The larger measured acquisition interval at 4w is consistent with concurrency pressure on the shared inbox mutex, but **is not its uninstrumented waiting time**. The probe reads clocks and updates statistics inside the critical section; aggregated wait intervals overlap, and measured hold times exclude final observer bookkeeping and unlock.
+
+**Decision:** KEEP the repeated-workload control scaling and source-verified, internally consistent lock timing evidence; **DEFER** attributing a production percentage or nanosecond bottleneck, rewriting `completeOne`, tuning queues/stealing/worker activation, or public `@safe` promotion. The next P16 research question should first calibrate/limit instrumentation and isolate one mechanism while preserving per-task completion, lost-wake protection, shutdown/join obligations and actual native failures.
