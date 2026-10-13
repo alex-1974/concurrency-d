@@ -29,7 +29,7 @@ private struct ScopedRecord
 {
     TaskHeader header;
     private void delegate() @safe action;
-    private Throwable failure;
+    private Exception failure;
     private shared uint returned;
     private bool prepared;
 
@@ -56,7 +56,7 @@ private struct ScopedRecord
         return atomicLoad!(MemoryOrder.acq)(returned) != 0u;
     }
 
-    Throwable error() @system
+    Exception error() @system
     {
         assert(hasReturned());
         return failure;
@@ -83,7 +83,7 @@ private void executeRecord(shared(TaskHeader)* raw)
     {
         record.action();
     }
-    catch (Throwable problem)
+    catch (Exception problem)
     {
         record.failure = problem;
     }
@@ -236,7 +236,9 @@ private final class ScopeKernel
     }
 }
 
-/++ Test synchronization only; deliberately not part of the scope API. +/
+/++ Test synchronization only; deliberately not part of the scope API.
+ The tested druntime Condition methods are @system in DMD 2.111/LDC 1.41;
+ test-only @trusted wrappers require their own mutex discipline. +/
 private final class Gate
 {
     Mutex mutex;
@@ -250,7 +252,7 @@ private final class Gate
         changed = new Condition(mutex);
     }
 
-    void block() @safe
+    void block() @trusted
     {
         synchronized (mutex)
         {
@@ -261,7 +263,7 @@ private final class Gate
         }
     }
 
-    void waitUntil(size_t count) @safe
+    void waitUntil(size_t count) @trusted
     {
         synchronized (mutex)
         {
@@ -270,7 +272,7 @@ private final class Gate
         }
     }
 
-    void release() @safe
+    void release() @trusted
     {
         synchronized (mutex)
         {
