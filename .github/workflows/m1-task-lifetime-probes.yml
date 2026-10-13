@@ -42,6 +42,13 @@ on:
       - "tools/research/m1_p16_2_check.py"
       - "tools/research/m1_p16_2_probe.sh"
       - "tools/research/m1_p16_2_xps.sh"
+      - "tools/research/m1_p17_make_event_pair.py"
+      - "tools/research/m1_p17_make_fixture.py"
+      - "tools/research/m1_p17_compare.py"
+      - "tools/research/m1_p17_probe.sh"
+      - "tools/research/m1_p17_telemetry.py"
+      - "tools/research/m1_p17_thermal_review.py"
+      - "tools/research/m1_p17_xps.sh"
       - ".github/workflows/m1-task-lifetime-probes.yml"
   pull_request:
     branches:
@@ -84,6 +91,13 @@ on:
       - "tools/research/m1_p16_2_check.py"
       - "tools/research/m1_p16_2_probe.sh"
       - "tools/research/m1_p16_2_xps.sh"
+      - "tools/research/m1_p17_make_event_pair.py"
+      - "tools/research/m1_p17_make_fixture.py"
+      - "tools/research/m1_p17_compare.py"
+      - "tools/research/m1_p17_probe.sh"
+      - "tools/research/m1_p17_telemetry.py"
+      - "tools/research/m1_p17_thermal_review.py"
+      - "tools/research/m1_p17_xps.sh"
       - ".github/workflows/m1-task-lifetime-probes.yml"
   workflow_dispatch:
 
@@ -177,3 +191,7 @@ jobs:
       - name: P16.2 seq-cst completion race and uninstrumented M0 control
         shell: bash
         run: bash tools/research/m1_p16_2_probe.sh "$DC"
+
+      - name: P17 original vs atomic scheduler event-path and thermal-monitor preflight
+        shell: bash
+        run: bash tools/research/m1_p17_probe.sh "$DC"
