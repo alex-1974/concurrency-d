@@ -2,7 +2,7 @@
 # Native XPS experiment capture: NO background work, NO repository mutation.
 # Usage:
 #   bash tools/research/m1_matched_pool_xps.sh ldc2 /tmp/p12-xps-2026-10-13
-# Optional: P12_CPUSET=2,3 restricts the benchmark executable only via taskset.
+# Optional: P12_CPUSET=2,3 applies CPU affinity to the benchmark process (and DUB child processes).
 set -euo pipefail
 DC="${1:-ldc2}"
 DEST="${2:-$PWD/p12-matched-pool-$(date +%Y%m%d-%H%M%S)}"
