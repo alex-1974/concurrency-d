@@ -14,6 +14,15 @@ import concurrency.internal.task_record : TaskHeader, TaskRef, dispatchTask;
 import core.sync.mutex : Mutex;
 import core.sync.condition : Condition;
 import core.thread : Thread;
+version (M1P07FailStop)
+{
+    import core.stdc.stdlib : abort;
+    import core.stdc.stdio : fputs, fflush, stderr;
+}
+version (M1P07JoinFault)
+    import core.thread.threadbase : ThreadException;
+version (M1P07StartFault)
+    import core.thread.threadbase : ThreadException;
 
 enum size_t ValueCapacity = 8;
 private enum size_t WorkerCount = 2;
@@ -84,6 +93,18 @@ version (M1P06Fatal)
     private size_t p06LastPending;
 }
 
+// P07 deliberately destructive research-only policy: if the native worker
+// lifecycle cannot establish quiescence, no caller is allowed to unwind
+// stack-resident TaskRef storage.  A process abort is an availability loss,
+// not a recoverable exception or an accepted production policy.
+version (M1P07FailStop)
+private void p07FailStop(const(char)* marker) @system
+{
+    fputs(marker, stderr);
+    fflush(stderr);
+    abort();
+}
+
 private final class WorkerBatch
 {
     private Mutex mutex;
@@ -123,6 +144,15 @@ private final class WorkerBatch
                 }
                 worker = new Thread({ workerLoop(); });
                 worker.start();
+                version (M1P07StartFault)
+                {
+                    // Simulates a start() reporting failure *after* native
+                    // launch, before the caller records a started worker.
+                    // It is not a real pthread_attr_destroy failure.
+                    if (started == 0)
+                        throw new ThreadException(
+                            "P07 synthetic post-launch start failure");
+                }
                 ++started;
             }
             version (M1P06Start)
@@ -133,8 +163,17 @@ private final class WorkerBatch
         }
         catch (Throwable problem)
         {
-            closeAndJoin();
-            throw problem;
+            version (M1P07FailStop)
+            {
+                // Any start() failure is conservative fail-stop, because
+                // the exact post-native-launch state is not established.
+                p07FailStop("P07_FAILSTOP_START\n".ptr);
+            }
+            else
+            {
+                closeAndJoin();
+                throw problem;
+            }
         }
     }
 
@@ -164,7 +203,31 @@ private final class WorkerBatch
         Throwable firstWorkerFailure;
         foreach (i; 0 .. started)
         {
-            auto failure = workers[i].join(false);
+            Throwable failure;
+            try
+            {
+                version (M1P07JoinFault)
+                {
+                    // Simulates Thread.join(false) throwing, but deliberately
+                    // does NOT invoke undefined native join behaviour.
+                    if (i == 0)
+                        throw new ThreadException(
+                            "P07 synthetic native join failure");
+                }
+                failure = workers[i].join(false);
+            }
+            catch (Throwable joinProblem)
+            {
+                version (M1P07FailStop)
+                {
+                    // A join failure does NOT establish target quiescence.
+                    // Aborting prevents stack records from being destroyed
+                    // while an unjoined worker might still hold TaskRefs.
+                    p07FailStop("P07_FAILSTOP_JOIN\n".ptr);
+                }
+                else
+                    throw joinProblem;
+            }
             version (M1P06Start)
                 ++confirmedJoins;
             if (failure !is null && firstWorkerFailure is null)
@@ -442,4 +505,27 @@ unittest
     int[2] next = [7, 9];
     auto after = evaluateScalars(next[], &p05Identity);
     assert(after.count == 2 && after.values[0] == 7 && after.values[1] == 9);
+}
+
+
+version (M1P07JoinFault)
+unittest
+{
+    // The native start succeeds; the research hook then simulates an
+    // exceptional return from join(false) while worker threads are alive.
+    // M1P07FailStop MUST terminate this process; returning is failure.
+    int[4] values = [2, 3, 5, 7];
+    evaluateScalars(values[], &p05Identity);
+    assert(0, "P07 returned after uncertain native join");
+}
+
+version (M1P07StartFault)
+unittest
+{
+    // Native first start succeeds, but this research hook simulates an
+    // exception before its handle is registered by the caller.
+    // The only qualified behavior is fail-stop, not caller-stack unwind.
+    int[4] values = [2, 3, 5, 7];
+    evaluateScalars(values[], &p05Identity);
+    assert(0, "P07 returned after uncertain native start");
 }
