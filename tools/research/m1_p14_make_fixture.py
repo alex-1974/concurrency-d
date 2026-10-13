@@ -73,6 +73,8 @@ else
     ulong stealSuccesses;
     ulong parkAttempts;
     ulong executed;
+    size_t workerCount;
+    ulong[16] workerExecuted;
 }
 struct ScalingSample
 {""")
@@ -108,8 +110,15 @@ struct ScalingSample
                 trace.inboxBatchClaims + trace.localPushFailures ||
             trace.localPushes !=
                 trace.localHits + trace.stealSuccesses ||
-            trace.stealSuccesses > trace.stealAttempts)
+            trace.stealSuccesses > trace.stealAttempts ||
+            trace.workerCount != workers)
             throw new Exception("P14 instrumentation event conservation failure");
+
+        ulong workerSum;
+        foreach (i; 0 .. trace.workerCount)
+            workerSum += trace.workerExecuted[i];
+        if (workerSum != all)
+            throw new Exception("P14 per-worker execution distribution mismatch");
 
         sample.events = P14Events(
             trace.fullSubmissions, trace.acceptedSubmissions,
@@ -121,6 +130,8 @@ struct ScalingSample
             trace.inboxBatchTasks, trace.localPushes,
             trace.localPushFailures, trace.stealAttempts,
             trace.stealSuccesses, trace.parkAttempts, trace.executed);
+        sample.events.workerCount = trace.workerCount;
+        sample.events.workerExecuted = trace.workerExecuted;
     }""")
 
     driver = once(driver,
@@ -150,7 +161,24 @@ struct ScalingSample
         ",", sample.events.stealAttempts,
         ",", sample.events.stealSuccesses,
         ",", sample.events.parkAttempts,
-        ",", sample.events.executed);""")
+        ",", sample.events.executed,
+        ",", sample.events.workerCount,
+        ",", sample.events.workerExecuted[0],
+        ",", sample.events.workerExecuted[1],
+        ",", sample.events.workerExecuted[2],
+        ",", sample.events.workerExecuted[3],
+        ",", sample.events.workerExecuted[4],
+        ",", sample.events.workerExecuted[5],
+        ",", sample.events.workerExecuted[6],
+        ",", sample.events.workerExecuted[7],
+        ",", sample.events.workerExecuted[8],
+        ",", sample.events.workerExecuted[9],
+        ",", sample.events.workerExecuted[10],
+        ",", sample.events.workerExecuted[11],
+        ",", sample.events.workerExecuted[12],
+        ",", sample.events.workerExecuted[13],
+        ",", sample.events.workerExecuted[14],
+        ",", sample.events.workerExecuted[15]);""")
     driver = once(driver,
         """        "retries,park_count,checksum");""",
         """        "retries,park_count,checksum,",
@@ -158,7 +186,13 @@ struct ScalingSample
         "complete_calls,final_signals,close_signals,park_waits,",
         "local_hits,local_misses,batch_attempts,batch_claims,",
         "batch_tasks,local_pushes,local_push_failures,steal_attempts,",
-        "steal_successes,park_attempts,executed");""")
+        "steal_successes,park_attempts,executed,worker_count,",
+        "worker0_executed,worker1_executed,worker2_executed,",
+        "worker3_executed,worker4_executed,worker5_executed,",
+        "worker6_executed,worker7_executed,worker8_executed,",
+        "worker9_executed,worker10_executed,worker11_executed,",
+        "worker12_executed,worker13_executed,worker14_executed,",
+        "worker15_executed");""")
 
     # Make the two executable modes clearly distinguishable without
     # affecting task work or the shuffled scenario sequence.
