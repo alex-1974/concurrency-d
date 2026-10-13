@@ -85,3 +85,12 @@ The negative probes are compile-only. The positive consumer is a linked executab
 **NO-GO for claiming this solves Issue #17's general dynamic TaskScope:** There are no borrowed closure captures, no arbitrary returned result type, no dynamic child submissions, no parallel external producers, no nested worker-side scope, no cancellation and no performance qualification. The narrow `@trusted` runtime proof needs independent review; source-level negative tests do not prove the internals safe. The design also snapshots eight input scalars rather than exercising a general borrowed view. This is a **different task family**, not evidence that arbitrary borrowed tasks become `@safe` after an outer join.
 
 **Next research gate:** compare the feasibility of typed, copyable, alias-free values against a *separate* explicit `@system` borrowing family; qualify the `@trusted` bridge and worker shutdown corner cases before any promotion; only then consider generic typed results, cancellation or realistic consumer measurements. Continue to preserve P01–P03 and the R0.5 research evidence.
+
+
+## P05 follow-up — limited trust reduction and independent blockers
+
+The original P04 result above describes the **pre-P05** implementation and its pinned CI source. Later work **on this same research module** is tracked separately as [P05 trusted-boundary audit](../p05_trust_audit/README.md).
+
+P05 now executes count 0 and 1 *entirely through compiler-checked `@safe` code*; only count 2–8 can cross the `@trusted` worker-lifecycle function. The internal trusted method validates its own count/non-null operation before allocating or publishing any records; `Record.prepare` is compiler-checked `@safe`. A test-only version hook injects ordinary exceptions after 0, 1 and 3 enqueue attempts and demonstrates quiescent join-before-rethrow. Both trust markers were individually challenged as `@safe` and rejected for the anticipated compiler safety reasons.
+
+[Updated CI evidence #38382063661](https://github.com/alex-1974/concurrency-d/actions/runs/38382063661): DMD 2.111.0, LDC 1.41.0 and optimized LDC normal consumer PASS. **The parallel `@trusted` worker lifecycle still has unsolved thread-start, fatal-Error, join-failure and transitive-soundness proof obligations. P05 explicitly does NOT accept or promote a production-safe parallel TaskScope.**
