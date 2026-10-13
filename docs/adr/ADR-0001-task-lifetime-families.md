@@ -106,3 +106,14 @@ The accompanying probes in `research/m1_task_lifetime/probes/` distinguish **com
 ## Research branching note
 
 This issue's isolated `research/m1-task-lifetime-boundaries` branch was created from the exact `develop` M0 HEAD `7af4409a2e09a303dfbc6c54033d28c92eb67581`, **not** from the older `research-integration` snapshot. At inspection the latter was 137 commits ahead and 9 behind `develop` with unrelated R0 experiments. This is a documented research-topic exception to the normal parent preference, chosen to assess **current M0 semantics without dragging unrelated grandfathered R0 history or misleadingly patching PR #35**. No existing branch was reset, renamed or rebased. This proposal must not be merged into production as an accepted contract until its gates pass.
+
+
+## P02 lexical-batch evidence update — 2026-10-13
+
+A deliberately narrow, **synchronous** `runScopedBatch(scope Work[])` research kernel now provides pinned **private** task records and **unconditional join before function return** without giving callers access to individual TaskRefs. It reuses the existing eight-byte internal transport; unlike P01 it eliminates the *caller forgetting to invoke join* for this limited batch family. See [P02 detailed qualification](../../research/m1_task_lifetime/prototypes/p02_lexical_batch/README.md).
+
+Compiler/runtime evidence at exact source commit `d0b6dfceb66398f93ecb4a60543216105ff681f0`: [GitHub Actions #38376599810](https://github.com/alex-1974/concurrency-d/actions/runs/38376599810), DMD 2.111.0 PASS and LDC 1.41.0 PASS (normal and `-O3` with assertions enabled). Includes distinct borrowed stack slots, GC-visible class capture under one forced collection, child `Exception` plus sibling drain, a destructor that runs after the join, bounded rejection before publication, 32 repeated eight-task calls, and disabled ordinary record-copy construction. These are **bounded tests, not a general proof**.
+
+The experiment also showed that allowing a nested-worker call by wrapping a whole `@system` nested task runner in `@trusted` was **not justified** by the test; this wrapper and the misleading nested test were removed. Nested structured task execution stays OPEN.
+
+**Interpretation:** keep P02 as a proof of a small synchronous batch regime, **not** a general public `TaskScope`, `@safe` cross-thread borrow contract, performance superiority, or a replacement for independent owned tasks. Specifically, `scope` does not prove callback captures are transitively thread-safe. Issue #17 remains OPEN; the original qualification checklist still applies to any dynamic scope design. ADR status remains PROPOSED.
