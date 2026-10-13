@@ -22,7 +22,7 @@ version (M1P07FailStop)
 version (M1P07JoinFault)
     import core.thread.threadbase : ThreadException;
 version (M1P07StartFault)
-    import core.thread.threadbase : ThreadException;
+    import core.thread.threadbase : ThreadError;
 
 enum size_t ValueCapacity = 8;
 private enum size_t WorkerCount = 2;
@@ -150,7 +150,7 @@ private final class WorkerBatch
                     // launch, before the caller records a started worker.
                     // It is not a real pthread_attr_destroy failure.
                     if (started == 0)
-                        throw new ThreadException(
+                        throw new ThreadError(
                             "P07 synthetic post-launch start failure");
                 }
                 ++started;
