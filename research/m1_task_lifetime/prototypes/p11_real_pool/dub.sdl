@@ -3,9 +3,21 @@ description "Research-only typed M0 work-stealing consumer; not a public package
 targetType "executable"
 // Research fixture only: preview flags must NOT enter the published package.
 dflags "-preview=dip1000"
-mainSourceFile "consumer/main.d"
 sourcePaths "concurrency"
 // Import only P09’s trait module, not its separate experimental main().
 sourceFiles "../p09_transfer_contract/concurrency/research/m1_inline_transfer.d"
 importPaths "." "../p09_transfer_contract"
 dependency "concurrency-d" path="../../../../"
+
+configuration "positive" {
+    mainSourceFile "consumer/main.d"
+}
+configuration "negative-safe" {
+    mainSourceFile "consumer/negative_safe.d"
+}
+configuration "negative-borrow" {
+    mainSourceFile "consumer/negative_borrow.d"
+}
+configuration "negative-delegate" {
+    mainSourceFile "consumer/negative_delegate.d"
+}
