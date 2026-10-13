@@ -49,6 +49,11 @@ on:
       - "tools/research/m1_p17_telemetry.py"
       - "tools/research/m1_p17_thermal_review.py"
       - "tools/research/m1_p17_xps.sh"
+      - "tools/research/m1_p18_make_grace_pool.py"
+      - "tools/research/m1_p18_make_fixture.py"
+      - "tools/research/m1_p18_compare.py"
+      - "tools/research/m1_p18_probe.sh"
+      - "tools/research/m1_p18_xps.sh"
       - ".github/workflows/m1-task-lifetime-probes.yml"
   pull_request:
     branches:
@@ -98,6 +103,11 @@ on:
       - "tools/research/m1_p17_telemetry.py"
       - "tools/research/m1_p17_thermal_review.py"
       - "tools/research/m1_p17_xps.sh"
+      - "tools/research/m1_p18_make_grace_pool.py"
+      - "tools/research/m1_p18_make_fixture.py"
+      - "tools/research/m1_p18_compare.py"
+      - "tools/research/m1_p18_probe.sh"
+      - "tools/research/m1_p18_xps.sh"
       - ".github/workflows/m1-task-lifetime-probes.yml"
   workflow_dispatch:
 
@@ -195,3 +205,7 @@ jobs:
       - name: P17 original vs atomic scheduler event-path and thermal-monitor preflight
         shell: bash
         run: bash tools/research/m1_p17_probe.sh "$DC"
+
+      - name: P18 exact-M0 bounded idle retry, race and same-work checks
+        shell: bash
+        run: bash tools/research/m1_p18_probe.sh "$DC"
