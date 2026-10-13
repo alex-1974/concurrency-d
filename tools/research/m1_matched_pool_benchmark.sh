@@ -35,6 +35,16 @@ if [[ "$(basename -- "$DC")" == ldc2* ]]; then
             --workers 2 --ingress 64 >"$TMP/optimized.raw"
     grep -E '^(phase,pair,mode,|warmup,|measure,)' "$TMP/optimized.raw" >"$TMP/optimized.csv"
     cat "$TMP/optimized.csv"
+
+    # Production-like compiler flags across the DUB dependency graph.
+    # Explicit per-task/oracle checks in P12 source remain active when
+    # ordinary compiler 'assert' checks are disabled by release mode.
+    timeout --signal=TERM --kill-after=5s 150s \
+        dub run --root="$BASE" --compiler="$DC" --build=release \
+            --config=release-mode -- --count 8192 --warmup 2 \
+            --rounds 5 --workers 2 --ingress 64 >"$TMP/release.raw"
+    grep -E '^(phase,pair,mode,|warmup,|measure,)' "$TMP/release.raw" >"$TMP/release.csv"
+    cat "$TMP/release.csv"
 fi
 
 # Check comparable work, paired samples, deterministic checksum and order.
