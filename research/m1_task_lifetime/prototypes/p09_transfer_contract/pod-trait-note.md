@@ -1,0 +1,1 @@
+D has a built-in POD trait accessible via the compiler traits expression. The original std.traits import was incorrect.
