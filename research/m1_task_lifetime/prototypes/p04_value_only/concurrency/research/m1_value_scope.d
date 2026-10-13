@@ -65,6 +65,13 @@ private Record* fromHeader(shared(TaskHeader)* raw)
 private void execute(shared(TaskHeader)* raw) @safe nothrow
 {
     auto record = fromHeader(raw);
+    // P06 fatal-Error probe is deliberately NOT part of the normal binary.
+    // The exception is an Error (permitted by nothrow), not an Exception.
+    version (M1P06Fatal)
+    {
+        if (record.argument == int.min)
+            assert(0, "P06 injected worker Error");
+    }
     record.result = record.operation(record.argument);
 }
 
@@ -82,6 +89,12 @@ private final class WorkerBatch
     private bool closing;
     private bool joined;
 
+    // Test-only, controller-thread flags: these do not enter any worker.
+    version (M1P06Start)
+        private size_t failBeforeStart = size_t.max;
+    version (M1P06Start)
+        private size_t confirmedJoins;
+
     this()
     {
         mutex = new Mutex();
@@ -94,9 +107,19 @@ private final class WorkerBatch
         {
             foreach (ref worker; workers)
             {
+                version (M1P06Start)
+                {
+                    if (started == failBeforeStart)
+                        throw new Exception("P06 injected pre-start failure");
+                }
                 worker = new Thread({ workerLoop(); });
                 worker.start();
                 ++started;
+            }
+            version (M1P06Start)
+            {
+                if (started == failBeforeStart)
+                    throw new Exception("P06 injected pre-start failure");
             }
         }
         catch (Throwable problem)
@@ -126,8 +149,18 @@ private final class WorkerBatch
             closing = true;
             workReady.notifyAll();
         }
+        // join() defaults to rethrow=true and would leave later workers
+        // unjoined if one earlier worker terminated with a Throwable.
+        // join(false) waits first and defers propagation until all have joined.
+        Throwable firstWorkerFailure;
         foreach (i; 0 .. started)
-            workers[i].join();
+        {
+            const failure = workers[i].join(false);
+            version (M1P06Start)
+                ++confirmedJoins;
+            if (failure !is null && firstWorkerFailure is null)
+                firstWorkerFailure = failure;
+        }
 
         synchronized (mutex)
         {
@@ -135,6 +168,8 @@ private final class WorkerBatch
             assert(accepted == completed);
             joined = true;
         }
+        if (firstWorkerFailure !is null)
+            throw firstWorkerFailure;
     }
 
     private void workerLoop() @system
@@ -154,11 +189,18 @@ private final class WorkerBatch
                 --pending;
             }
 
+            // This executes when dispatchTask returns *or unwinds with
+            // a Throwable*. The counter never needs to access the record.
+            // An unhandled child Error still makes its Thread terminate;
+            // closeAndJoin() waits for all workers before rethrowing it.
+            scope(exit)
+            {
+                synchronized (mutex)
+                    ++completed;
+            }
             dispatchTask(task);
-            // No further record access after execution. Thread.join
-            // establishes that all records are quiescent before they die.
-            synchronized (mutex)
-                ++completed;
+            // No further record access after dispatch. Thread.join, rather
+            // than the counter or result cell, is the quiescence barrier.
         }
     }
 }
