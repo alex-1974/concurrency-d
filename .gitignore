@@ -15,3 +15,7 @@ concurrency-d-test-*
 *.exe
 
 .workspace/
+
+# Generated, exact-source M1 experimental overlays (not primary evidence)
+research/m1_task_lifetime/prototypes/p14_scheduler_events/generated/
+research/m1_task_lifetime/prototypes/p15_mutex_timing/generated/
