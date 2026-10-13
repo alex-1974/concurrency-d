@@ -39,7 +39,7 @@ private void executeProbe(shared(TaskHeader)* header) @trusted nothrow @nogc
 {
     auto record = cast(shared(ProbeRecord)*) header;
     const kind = atomicLoad!(MemoryOrder.raw)(record.kind);
-    final switch (kind)
+    switch (kind)
     {
         case PrepA:
             atomicStore!(MemoryOrder.rel)(enteredA, 1u);
@@ -56,6 +56,8 @@ private void executeProbe(shared(TaskHeader)* header) @trusted nothrow @nogc
         case Remaining:
             atomicFetchAdd!(MemoryOrder.rel)(otherExecuted, 1u);
             return;
+        default:
+            assert(0, "P11 unknown steal probe record kind");
     }
 }
 
