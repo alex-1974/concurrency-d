@@ -9,6 +9,9 @@ TMP="$(mktemp -d)"
 trap 'rm -rf -- "$TMP"' EXIT
 command -v "$DC" >/dev/null 2>&1
 command -v dub >/dev/null 2>&1
+# The native XPS capture script is shell-parsed in CI, but never launched
+# there: its full 6-workload measurement belongs on the target hardware.
+bash -n "$ROOT/tools/research/m1_matched_pool_xps.sh"
 
 echo "P12 compiler=$("$DC" --version | head -n 1)"
 echo "P12 dub=$(dub --version)"
