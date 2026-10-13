@@ -1,0 +1,23 @@
+name "m1-p15-mutex-timing"
+description "Research only — same P13 workload and M0 timed-lock overlay/control"
+targetType "executable"
+sourcePaths "generated"
+mainSourceFile "generated/consumer/main.d"
+dependency "concurrency-d" path="../../../../"
+dflags "-preview=dip1000"
+
+configuration "control" {
+    mainSourceFile "generated/consumer/main.d"
+}
+configuration "timed" {
+    mainSourceFile "generated/consumer/main.d"
+    dflags "-version=P15Timed"
+}
+configuration "control-optimized" {
+    mainSourceFile "generated/consumer/main.d"
+    dflags "-O3"
+}
+configuration "timed-optimized" {
+    mainSourceFile "generated/consumer/main.d"
+    dflags "-O3" "-version=P15Timed"
+}
