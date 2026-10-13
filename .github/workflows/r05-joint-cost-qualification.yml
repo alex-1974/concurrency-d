@@ -1,0 +1,129 @@
+name: R0.5 same-source admission and worker cost diagnostic
+
+on:
+  push:
+    branches:
+      - perf/r05-owned-task-pipeline
+    paths:
+      - "tools/research/r05_joint_cost_matrix.py"
+      - "tools/research/r05_native_cpu_profile.py"
+      - "tools/research/r05_worker_resource_matrix.py"
+      - "tools/research/r05_worker_parking_matrix.py"
+      - "tools/research/r05_worker_parking_correlation.py"
+      - "source/concurrency/internal/**"
+      - "benchmarks/task_pipeline/**"
+      - "dub.sdl"
+      - ".github/workflows/r05-joint-cost-qualification.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  joint:
+    name: Same-source joint diagnostics / ${{ matrix.label }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: dmd-x86
+            runner: ubuntu-24.04
+            compiler: dmd-2.111.0
+          - label: ldc-x86
+            runner: ubuntu-24.04
+            compiler: ldc-1.41.0
+          - label: ldc-arm64
+            runner: ubuntu-24.04-arm
+            compiler: ldc-1.41.0
+
+    steps:
+      - name: Checkout grandfathered research
+        uses: actions/checkout@v7
+      - name: Install D compiler
+        uses: dlang-community/setup-dlang@v2
+        with:
+          compiler: ${{ matrix.compiler }}
+      - name: Verify driver syntax
+        shell: bash
+        run: |
+          python3 -m py_compile tools/research/r05_joint_cost_matrix.py
+          "$DC" --version
+          dub --version
+      - name: Run four diagnostic modes with exactly identical Tasks
+        shell: bash
+        run: |
+          python3 tools/research/r05_joint_cost_matrix.py \
+            --compiler="$DC" --workers=4 --tasks=384 --rounds=1 \
+            --producers 1 4 --budget=512 \
+            --policies gc recycle --workloads minimal compute \
+            --counter=shared --cooldown-ms=0 \
+            --output="evidence/r05-joint/${{ matrix.label }}"
+      - name: Check conserved task state, worker counters and stage boundaries
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import csv
+          from pathlib import Path
+          p = Path("evidence/r05-joint/${{ matrix.label }}")
+          def read(name):
+              with (p / name).open(newline="") as f:
+                  return list(csv.DictReader(f))
+          raw, workers = read("raw.csv"), read("worker.csv")
+          stages, pairs = read("stages.csv"), read("pairs.csv")
+          summary = read("summary.csv")
+          assert (len(raw), len(workers), len(stages), len(pairs),
+                  len(summary)) == (32, 96, 8, 8, 8)
+          assert len({(x["round"], x["workload"], x["producers"],
+                      x["policy"], x["mode"]) for x in raw}) == 32
+          assert len({(x["round"], x["workload"], x["producers"],
+                      x["policy"], x["mode"], x["worker_index"])
+                     for x in workers}) == 96
+          checksums = {}
+          hashes = {}
+          for row in raw:
+              checksums.setdefault(row["workload"], set()).add(row["checksum"])
+              hashes.setdefault(row["mode"], set()).add(row["binary_sha256"])
+              assert int(row["tasks"]) == int(row["completed"]) == 384
+              assert int(row["fresh_nodes"]) + int(row["reused_nodes"]) == 384
+              assert int(row["observed_handles"]) > 0
+              assert float(row["throughput_per_s"]) > 0
+              if row["mode"] == "plain":
+                  assert row["worker_count"] == ""
+                  assert row["condition_waits_per_task"] == ""
+                  assert row["admission_wait_ns_per_attempt"] == ""
+              elif row["mode"] != "joint_on":
+                  assert int(row["worker_count"]) == 4
+                  assert row["admission_wait_ns_per_attempt"] == ""
+                  assert float(row["failed_steals_per_task"]) >= 0
+              else:
+                  assert int(row["worker_count"]) == 4
+                  assert float(row["admission_wait_ns_per_attempt"]) >= 0
+                  assert float(row["admission_hold_ns_per_attempt"]) >= 0
+                  assert float(row["inbox_submit_ns_per_accepted"]) >= 0
+          assert set(hashes) == {"plain", "worker", "joint_off", "joint_on"}
+          assert all(len(values) == 1 for values in hashes.values())
+          assert hashes["joint_off"] == hashes["joint_on"]
+          assert all(len(values) == 1 for values in checksums.values())
+          for item in stages:
+              assert int(item["accepted"]) == 384
+              assert int(item["gate_count"]) == int(
+                  item["admission_attempts"])
+              for field in ("cell", "node", "publish", "root_append",
+                            "inbox_submit"):
+                  assert int(item[field + "_count"]) == 384
+          assert all(float(x["joint_on_over_joint_off"]) > 0
+                     for x in pairs)
+          assert all(int(x["rounds"]) == 1 for x in summary)
+          assert "NO R05InboxSubmitProbe" in (p / "environment.txt").read_text()
+          print("PASS: 32-process four-mode joint-cost source and counters")
+          PY
+      - name: Preserve correctness evidence only
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: r05-joint-${{ matrix.label }}-${{ github.run_id }}
+          path: evidence/r05-joint/${{ matrix.label }}/
+          if-no-files-found: warn
+          retention-days: 30
