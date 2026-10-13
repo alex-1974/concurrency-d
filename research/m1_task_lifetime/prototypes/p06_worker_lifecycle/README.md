@@ -63,7 +63,7 @@ The **initial P06 fatal probe failed under both pinned compilers** ([CI #3838361
 
 The source was corrected to distinguish successful task completion from **joined but failed/abandoned** execution. The same isolated tests then passed under both compilers ([CI #38383923253](https://github.com/alex-1974/concurrency-d/actions/runs/38383923253)). An additional stronger regression asserted that exactly two queued tasks remained unclaimed after both workers died, and [CI #38384177075](https://github.com/alex-1974/concurrency-d/actions/runs/38384177075) passed with DMD 2.111.0 and LDC 1.41.0.
 
-Exact asserted-queue source commit: `4e367200017937e47788b3477f45161732704f33`. Later runner commit `469002a80436769af54205faa9310241b210c9e9` adds optimized LDC P06 checks, without changing this source. See the repository's latest P06 workflow for its exact-source CI result. Prior P01–P05 remained checked in the same workflow.
+Exact asserted-queue source commit: `4e367200017937e47788b3477f45161732704f33`. Later runner commit `469002a80436769af54205faa9310241b210c9e9` adds optimized LDC P06 checks without changing that implementation. **[GitHub Actions #38384303420](https://github.com/alex-1974/concurrency-d/actions/runs/38384303420) passed both jobs**: DMD 2.111.0 job `115252155169`, LDC 1.41.0 job `115252155473`. The LDC log explicitly confirms `M1P06Start` and `M1P06Fatal` PASS twice each, once normally and once with `-O3` and asserts enabled. Prior P01–P05 remained passing in the same workflow.
 
 ## Remaining safety decisions — intentional NO-GO
 
