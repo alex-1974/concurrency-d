@@ -48,4 +48,13 @@ for scenario in negative-safe negative-borrow negative-delegate; do
     rm -f -- "$LOG"
 done
 
+if [[ "$(basename -- "$DC")" == ldc2* ]]; then
+    # The opt-in research configuration injects -O3 into a debug build:
+    # compiler assertions remain enabled, unlike ordinary release mode.
+    timeout --signal=TERM --kill-after=5s 160s \
+        dub run --root="$BASE" --compiler="$DC" --build=debug \
+            --config=optimized
+    echo "P11 LDC -O3 research configuration (assertions-on): PASS"
+fi
+
 echo "P11 unchanged M0 submission pool DUB integration: PASS"
