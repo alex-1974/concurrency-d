@@ -65,6 +65,8 @@ package(concurrency) struct P14Trace
     ulong stealSuccesses;
     ulong parkAttempts;
     ulong executed;
+    size_t workerCount;
+    ulong[16] workerExecuted;
 }
 """)
 
@@ -208,8 +210,11 @@ package(concurrency) struct P14Trace
     {
         P14Trace trace;
         _inbox.p14Read(trace);
-        foreach (ref worker; _p14Workers)
+        trace.workerCount = _p14Workers.length;
+        foreach (index, ref worker; _p14Workers)
         {
+            if (index < trace.workerExecuted.length)
+                trace.workerExecuted[index] = worker.executed;
             trace.localHits += worker.localHits;
             trace.localMisses += worker.localMisses;
             trace.inboxBatchAttempts += worker.inboxBatchAttempts;
