@@ -37,7 +37,7 @@ The pinned CI definitions, when actually run, use `dmd-2.111.0` and `ldc-1.41.0`
 - The compiler cannot be treated as a universal borrow checker. D language scope constrains selected indirections under checked `@safe` code; `@system` can bypass these checks.
 - Neither `@nogc` on small sample functions nor compiling an unrelated positive demonstrates a `@nogc` scheduler.
 
-The first seven-fixture run is reviewed in [CI evidence, 2026-10-13](results/ci-lifetime-compile-review-2026-10-13.md). The subsequent scoped-delegate pair needs its **own exact-head DMD/LDC CI review**; do not count unverified source additions as a passed gate.
+Both the original seven-fixture gate and the subsequent captured-delegate extension have **verified DMD 2.111.0 and LDC 1.41.0 PASS** (4 positive and 5 negative in the final source matrix). See [pinned CI results and exact source identities](results/ci-lifetime-compile-review-2026-10-13.md). These are language-property proofs only, not TaskScope runtime or `@safe` concurrency evidence.
 
 ## Next qualification (not implemented here)
 
