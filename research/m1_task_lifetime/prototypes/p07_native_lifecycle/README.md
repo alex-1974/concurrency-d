@@ -52,6 +52,7 @@ On the Linux POSIX path:
 - DMD first calls `pthread_create(&m_addr,...)` (success means the OS thread has started), then **checks `pthread_attr_destroy`**. If the later call fails, `onThreadError` causes `start()` to throw *after the native thread may exist*, but the caller's `started++` has not run.
 - LDC does likewise, with a larger shared-library `pinLoadedLibraries` handoff. Its tagged implementation checks `pthread_attr_destroy` after `pthread_create` as well.
 - For Darwin the tagged implementations also check `pthread_mach_thread_np` after native thread creation; the failure interpretation is not qualified on macOS by this Linux-only research.
+- **Important D-specific correction:** although `Thread.start()` is declared `nothrow`, its internal `onThreadError` routine throws a preallocated **`ThreadError : Error`**, not the `ThreadException : Exception` used by native `join(false)` errors. This is explicit in [DMD `threadbase.d` L40–70 and L1164–1181](https://github.com/dlang/dmd/blob/v2.111.0/druntime/src/core/thread/threadbase.d#L1164-L1181) and [LDC `threadbase.d` L1237–1254](https://github.com/ldc-developers/ldc/blob/v1.41.0/runtime/druntime/src/core/thread/threadbase.d#L1237-L1254). A start cleanup guard limited to `catch(Exception)` is therefore **incorrect**. The P07 fallback intercepts `Throwable`, and the isolated start-failure simulation is typed as `ThreadError`.
 - Linux's manual says `pthread_attr_destroy` normally succeeds on Linux; this is therefore a **source-level error path**, not evidence that it occurs in everyday Ubuntu execution: [Linux pthread attributes manual](https://man7.org/linux/man-pages/man3/pthread_attr_destroy.3.html). Portability and exceptional reliability still demand a policy.
 
 A producer recording `started` **only when `start()` returns** can miss a possibly launched native worker on that path. Retrying startup or unwinding without an independently established worker/engine ownership state is not an acceptable proof for pinned caller-frame records.
@@ -70,7 +71,7 @@ Under the conditional research flag **`M1P07FailStop`**, the existing P04/P05/P0
 
 Conditional fault hooks:
 
-- `M1P07StartFault` deliberately throws **after** a successful native `worker.start()` but **before** the local `started++`. This models the missing-registration window; it does **not** claim to reproduce a real `pthread_attr_destroy` fault.
+- `M1P07StartFault` deliberately throws a **`ThreadError`** **after** a successful native `worker.start()` but **before** the local `started++`. This models the missing-registration window; it does **not** claim to reproduce a real `pthread_attr_destroy` fault.
 - `M1P07JoinFault` throws a simulated `ThreadException` at the join call site while workers have started. It tests the fail-stop path **without performing an invalid, undefined or corrupted native pthread operation**.
 - The normal `M1P07FailStop` build with **neither** injection flag must still execute the real P04 `@safe` scalar consumer correctly.
 
