@@ -78,7 +78,7 @@ cd ../concurrency-d-p15
 bash tools/research/m1_p15_xps.sh ldc2 /tmp/p15-xps-2026-10-13
 ```
 
-Output: `/tmp/p15-xps-2026-10-13.tar.gz` containing `manifest.txt`, control/timed raw logs and normalized CSV files, session comparison diagnostics and machine snapshots. **Review manifests/raw logs for local user/host/path information before publication.** The experiment is foreground-only. The native XPS P15 archive has not yet been provided.
+Output: `/tmp/p15-xps-2026-10-13.tar.gz` containing `manifest.txt`, control/timed raw logs and normalized CSV files, session comparison diagnostics and machine snapshots. **Review manifests/raw logs for local user/host/path information before publication.** The experiment is foreground-only. The native XPS P15 archive was subsequently provided and analyzed; the complete results and limits are recorded in the evidence section below.
 
 ## Disposition
 
