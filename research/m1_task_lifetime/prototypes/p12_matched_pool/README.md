@@ -116,3 +116,20 @@ To qualify a performance conclusion, run multiple independent native repetitions
 **DEFER architecture/optimizations:** CI timing is not XPS evidence; no allocation count, per-dispatch cost or C++ parity has yet been measured. P12 does not remove the known native-lifecycle hazard or approve a public `@safe TaskScope`. No `source/`, production package manifest, `develop`, or grandfathered R0.5 PR #35 is changed.
 
 **P13 candidate after native evidence:** isolate record allocation counts and M0 thunk/execute codegen under pinned optimized LDC, or construct a truly **equivalent owned-result semantics** reference before comparing the public-family costs. Preserve P01–P11 and the proposed ADR/Issue #17/Draft PR #38 contract.
+
+
+## Native Dell XPS evidence received (2026-10-13)
+
+The previously pending actual-XPS run is now **available and independently reviewed**. See the [native evidence report](evidence/xps-2026-10-13-analysis.md) and [sanitized original summary CSV](evidence/xps-2026-10-13-summary.csv). The user's original 7.8-KiB archive was inspected and hash-pinned in the report, but **not posted to the public repository** because its manifest contains a local username/hostname/path.
+
+**Machine/build:** Dell XPS 15, Intel Core i7-9750H 6 cores/12 threads, Ubuntu Linux x86-64, LDC 1.41.0, DUB 1.40.0, release, no explicit CPU affinity. The recorded archive source commit is `6ef0e9353359bbab6571a3f31eef83bcd1915ebb`.
+
+**Integrity:** all six workloads (1/2/4 workers × 2,048/16,384 tasks) contain 3 warm-up pairs + 11 complete measured pairs. In all **66 measured pairs**, source/task counts, AB/BA order, checksums, stage sums, and summary statistics were verified. Both configurations perform exactly the same M0 TaskRef work and per-result oracle validation.
+
+**Observed (per-mode whole-batch medians, stack vs contiguous GC buffer):** 1w/2,048: 0.725 vs 0.841 ms; 1w/16,384: 4.725 vs 4.844 ms; **2w/2,048: 0.628 vs 0.834 ms**; **2w/16,384: 4.134 vs 4.379 ms**; 4w/2,048: 0.988 vs 1.160 ms; 4w/16,384: 6.903 vs 7.001 ms. The 2-worker cases favored stack in **11/11 paired runs** each; the 1- and 4-worker/16,384-task cases were mixed at 6/11.
+
+**Important causal limitation:** heap record *preparation* typically cost an additional ~137–148 µs **per fixed-capacity batch**. The buffer is **16,384 records even in the 2,048-task cases**, so this constant cost biases whole-batch contrast in small workloads. Post-preparation paired runtime differences are much smaller and mixed. **This does not establish better per-task TaskRef dispatch from stack memory**, nor superior general borrowed-vs-owned executor performance.
+
+**Worker scaling concern:** for stack/16,384, two workers improve only ~1.14× over one, while four workers take ~1.67× as long as two; the 2,048-task case similarly regresses at four workers. This is an important reproducible-once workload-specific observation, not proof of a scheduler bug. The six workloads were run sequentially, with no frequency/thermal trace or core pinning, and may be confounded by load/power/SMT.
+
+**Disposition:** P12 benchmark is qualified as a **single native research session**, but **NO-GO for storage/ownership selection, scheduler optimization or public `@safe` API promotion** until replicated frequency-controlled sessions and more targeted dispatch/scaling experiments. The native source evidence now motivates P13's first focus on worker scaling, separately from a follow-up to isolate preparation versus long-lived pooled dispatch.
