@@ -27,7 +27,8 @@ compile_one() {
 for name in \
     positive_scope_local \
     positive_return_scope \
-    positive_return_ref
+    positive_return_ref \
+    positive_scope_delegate
 do
     if ! compile_one "$name"; then
         echo "FAIL: positive control $name failed to compile" >&2
@@ -41,7 +42,8 @@ for name in \
     negative_scope_return \
     negative_scope_global \
     negative_ref_escape \
-    negative_stack_escape
+    negative_stack_escape \
+    negative_scope_delegate_escape
 do
     if compile_one "$name"; then
         echo "FAIL: forbidden source $name unexpectedly compiled" >&2
@@ -53,4 +55,4 @@ do
     cat -- "$TEMP/$name.log"
 done
 
-echo "PASS: 3 positive / 4 negative compile-only DIP1000 probes."
+echo "PASS: 4 positive / 5 negative compile-only DIP1000 probes."
