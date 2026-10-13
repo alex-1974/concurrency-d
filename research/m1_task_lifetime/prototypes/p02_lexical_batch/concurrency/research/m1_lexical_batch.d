@@ -20,7 +20,7 @@ private alias Work = void delegate() @safe;
 
 private struct Record
 {
-    @disable this(this); // never copy/move a published header
+    @disable this(this); // compiler forbids ordinary postblit of this record
     TaskHeader header;
     Work callback;
     Exception failure;
@@ -195,7 +195,8 @@ private struct BatchResult
 +/
 private BatchResult runScopedBatch(scope Work[] callbacks) @system
 {
-    assert(callbacks.length <= Capacity);
+    if (callbacks.length > Capacity)
+        throw new Exception("P02 lexical batch capacity exceeded");
     BatchResult result;
     if (callbacks.length == 0)
         return result;
@@ -257,29 +258,40 @@ private void testThrownChildStillDrains() @system
     assert(atomicLoad!(MemoryOrder.acq)(ran) == 2u);
 }
 
-private void testNestedBatch() @system
+private void testBatchCapacityAndEmpty() @system
 {
-    // Outer worker starts and joins a separate inner scope before returning.
-    // This test does not imply that a shared saturated pool may block-join.
-    shared uint innerRan;
-    Work[1] outer;
-    outer[0] = () @safe
-    {
-        // Keep the inner synchronous lexical scope in the worker.
-        runNestedBody(&innerRan);
-    };
-    auto result = runScopedBatch(outer[]);
-    assert(result.accepted == 1 && result.returned == 1);
-    assert(atomicLoad!(MemoryOrder.acq)(innerRan) == 1u);
+    Work[0] none;
+    auto empty = runScopedBatch(none[]);
+    assert(empty.accepted == 0 && empty.returned == 0);
+
+    shared uint executed;
+    Work[Capacity + 1] tooMany;
+    foreach (ref job; tooMany)
+        job = borrowedIncrement(&executed);
+    bool rejected;
+    try
+        runScopedBatch(tooMany[]);
+    catch (Exception problem)
+        rejected = problem.msg == "P02 lexical batch capacity exceeded";
+    assert(rejected);
+    assert(atomicLoad!(MemoryOrder.acq)(executed) == 0u);
 }
 
-private void runNestedBody(shared(uint)* target) @trusted
+private void testRepeatedLexicalBatches() @system
 {
-    // This test helper crosses the @system entry boundary deliberately.
-    // It is NOT a safety guarantee for arbitrary nested scope captures.
-    Work[1] inner = [borrowedIncrement(target)];
-    auto result = runScopedBatch(inner[]);
-    assert(result.accepted == 1 && result.returned == 1);
+    // Repeated independent submissions must never observe stale TaskRefs
+    // from an earlier call whose stack records already expired.
+    shared uint total;
+    foreach (round; 0 .. 32)
+    {
+        Work[Capacity] jobs;
+        foreach (ref job; jobs)
+            job = borrowedIncrement(&total);
+        auto result = runScopedBatch(jobs[]);
+        assert(result.accepted == Capacity && result.returned == Capacity);
+        assert(result.exceptions == 0);
+    }
+    assert(atomicLoad!(MemoryOrder.acq)(total) == 32u * Capacity);
 }
 
 private void gcCollectForTest() @trusted
@@ -342,9 +354,10 @@ void main()
 {
     testStackBorrows();
     testThrownChildStillDrains();
-    testNestedBatch();
+    testBatchCapacityAndEmpty();
+    testRepeatedLexicalBatches();
     testGcVisibleCapturedObject();
     testDestructorAfterJoinedWork();
     writeln("P02 lexical batch: PASS (automatic join, stack/GC borrows, ",
-        "exception drain, nested batch, destructor order)");
+        "exception drain, capacity rejection, 32 cycles, destructor order)");
 }
