@@ -180,6 +180,19 @@ configuration "task-pipeline-mixed-full-victim-worker-resource" {
     targetName "concurrency-task-pipeline-mixed-full-victim-worker-resource"
 }
 
+ // Research-only joint attribution: existing admission stage clocks (runtime
+ // opt-in) plus thread-boundary worker usage and existing parking counters.
+ // No R05InboxSubmitProbe: its inner per-submit clocks run even when the
+ // benchmark's outer 'instrumentation' runtime switch is off.
+configuration "task-pipeline-mixed-full-victim-joint-cost" {
+    targetType "executable"
+    mainSourceFile "benchmarks/task_pipeline/multi_producer.d"
+    sourcePaths "source" "benchmarks/task_pipeline"
+    importPaths "source" "benchmarks/task_pipeline"
+    versions "R05FullVictimSweep" "R05AdmissionStageProbe" "R05WorkerThreadResources"
+    targetName "concurrency-task-pipeline-mixed-full-victim-joint-cost"
+}
+
 // Opt-in diagnostic only: post-PR37 full N-slot scheduler plus lookup
 // counters/timing. Never the default configuration or a production policy.
 configuration "task-pipeline-mixed-full-victim-lookup-probe" {
