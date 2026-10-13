@@ -124,18 +124,19 @@ private void p16Account(ref P16Worker stats, long begin, long finish)
         if ((stats.calls & (P16Period - 1)) == 0)
         {
             const before = MonoTime.currTime.ticks;
+            long after;
             version (P16NullProbe)
             {
                 // Same two timestamp calls, but around NO work.
                 // The normal completion runs AFTER both clocks.
-                const after = MonoTime.currTime.ticks;
+                after = MonoTime.currTime.ticks;
                 _inbox.completeOne();
             }
             else
             {
                 // Entire completion call (not just lock wait/hold).
                 _inbox.completeOne();
-                const after = MonoTime.currTime.ticks;
+                after = MonoTime.currTime.ticks;
             }
             p16Account(*stats, before, after);
         }
