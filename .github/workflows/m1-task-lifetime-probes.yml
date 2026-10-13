@@ -36,6 +36,12 @@ on:
       - "tools/research/m1_p16_compare.py"
       - "tools/research/m1_p16_sampling_probe.sh"
       - "tools/research/m1_p16_xps.sh"
+      - "tools/research/m1_p16_2_make_atomic_completion.py"
+      - "tools/research/m1_p16_2_make_fixture.py"
+      - "tools/research/m1_p16_2_sc_handshake.py"
+      - "tools/research/m1_p16_2_check.py"
+      - "tools/research/m1_p16_2_probe.sh"
+      - "tools/research/m1_p16_2_xps.sh"
       - ".github/workflows/m1-task-lifetime-probes.yml"
   pull_request:
     branches:
@@ -72,6 +78,12 @@ on:
       - "tools/research/m1_p16_compare.py"
       - "tools/research/m1_p16_sampling_probe.sh"
       - "tools/research/m1_p16_xps.sh"
+      - "tools/research/m1_p16_2_make_atomic_completion.py"
+      - "tools/research/m1_p16_2_make_fixture.py"
+      - "tools/research/m1_p16_2_sc_handshake.py"
+      - "tools/research/m1_p16_2_check.py"
+      - "tools/research/m1_p16_2_probe.sh"
+      - "tools/research/m1_p16_2_xps.sh"
       - ".github/workflows/m1-task-lifetime-probes.yml"
   workflow_dispatch:
 
@@ -161,3 +173,7 @@ jobs:
       - name: P16 completion sampling with null-clock and untouched M0 control
         shell: bash
         run: bash tools/research/m1_p16_sampling_probe.sh "$DC"
+
+      - name: P16.2 seq-cst completion race and uninstrumented M0 control
+        shell: bash
+        run: bash tools/research/m1_p16_2_probe.sh "$DC"
