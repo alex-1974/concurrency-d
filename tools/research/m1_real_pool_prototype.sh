@@ -14,7 +14,6 @@ dub --version
 # Uses the real root concurrency-d package and its pinned containers-d 0.2.0
 # dependency, not a local replacement deque or changed M0 source.
 timeout --signal=TERM --kill-after=5s 160s \
-    dub run --root="$BASE" --compiler="$DC" --build=debug \
-        --dflags=-preview=dip1000
+    dub run --root="$BASE" --compiler="$DC" --build=debug
 
 echo "P11 unchanged M0 submission pool DUB integration: PASS"
