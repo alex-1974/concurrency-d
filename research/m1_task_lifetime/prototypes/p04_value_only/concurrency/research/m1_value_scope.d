@@ -81,6 +81,7 @@ version (M1P06Fatal)
     private size_t p06LastJoined;
     private size_t p06LastAccepted;
     private size_t p06LastCompleted;
+    private size_t p06LastPending;
 }
 
 private final class WorkerBatch
@@ -175,6 +176,7 @@ private final class WorkerBatch
             p06LastJoined = started;
             p06LastAccepted = accepted;
             p06LastCompleted = completed;
+            p06LastPending = pending;
         }
         synchronized (mutex)
         {
@@ -432,6 +434,8 @@ unittest
     assert(p06LastJoined == WorkerCount);
     assert(p06LastAccepted == fatalBoth.length);
     assert(p06LastCompleted <= fatalBoth.length);
+    assert(p06LastPending == 2,
+        "two failing workers must leave the final two queued tasks unrun");
 
     // A successful fresh call checks that the failed scope did not leave
     // active users of its former stack records.
