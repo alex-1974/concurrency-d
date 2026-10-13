@@ -89,10 +89,10 @@ private void executeRecord(shared(TaskHeader)* raw)
     }
 }
 
-private void markReturned(TaskRef ref)
+private void markReturned(TaskRef task)
     @safe nothrow @nogc
 {
-    auto record = recordFromHeader(ref.ptr);
+    auto record = recordFromHeader(task.ptr);
     atomicStore!(MemoryOrder.rel)(record.returned, 1u);
 }
 
@@ -282,7 +282,7 @@ private final class Gate
 
 private void testPinnedQueueAndDrain() @system
 {
-    ScopeKernel scope = new ScopeKernel();
+    ScopeKernel kernel = new ScopeKernel();
     ScopedRecord[4] records; // caller frame, never moved after submission
     Gate gate = new Gate();
     shared uint finished;
@@ -296,34 +296,34 @@ private void testPinnedQueueAndDrain() @system
                 atomicLoad!(MemoryOrder.acq)(finished) + 1u);
         });
 
-    scope.start();
+    kernel.start();
     try
     {
-        assert(scope.trySubmit(records[0]));
-        assert(scope.trySubmit(records[1]));
+        assert(kernel.trySubmit(records[0]));
+        assert(kernel.trySubmit(records[1]));
         gate.waitUntil(2); // both workers busy
-        assert(scope.trySubmit(records[2]));
-        assert(scope.trySubmit(records[3])); // queued, not executed yet
+        assert(kernel.trySubmit(records[2]));
+        assert(kernel.trySubmit(records[3])); // queued, not executed yet
         assert(!records[2].hasReturned());
         assert(!records[3].hasReturned());
         gate.release();
     }
     finally
-        scope.closeAndJoin();
+        kernel.closeAndJoin();
 
-    assert(scope.acceptedCount() == 4);
-    assert(scope.returnedTasks() == 4);
+    assert(kernel.acceptedCount() == 4);
+    assert(kernel.returnedTasks() == 4);
     foreach (ref record; records)
         assert(record.hasReturned());
     assert(atomicLoad!(MemoryOrder.acq)(finished) == 2u);
-    assert(!scope.trySubmit(records[0]));
+    assert(!kernel.trySubmit(records[0]));
 }
 
 private void testBorrowedStackReference() @system
 {
     int[3] stackValues = [3, 5, 7];
     ScopedRecord[3] records;
-    ScopeKernel scope = new ScopeKernel();
+    ScopeKernel kernel = new ScopeKernel();
 
     foreach (i; 0 .. records.length)
     {
@@ -331,14 +331,14 @@ private void testBorrowedStackReference() @system
         records[i].prepare(() @safe { *borrowed += 10; });
     }
 
-    scope.start();
+    kernel.start();
     try
     {
         foreach (ref record; records)
-            assert(scope.trySubmit(record));
+            assert(kernel.trySubmit(record));
     }
     finally
-        scope.closeAndJoin();
+        kernel.closeAndJoin();
 
     assert(stackValues == [13, 15, 17]);
     foreach (ref record; records)
@@ -347,7 +347,7 @@ private void testBorrowedStackReference() @system
 
 private void testExceptionDrainAndCancellation() @system
 {
-    ScopeKernel scope = new ScopeKernel();
+    ScopeKernel kernel = new ScopeKernel();
     ScopedRecord[3] records;
     shared uint ran;
     records[0].prepare(() @safe { throw new Exception("child failure"); });
@@ -361,13 +361,13 @@ private void testExceptionDrainAndCancellation() @system
         // still reach its post-dispatch return marker.
     });
 
-    scope.start();
+    kernel.start();
     try
     {
-        scope.requestCancel();
-        assert(scope.cancellationRequested());
+        kernel.requestCancel();
+        assert(kernel.cancellationRequested());
         foreach (ref record; records)
-            assert(scope.trySubmit(record));
+            assert(kernel.trySubmit(record));
         throw new Exception("caller unwind");
     }
     catch (Exception problem)
@@ -375,9 +375,9 @@ private void testExceptionDrainAndCancellation() @system
         assert(problem.msg == "caller unwind");
     }
     finally
-        scope.closeAndJoin();
+        kernel.closeAndJoin();
 
-    assert(scope.returnedTasks() == 3);
+    assert(kernel.returnedTasks() == 3);
     assert(records[0].error() !is null);
     assert(records[1].error() is null);
     assert(records[2].error() is null);
