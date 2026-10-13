@@ -1,0 +1,57 @@
+name: R0.5 victim repeat trace audit
+
+on:
+  push:
+    branches:
+      - perf/r05-owned-task-pipeline
+    paths:
+      - "tools/research/r05_victim_repeat_trace_audit.py"
+      - ".github/workflows/r05-victim-repeat-audit.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deterministic-trace-audit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Checkout grandfathered R0.5 research
+        uses: actions/checkout@v7
+      - name: Python model and parser syntax
+        shell: bash
+        run: |
+          python3 -m py_compile tools/research/r05_victim_repeat_trace_audit.py
+          python3 tools/research/r05_victim_repeat_trace_audit.py
+      - name: Synthetic worker-local trace and interrupted failure check
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import importlib.util
+          path = "tools/research/r05_victim_repeat_trace_audit.py"
+          spec = importlib.util.spec_from_file_location("audit", path)
+          audit = importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(audit)
+          def events(kinds):
+              return [dict(kind=k, victim=str(v), offset_ns=str(i))
+                      for i, (k, v) in enumerate(kinds)]
+          scan = [("stealMiss", 1), ("stealMiss", 2),
+                  ("stealMiss", 3), ("searchEmpty", -1)]
+          r = audit.audit_worker(("full", "0", "gc", "always", "3", "0"),
+                                 events(scan + scan))
+          assert r["empty_scans"] == 2
+          assert r["success_free_pairs"] == 1
+          assert r["same_order"] == 1
+          assert r["pairs_with_success_between"] == 0
+          r = audit.audit_worker(("full", "0", "gc", "always", "3", "0"),
+                                 events(scan + [("ingressClaim", -1)] + scan))
+          assert r["pairs_with_success_between"] == 1
+          assert r["success_free_pairs"] == 0
+          old = [("stealMiss", 1), ("stealMiss", 2),
+                 ("searchEmpty", -1)]
+          r = audit.audit_worker(("old", "0", "gc", "always", "3", "0"),
+                                 events(old + old))
+          assert r["omitted_foreign"] == 2
+          print("PASS: all scan-cover and intervening-acquisition counters")
+          PY
