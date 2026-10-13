@@ -240,3 +240,34 @@ ScalarBatchResult evaluateScalars(
 
     return executeCopied(snapshot, inputs.length, operation);
 }
+
+
+// P05: exercise the defensive trusted-dispatch guards through same-module
+// compile-gated tests. None of these calls may start a worker or publish a
+// TaskRef; every invalid count/callback is rejected before construction.
+private int p05Identity(int value) @safe pure nothrow @nogc
+{
+    return value;
+}
+
+unittest
+{
+    int[ValueCapacity] data;
+    foreach (invalidCount; [0, 1, ValueCapacity + 1])
+    {
+        bool rejected;
+        try
+            executeCopied(data, invalidCount, &p05Identity);
+        catch (Exception ex)
+            rejected = ex.msg == "P05 invalid trusted dispatch arguments";
+        assert(rejected, "invalid trusted entry count was not rejected");
+    }
+
+    ScalarOperation noOperation;
+    bool nullRejected;
+    try
+        executeCopied(data, 2, noOperation);
+    catch (Exception ex)
+        nullRejected = ex.msg == "P05 invalid trusted dispatch arguments";
+    assert(nullRejected, "null trusted operation was not rejected");
+}
