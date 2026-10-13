@@ -18,6 +18,9 @@ on:
       - "tools/research/m1_typed_transport_prototype.sh"
       - "tools/research/m1_real_pool_prototype.sh"
       - "tools/research/m1_matched_pool_benchmark.sh"
+      - "tools/research/m1_worker_scaling_probe.sh"
+      - "tools/research/m1_worker_scaling_analyze.py"
+      - "tools/research/m1_worker_scaling_xps.sh"
       - ".github/workflows/m1-task-lifetime-probes.yml"
   pull_request:
     branches:
@@ -36,6 +39,9 @@ on:
       - "tools/research/m1_typed_transport_prototype.sh"
       - "tools/research/m1_real_pool_prototype.sh"
       - "tools/research/m1_matched_pool_benchmark.sh"
+      - "tools/research/m1_worker_scaling_probe.sh"
+      - "tools/research/m1_worker_scaling_analyze.py"
+      - "tools/research/m1_worker_scaling_xps.sh"
       - ".github/workflows/m1-task-lifetime-probes.yml"
   workflow_dispatch:
 
@@ -109,3 +115,7 @@ jobs:
       - name: P12 paired matched M0 work-stealing benchmark (CI diagnostic only)
         shell: bash
         run: bash tools/research/m1_matched_pool_benchmark.sh "$DC"
+
+      - name: P13 wave-wise real M0 scaling (CI correctness diagnostic only)
+        shell: bash
+        run: bash tools/research/m1_worker_scaling_probe.sh "$DC"
