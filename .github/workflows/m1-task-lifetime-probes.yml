@@ -11,6 +11,7 @@ on:
       - "tools/research/m1_lexical_batch_prototype.sh"
       - "tools/research/m1_dynamic_scope_prototype.sh"
       - "tools/research/m1_value_only_prototype.sh"
+      - "tools/research/m1_worker_lifecycle_probe.sh"
       - ".github/workflows/m1-task-lifetime-probes.yml"
   pull_request:
     branches:
@@ -22,6 +23,7 @@ on:
       - "tools/research/m1_lexical_batch_prototype.sh"
       - "tools/research/m1_dynamic_scope_prototype.sh"
       - "tools/research/m1_value_only_prototype.sh"
+      - "tools/research/m1_worker_lifecycle_probe.sh"
       - ".github/workflows/m1-task-lifetime-probes.yml"
   workflow_dispatch:
 
@@ -67,3 +69,7 @@ jobs:
       - name: P04 @safe scalar-only external consumer (research only)
         shell: bash
         run: bash tools/research/m1_value_only_prototype.sh "$DC"
+
+      - name: P06 partial-start and fatal-worker lifecycle (isolated research)
+        shell: bash
+        run: bash tools/research/m1_worker_lifecycle_probe.sh "$DC"
