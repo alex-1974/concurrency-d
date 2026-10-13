@@ -16,6 +16,7 @@ on:
       - "tools/research/m1_owned_vs_borrowed_prototype.sh"
       - "tools/research/m1_inline_transfer_and_uncertain.sh"
       - "tools/research/m1_typed_transport_prototype.sh"
+      - "tools/research/m1_real_pool_prototype.sh"
       - ".github/workflows/m1-task-lifetime-probes.yml"
   pull_request:
     branches:
@@ -32,6 +33,7 @@ on:
       - "tools/research/m1_owned_vs_borrowed_prototype.sh"
       - "tools/research/m1_inline_transfer_and_uncertain.sh"
       - "tools/research/m1_typed_transport_prototype.sh"
+      - "tools/research/m1_real_pool_prototype.sh"
       - ".github/workflows/m1-task-lifetime-probes.yml"
   workflow_dispatch:
 
@@ -97,3 +99,7 @@ jobs:
       - name: P10 typed inline TaskRef transport (research only)
         shell: bash
         run: bash tools/research/m1_typed_transport_prototype.sh "$DC"
+
+      - name: P11 actual M0 work stealing typed task DUB consumer (research only)
+        shell: bash
+        run: bash tools/research/m1_real_pool_prototype.sh "$DC"
