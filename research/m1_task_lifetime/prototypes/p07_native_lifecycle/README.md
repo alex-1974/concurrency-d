@@ -88,9 +88,14 @@ bash tools/research/m1_native_lifecycle_failstop.sh ldc2
 
 The original P07 executable source commit with passing normal and simulated fail-stop tests was `e23c49a1d4e5d8fe17458e00dfe28ddddb44e9f3`, with [GitHub Actions #38390259078](https://github.com/alex-1974/concurrency-d/actions/runs/38390259078) **PASS** for both DMD 2.111.0 and LDC 1.41.0. Job DMD `115272026340`, LDC `115272025864`.
 
-LDC `-O3` simulated fail-stop checks are added subsequently to the same runner (with **assertions enabled**, not `-release`). Record the exact final source commit and CI run below once they have completed:
+LDC `-O3` simulated fail-stop checks were added to the same runner (with **assertions enabled**, not `-release`).
 
-- **Final source/CI:** pending the updated optimized-run validation; do **not** equate prior run #38390259078 with the optimized checks.
+**Final P07 source/CI evidence (including the correct D runtime `ThreadError` start-failure simulation):**
+- Implementation source commit: `a9562a5dd491a0a1db9b80c019a459f4211a6665`.
+- [GitHub Actions **#38390697965**](https://github.com/alex-1974/concurrency-d/actions/runs/38390697965): both matrix jobs **PASS**, DMD 2.111.0 job `115273475082` and LDC 1.41.0 job `115273474637`.
+- Each job checks the normal `@safe` external scalar consumer in the fail-stop version, plus both separate synthetic-fault subprocesses, each required to terminate via the expected distinct marker and SIGABRT (134).
+- LDC separately checks **both** synthetic-fault branches under **`-O3`** with assertions enabled. P01–P06 and the old compile-negative probes remain passing under the same workflow.
+- These results prove the injected **fallback** behavior, not that a real failed native join/start has been reproduced or that default production code is protected.
 
 ## Design disposition
 
