@@ -32,6 +32,7 @@ private struct ScopedRecord
     private Exception failure;
     private shared uint returned;
     private bool prepared;
+    private bool submitted;
 
     static assert(header.offsetof == 0);
 
@@ -43,6 +44,7 @@ private struct ScopedRecord
         header.execute = &executeRecord;
         atomicStore!(MemoryOrder.raw)(returned, 0u);
         prepared = true;
+        submitted = false;
     }
 
     TaskRef reference() @system
@@ -147,10 +149,11 @@ private final class ScopeKernel
     {
         synchronized (mutex)
         {
-            if (closed || queued == MaxQueued)
+            if (closed || queued == MaxQueued || record.submitted)
                 return false;
 
             auto task = record.reference();
+            record.submitted = true; // protected by this kernel's mutex
             queue[(head + queued) % MaxQueued] = task;
             ++queued;
             ++accepted;
@@ -285,13 +288,13 @@ private final class Gate
 private void testPinnedQueueAndDrain() @system
 {
     ScopeKernel kernel = new ScopeKernel();
-    ScopedRecord[4] records; // caller frame, never moved after submission
+    ScopedRecord[11] records; // caller frame, never moved after submission
     Gate gate = new Gate();
     shared uint finished;
 
     foreach (i; 0 .. 2)
         records[i].prepare(() @safe { gate.block(); });
-    foreach (i; 2 .. 4)
+    foreach (i; 2 .. records.length)
         records[i].prepare(() @safe
         {
             atomicOp!"+="(finished, 1u);
@@ -303,21 +306,27 @@ private void testPinnedQueueAndDrain() @system
         assert(kernel.trySubmit(records[0]));
         assert(kernel.trySubmit(records[1]));
         gate.waitUntil(2); // both workers busy
-        assert(kernel.trySubmit(records[2]));
-        assert(kernel.trySubmit(records[3])); // queued, not executed yet
-        assert(!records[2].hasReturned());
-        assert(!records[3].hasReturned());
+        foreach (i; 2 .. 10)
+            assert(kernel.trySubmit(records[i]));
+        // 2 active blockers + 8 pending = 10 accepted.
+        assert(!kernel.trySubmit(records[10])); // bounded inbox full
+        assert(!records[10].submitted); // rejected record remains caller-owned
+        assert(!kernel.trySubmit(records[2])); // reject second publication
+        foreach (i; 2 .. 10)
+            assert(!records[i].hasReturned());
         gate.release();
     }
     finally
         kernel.closeAndJoin();
 
-    assert(kernel.acceptedCount() == 4);
-    assert(kernel.returnedTasks() == 4);
-    foreach (ref record; records)
-        assert(record.hasReturned());
-    assert(atomicLoad!(MemoryOrder.acq)(finished) == 2u);
-    assert(!kernel.trySubmit(records[0]));
+    assert(kernel.acceptedCount() == 10);
+    assert(kernel.returnedTasks() == 10);
+    foreach (i; 0 .. 10)
+        assert(records[i].hasReturned());
+    assert(!records[10].hasReturned());
+    assert(atomicLoad!(MemoryOrder.acq)(finished) == 8u);
+    assert(!kernel.trySubmit(records[10])); // closed even for never-accepted
+
 }
 
 // Each factory invocation creates its own closure frame for the pointer.
@@ -397,6 +406,6 @@ void main()
     testPinnedQueueAndDrain();
     testBorrowedStackReference();
     testExceptionDrainAndCancellation();
-    writeln("P01 scoped join: PASS (pinned refs, queue drain, stack borrow, ",
-        "exceptions, cancellation request)");
+    writeln("P01 scoped join: PASS (pinned refs, queue full/duplicate/close, ",
+        "join, stack borrow, exceptions, cancellation request)");
 }
