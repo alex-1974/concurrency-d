@@ -99,9 +99,10 @@ void main(string[] args)
 
         // Paired parity, including checksum and accepted+returned checks
         // inside the actual M0 worker-pool execution kernel.
-        assert(first.count == opts.count);
-        assert(second.count == opts.count);
-        assert(first.checksum == second.checksum);
+        if (first.count != opts.count ||
+            second.count != opts.count ||
+            first.checksum != second.checksum)
+            throw new Exception("P12 paired semantics/checksum mismatch");
         emit(phase, pair, firstLabel, opts, first);
         emit(phase, pair, secondLabel, opts, second);
     }
