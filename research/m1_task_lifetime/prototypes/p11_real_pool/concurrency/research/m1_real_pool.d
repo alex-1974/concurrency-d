@@ -97,6 +97,20 @@ static assert(!__traits(compiles, {
     TypedRecord!(int, int) copied = original;
 }));
 
+// D does not permit a catch inside a finally block. Keep the
+// fail-closed join policy in an independent private @system helper.
+private void joinOrFailStop(SubmissionWorkerPool pool) @system
+{
+    try
+        pool.closeAndJoin();
+    catch (Throwable)
+    {
+        // The unchanged M0 pool may throw before all native workers joined.
+        // This must never unwind our caller-frame TaskRefs.
+        abort();
+    }
+}
+
 /++
  Real M0 SubmissionWorkerPool, bounded fixed-address typed records.
 
@@ -157,16 +171,7 @@ PoolResults!R evaluateWithRealPool(P, R)(
         }
     }
     finally
-    {
-        try
-            pool.closeAndJoin();
-        catch (Throwable)
-        {
-            // M0's default throwing joins may leave later workers
-            // unjoined. Do not unwind lexical TaskRef storage.
-            abort();
-        }
-    }
+        joinOrFailStop(pool);
 
     results.accepted = pool.acceptedCount();
     results.completed = pool.completedCount();
