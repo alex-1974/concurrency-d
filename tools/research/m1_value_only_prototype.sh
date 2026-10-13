@@ -43,3 +43,52 @@ do
     cat -- "$TMP/$name.log"
 done
 echo "P04 scalar-only language gate: PASS (safe consumer + 3 negative sources)"
+
+# P05 same-module defensive precondition regression (no worker starts).
+"$DC" -unittest -main -preview=dip1000 "-I$ROOT/source" "-I$BASE" \
+    "-of=$TMP/m1-p05-defensive-unittests" \
+    "$ROOT/source/concurrency/internal/task_record.d" \
+    "$BASE/concurrency/research/m1_value_scope.d"
+"$TMP/m1-p05-defensive-unittests"
+echo "P05 trusted-entry invalid count/null guards: PASS"
+
+# QUALITY_GATES.md requires a compilation challenge for each @trusted
+# marker. Change each marker individually to @safe, leaving the rest of
+# the actual module identical. The expected result is a frontend rejection
+# of a genuinely system-level operation, not a link failure.
+for marker in launch cast; do
+    python3 - "$BASE/concurrency/research/m1_value_scope.d" \
+        "$TMP/m1_value_scope_p05_$marker.d" "$marker" <<'PY'
+from pathlib import Path
+import sys
+source = Path(sys.argv[1]).read_text()
+destination = Path(sys.argv[2])
+marker = sys.argv[3]
+if marker == "launch":
+    needle = "ScalarOperation operation) @trusted"
+    replacement = "ScalarOperation operation) @safe"
+elif marker == "cast":
+    needle = "    @trusted nothrow @nogc"
+    replacement = "    @safe nothrow @nogc"
+else:
+    raise SystemExit("invalid challenge")
+if source.count(needle) != 1:
+    raise SystemExit(f"expected one {marker} trust marker; found {source.count(needle)}")
+destination.write_text(source.replace(needle, replacement, 1))
+PY
+    if "$DC" -c -preview=dip1000 "-I$ROOT/source" "-I$BASE" \
+         "-of=$TMP/p05_$marker.o" "$TMP/m1_value_scope_p05_$marker.d" \
+         >"$TMP/p05_$marker.log" 2>&1; then
+        echo "FAIL: $marker trusted function unexpectedly compiles @safe" >&2
+        exit 1
+    fi
+    # At a minimum the failure must involve D's safety verification.
+    if ! grep -Eq "@safe|@system|cast from" "$TMP/p05_$marker.log"; then
+        echo "FAIL: $marker challenge did not fail for a safety reason" >&2
+        cat -- "$TMP/p05_$marker.log" >&2
+        exit 1
+    fi
+    echo "P05 required @trusted marker ($marker) verified: rejected as @safe"
+    cat -- "$TMP/p05_$marker.log"
+done
+
