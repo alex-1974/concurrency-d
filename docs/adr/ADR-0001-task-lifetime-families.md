@@ -152,3 +152,17 @@ The [P05 `@trusted` audit](../../research/m1_task_lifetime/prototypes/p05_trust_
 **Release decision: NO-GO for accepting a complete parallel `@safe` TaskScope contract.** The larger trusted function and the druntime worker lifecycle require an independent safety review, especially `Thread.start` partial-failure semantics, fatal worker `Error` and multiple-worker `Thread.join` exceptional cleanup. Passing a compiler challenge means a trust boundary is *necessary*, not that its manually asserted postconditions are sound. A one-line `@trusted` wrapper around an arbitrary `@system` scheduler would merely hide these same transitive obligations.
 
 ADR remains PROPOSED; Issue #17 remains OPEN; no public API or production change is authorized by P05.
+
+
+## P06 worker lifecycle — deferred error propagation is necessary but not sufficient (2026-10-13)
+
+[P06 source-based analysis, documented failure and exact CI evidence](../../research/m1_task_lifetime/prototypes/p06_worker_lifecycle/README.md) qualified two important P04/P05 `@trusted` lifecycle edges:
+
+- The default `Thread.join()` may rethrow a worker's unhandled `Throwable` before **other** native workers have joined. This contradicts using the plain join loop as an unconditional quiescence barrier. P06 uses `join(false)` to gather a worker failure, joins *every successfully started worker*, and only then propagates the failure.
+- Successful task-accounting invariants (`accepted == completed` and empty pending queue) do **not** describe fatal worker termination. P06's first Error test failed under DMD/LDC because an Error aborting dispatch prevented normal completion accounting; that failure and a secondary mutex-cleanup abort were preserved in [original CI #38383612775](https://github.com/alex-1974/concurrency-d/actions/runs/38383612775). The corrected code distinguishes **quiescent failed** from **successfully executed**: both workers may die leaving two queued tasks unexecuted, but every worker is joined and the failure propagated without a success result.
+- Injecting a failure before native worker start positions 0, 1 or 2 proves that **already confirmed** thread launches are drained on the simulated error path; it does **not** prove the outcome of an actual `Thread.start()` that throws after partially starting a thread.
+- [Pinned CI #38384303420](https://github.com/alex-1974/concurrency-d/actions/runs/38384303420) PASS: DMD 2.111.0, LDC 1.41.0, and LDC `-O3` correctness with assertions enabled. P01–P05 remain passing.
+
+**Binding release NO-GO:** `Thread.join(false)` can itself throw `ThreadException`. There is still no independently verified policy guaranteeing that the underlying native thread is quiescent when a join fails. Neither retrying nor forgetting that thread is safe by assumption; for stack-borrowed records, a failed native join cannot be treated as ordinary scope unwind. A production implementation must either (1) fail-stop before referents can expire, (2) provide a separately proven native join recovery model, or (3) adopt a storage/lifetime design with a genuinely safe retention/abandonment protocol. This is a design choice, **not** permission to turn current research into a public `@safe` TaskScope.
+
+ADR remains PROPOSED, Issue #17 OPEN, Draft PR #38 DRAFT. No source outside this research topic was changed.
