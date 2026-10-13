@@ -47,6 +47,14 @@ private struct Record
     }
 }
 
+// The normal copy construction route for a record that may contain a
+// published TaskHeader address must stay disabled. This does not claim to
+// prohibit arbitrary byte moves from @system code.
+static assert(!__traits(compiles, {
+    Record first;
+    Record copy = first;
+}), "P02 records must reject ordinary copy construction");
+
 private Record* fromHeader(shared(TaskHeader)* raw)
     @trusted nothrow @nogc
 {
