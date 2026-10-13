@@ -470,7 +470,7 @@ def main():
         f.write("Combined worker CPU and switches can be perturbed by"
                 " the parking counters, unlike the worker-only control.\n")
         f.write("acquisition.csv and acquisition_summary.csv are "
-                "post-join derived measurements from combined-mode counters\\n")
+                "post-join derived measurements from combined-mode counters\n")
         f.write("Condition waits are NOT equivalent to voluntary"
                 " context switches or notified worker handoffs.\n")
         for cmd in ([a.compiler, "--version"], ["dub", "--version"],
