@@ -1,0 +1,30 @@
+name "m1-p18-idle-grace"
+description "Research-only fixed one-retry worker idle grace vs unmodified M0"
+targetType "executable"
+sourcePaths "generated/concurrency"
+mainSourceFile "generated/consumer/main.d"
+dependency "concurrency-d" path="../../../../"
+dflags "-preview=dip1000"
+
+configuration "control" {
+    mainSourceFile "generated/consumer/main.d"
+}
+configuration "grace" {
+    mainSourceFile "generated/consumer/main.d"
+    dflags "-version=P18Grace"
+}
+configuration "control-optimized" {
+    mainSourceFile "generated/consumer/main.d"
+    dflags "-O3"
+}
+configuration "grace-optimized" {
+    mainSourceFile "generated/consumer/main.d"
+    dflags "-O3" "-version=P18Grace"
+}
+configuration "race-control" {
+    mainSourceFile "generated/race/main.d"
+}
+configuration "race-grace" {
+    mainSourceFile "generated/race/main.d"
+    dflags "-version=P18Grace"
+}
