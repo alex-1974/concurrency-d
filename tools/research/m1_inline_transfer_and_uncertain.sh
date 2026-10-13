@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# P09 research-only typed inline-value contract and explicit supervisor state.
+# P09 research-only checked inline payload and supervisor state.
 set -euo pipefail
 DC="${1:-dmd}"
 ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)"
