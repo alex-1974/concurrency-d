@@ -1,0 +1,3 @@
+variant,empty_scans,omitted_foreign,pairs_of_empty_scans,pairs_with_success_between,success_free_pairs,same_order,different_order
+old,278,211,118,16,102,0,102
+full,271,0,111,11,100,100,0
