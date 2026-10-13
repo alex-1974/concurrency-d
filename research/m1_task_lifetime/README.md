@@ -14,6 +14,7 @@ The selected fixtures deliberately distinguish three relationships:
 | `positive_return_scope` | `negative_scope_return` | An explicitly `return scope` borrow can return; plain `scope` cannot |
 | `positive_return_ref` | `negative_ref_escape` | Explicit `return ref` may derive returned pointer; ordinary `ref` cannot |
 | `positive_scope_local` | `negative_stack_escape` | Borrowed local slice use is valid; returning a local stack slice is not |
+| `positive_scope_delegate` | `negative_scope_delegate_escape` | Locally captured `@safe` delegate may be synchronously invoked via a `scope` parameter; cannot be stored in longer-lived global state |
 
 ## How to run
 
@@ -24,7 +25,7 @@ bash tools/research/m1_lifetime_compile_probes.sh dmd
 bash tools/research/m1_lifetime_compile_probes.sh ldc2
 ```
 
-The script uses **`-c -preview=dip1000` for all seven compilation attempts**, isolated output object paths and a unique temporary directory. It checks that every positive fixture compiles and each negative fixture produces a compiler **failure**. Diagnostics are printed but not pattern-matched to a fragile wording. The test is compile-only, not a linker-error acceptance test.
+The script uses **`-c -preview=dip1000` for all nine compilation attempts**, isolated output object paths and a unique temporary directory. It checks that every positive fixture compiles and each negative fixture produces a compiler **failure**. Diagnostics are printed but not pattern-matched to a fragile wording. The test is compile-only, not a linker-error acceptance test.
 
 The pinned CI definitions, when actually run, use `dmd-2.111.0` and `ldc-1.41.0` on Ubuntu 24.04. A CI workflow run with final PASS is required before reporting qualified compiler evidence; a successful workflow definition commit is **not** itself evidence that compilers accepted or rejected the source.
 
@@ -35,6 +36,8 @@ The pinned CI definitions, when actually run, use `dmd-2.111.0` and `ldc-1.41.0`
 - A negative compile rejection is only meaningful alongside the closely related positive control; an unexecuted fixture is not a verified PASS.
 - The compiler cannot be treated as a universal borrow checker. D language scope constrains selected indirections under checked `@safe` code; `@system` can bypass these checks.
 - Neither `@nogc` on small sample functions nor compiling an unrelated positive demonstrates a `@nogc` scheduler.
+
+The first seven-fixture run is reviewed in [CI evidence, 2026-10-13](results/ci-lifetime-compile-review-2026-10-13.md). The subsequent scoped-delegate pair needs its **own exact-head DMD/LDC CI review**; do not count unverified source additions as a passed gate.
 
 ## Next qualification (not implemented here)
 
