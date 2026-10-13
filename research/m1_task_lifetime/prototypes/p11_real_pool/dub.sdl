@@ -21,3 +21,9 @@ configuration "negative-borrow" {
 configuration "negative-delegate" {
     mainSourceFile "consumer/negative_delegate.d"
 }
+
+configuration "optimized" {
+    mainSourceFile "consumer/main.d"
+    // Debug build retains assertions; this configuration adds LDC -O3.
+    dflags "-O3"
+}
