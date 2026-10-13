@@ -1,0 +1,45 @@
+name: M1 task lifetime compile probes
+
+on:
+  push:
+    branches:
+      - research/m1-task-lifetime-boundaries
+    paths:
+      - "research/m1_task_lifetime/**"
+      - "tools/research/m1_lifetime_compile_probes.sh"
+      - ".github/workflows/m1-task-lifetime-probes.yml"
+  pull_request:
+    branches:
+      - develop
+    paths:
+      - "research/m1_task_lifetime/**"
+      - "tools/research/m1_lifetime_compile_probes.sh"
+      - ".github/workflows/m1-task-lifetime-probes.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  lifetime-probes:
+    name: DIP1000 / ${{ matrix.compiler }}
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler:
+          - dmd-2.111.0
+          - ldc-1.41.0
+    steps:
+      - name: Checkout exact branch source
+        uses: actions/checkout@v7
+
+      - name: Install pinned D compiler
+        uses: dlang-community/setup-dlang@v2
+        with:
+          compiler: ${{ matrix.compiler }}
+          dub: 1.40.0
+
+      - name: Language and compile-negative contract gate
+        shell: bash
+        run: bash tools/research/m1_lifetime_compile_probes.sh "$DC"
