@@ -1,7 +1,7 @@
 # P16.2 — Atomic-completion / closed-state handshake (research only)
 
 **Date:** 2026-10-13  
-**Status:** candidate **NOT promoted**; DMD/LDC CI and native XPS results are tracked separately. This is an **isolated** alternate completion-state machine, **not** a production API or a repaired native-start/join exceptional contract.  
+**Status:** candidate **CORRECTNESS-QUALIFIED on pinned DMD/LDC** ([CI #38459761896](https://github.com/alex-1974/concurrency-d/actions/runs/38459761896)); native Dell-XPS uninstrumented A/B results **NOT YET AVAILABLE**. Candidate **NOT promoted**; this is an isolated alternate completion-state machine, not a production API or a repaired native-start/join exceptional contract.  
 **Baseline:** original M0 `source/concurrency/internal/submission_pool.d` Git blob `b7d8fafcb3179f00cba7e89e28c6d6b9b676353a`.  
 **Input evidence:** [P16.1 complete XPS evidence](../p16_completion_sampling/evidence/xps-2026-10-13-analysis.md), [P14 path events](../p14_scheduler_events/evidence/xps-2026-10-13-analysis.md), [ADR-0001 PROPOSED](../../../../docs/adr/ADR-0001-task-lifetime-families.md), [Issue #17](https://github.com/alex-1974/concurrency-d/issues/17), [Draft PR #38](https://github.com/alex-1974/concurrency-d/pull/38).
 
@@ -77,7 +77,7 @@ The [adversarial race consumer](race/main.d) tests original and candidate separa
 
 The original and candidate are run across **1/2/4 workers**, **ingress 1/8/64** and repeated rounds, with both debug and LDC whole-package release checks. Assertions essential to sampled/race semantic correctness are explicit exceptions surviving release builds. The `@system` native exception boundary retains the **research-only fail-stop** rule rather than claiming safe unwinding after a possibly failed join.
 
-The [P16.2 DMD/LDC CI runner](../../../../tools/research/m1_p16_2_probe.sh) also executes a bounded full 45-configuration target-profile preflight (0/8/32/128/512 iterations × ingress 8/64/256 × 1/2/4 workers), including the correct per-task oracle and native join/accepted obligations; LDC additionally checks debug `-O3` and release.
+[CI #38459761896](https://github.com/alex-1974/concurrency-d/actions/runs/38459761896) **PASS** on DMD 2.111.0 and LDC 1.41.0, including LDC debug `-O3`, whole-package release, and prior P01–P16.1 regressions. The adversarial consumer ran **135 scenarios in each of the original/atomic variants** in debug, and again under LDC release; the complete 45-configuration target preflight validated exact matching input/output checksums and stage timing partitions. No CI performance ratio is an acceptance gate. The [P16.2 DMD/LDC CI runner](../../../../tools/research/m1_p16_2_probe.sh) also executes a bounded full 45-configuration target-profile preflight (0/8/32/128/512 iterations × ingress 8/64/256 × 1/2/4 workers), including the correct per-task oracle and native join/accepted obligations; LDC additionally checks debug `-O3` and release.
 
 ## Native performance protocol: TWO UNINSTRUMENTED implementations
 
