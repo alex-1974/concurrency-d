@@ -139,3 +139,16 @@ The experiment also showed that allowing a nested-worker call by wrapping a whol
 **Safety interpretation:** this is not a discovered borrow checker or general dynamic TaskScope. The typed, alias-free integer snapshot eliminates the particular arbitrary-closure capture escape that blocks P03, **by excluding that class of work entirely**. The P04 implementation uses a reviewable but still nontrivial private `@trusted` bridge into internal thread/queue operations; the compiler does not prove this bridge sound. Treat it as a research-only manually justified boundary pending independent review and broader failure/memory-model tests. Constrained value execution and explicit `@system` borrowed execution are separate legitimate families; do **not** promise that their APIs or performance are interchangeable.
 
 **Issue #17 remains OPEN; ADR remains PROPOSED.** No TaskScope public API, generalized safety promise, or R0.5 storage decision is promoted by P04.
+
+
+## P05 trust audit and bounded worker failure testing — 2026-10-13
+
+The [P05 `@trusted` audit](../../research/m1_task_lifetime/prototypes/p05_trust_audit/README.md) revisits P04's **parallel** scalar execution proof rather than inventing another task family.
+
+**Qualified improvement:** the empty and singleton input paths are now evaluated without any trusted worker lifecycle; preparation of scalar task records is compiler-checked `@safe`, and the parallel dispatcher now locally rejects invalid count/null operation before worker startup. Deterministic, test-only `Exception` injection after 0/1/3 accepted submissions verifies join-before-rethrow. Both remaining trust markers are individually recompiled as `@safe`; compiler errors confirm that the thread/condition/TaskRef and shared-header cast boundaries cannot simply be relabeled.
+
+[CI #38382063661](https://github.com/alex-1974/concurrency-d/actions/runs/38382063661): DMD 2.111.0 and LDC 1.41.0 PASS, plus optimized LDC correctness for the ordinary `@safe` scalar consumer. Earlier P01–P03 and compile-negative gates remain PASS. The original P04 benchmark-free evidence stays preserved.
+
+**Release decision: NO-GO for accepting a complete parallel `@safe` TaskScope contract.** The larger trusted function and the druntime worker lifecycle require an independent safety review, especially `Thread.start` partial-failure semantics, fatal worker `Error` and multiple-worker `Thread.join` exceptional cleanup. Passing a compiler challenge means a trust boundary is *necessary*, not that its manually asserted postconditions are sound. A one-line `@trusted` wrapper around an arbitrary `@system` scheduler would merely hide these same transitive obligations.
+
+ADR remains PROPOSED; Issue #17 remains OPEN; no public API or production change is authorized by P05.
