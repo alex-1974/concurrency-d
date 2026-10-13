@@ -75,6 +75,14 @@ private void execute(shared(TaskHeader)* raw) @safe nothrow
     record.result = record.operation(record.argument);
 }
 
+// Only modified/read by the controller in the P06 fatal-worker probe.
+version (M1P06Fatal)
+{
+    private size_t p06LastJoined;
+    private size_t p06LastAccepted;
+    private size_t p06LastCompleted;
+}
+
 private final class WorkerBatch
 {
     private Mutex mutex;
@@ -155,7 +163,7 @@ private final class WorkerBatch
         Throwable firstWorkerFailure;
         foreach (i; 0 .. started)
         {
-            const failure = workers[i].join(false);
+            auto failure = workers[i].join(false);
             version (M1P06Start)
                 ++confirmedJoins;
             if (failure !is null && firstWorkerFailure is null)
@@ -167,6 +175,12 @@ private final class WorkerBatch
             assert(pending == 0);
             assert(accepted == completed);
             joined = true;
+        }
+        version (M1P06Fatal)
+        {
+            p06LastJoined = started;
+            p06LastAccepted = accepted;
+            p06LastCompleted = completed;
         }
         if (firstWorkerFailure !is null)
             throw firstWorkerFailure;
@@ -349,4 +363,47 @@ unittest
     auto success = executeCopied(data, 4, &p05Identity);
     assert(success.count == 4);
     assert(success.values[0 .. 4] == data[0 .. 4]);
+}
+
+
+version (M1P06Start)
+unittest
+{
+    // Injections before the FIRST, SECOND and after the SECOND start.
+    // All successfully launched worker threads must be fully joined
+    // before start() rethrows to the caller.
+    foreach (beforeStart; 0 .. WorkerCount + 1)
+    {
+        auto batch = new WorkerBatch();
+        batch.failBeforeStart = beforeStart;
+        bool sawFailure;
+        try
+            batch.start();
+        catch (Exception ex)
+            sawFailure = ex.msg == "P06 injected pre-start failure";
+        assert(sawFailure);
+        assert(batch.started == beforeStart);
+        assert(batch.confirmedJoins == beforeStart);
+        assert(batch.joined);
+        assert(batch.accepted == 0 && batch.completed == 0);
+    }
+}
+
+version (M1P06Fatal)
+unittest
+{
+    // Run this test in a SEPARATE test binary: the selected task throws
+    // an Error (as opposed to an ordinary Exception) from the @safe
+    // nothrow task thunk, reaching druntime Thread termination.
+    // join(false) must return the Throwable only AFTER the full join.
+    int[4] inputs = [10, int.min, 20, 30];
+    bool caughtWorkerError;
+    try
+        evaluateScalars(inputs[], &p05Identity);
+    catch (Error ex)
+        caughtWorkerError = true;
+    assert(caughtWorkerError, "P06 worker Error did not propagate");
+    assert(p06LastJoined == WorkerCount);
+    assert(p06LastAccepted == inputs.length);
+    assert(p06LastCompleted == inputs.length);
 }
