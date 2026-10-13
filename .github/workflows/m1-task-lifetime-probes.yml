@@ -31,6 +31,11 @@ on:
       - "tools/research/m1_p15_compare.py"
       - "tools/research/m1_p15_mutex_timing.sh"
       - "tools/research/m1_p15_xps.sh"
+      - "tools/research/m1_p16_make_sampled_pool.py"
+      - "tools/research/m1_p16_make_fixture.py"
+      - "tools/research/m1_p16_compare.py"
+      - "tools/research/m1_p16_sampling_probe.sh"
+      - "tools/research/m1_p16_xps.sh"
       - ".github/workflows/m1-task-lifetime-probes.yml"
   pull_request:
     branches:
@@ -62,6 +67,11 @@ on:
       - "tools/research/m1_p15_compare.py"
       - "tools/research/m1_p15_mutex_timing.sh"
       - "tools/research/m1_p15_xps.sh"
+      - "tools/research/m1_p16_make_sampled_pool.py"
+      - "tools/research/m1_p16_make_fixture.py"
+      - "tools/research/m1_p16_compare.py"
+      - "tools/research/m1_p16_sampling_probe.sh"
+      - "tools/research/m1_p16_xps.sh"
       - ".github/workflows/m1-task-lifetime-probes.yml"
   workflow_dispatch:
 
@@ -147,3 +157,7 @@ jobs:
       - name: P15 exact M0 mutex acquisition and hold timing (research diagnostic)
         shell: bash
         run: bash tools/research/m1_p15_mutex_timing.sh "$DC"
+
+      - name: P16 completion sampling with null-clock and untouched M0 control
+        shell: bash
+        run: bash tools/research/m1_p16_sampling_probe.sh "$DC"
