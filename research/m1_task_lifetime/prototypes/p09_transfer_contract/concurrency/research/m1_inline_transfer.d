@@ -56,7 +56,7 @@ template isInlineTransfer(T)
         enum bool isInlineTransfer = isInlineTransfer!Element;
     else static if (is(T == struct))
         enum bool isInlineTransfer =
-            isPOD!T && !hasNested!T && allInline!(Fields!T);
+            __traits(isPOD, T) && !hasNested!T && allInline!(Fields!T);
     else
         enum bool isInlineTransfer = false;
 }
