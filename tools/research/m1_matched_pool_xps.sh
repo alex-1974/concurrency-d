@@ -88,10 +88,6 @@ for path in sorted((root / "csv").glob("*.csv")):
     if len(data) != 11:
         raise SystemExit(f"Expected 11 measured pairs, got {len(data)} for {path}")
 
-    totals = {
-        kind: sorted(int(row[kind]["total_ns"]) for _, *values in [] )
-        for kind in ()
-    }
     # Single-run contrast and paired sample distribution are both retained.
     for mode, position in (("stack", 1), ("heap", 2)):
         samples = sorted(int(pair[position]["total_ns"]) for pair in data)
