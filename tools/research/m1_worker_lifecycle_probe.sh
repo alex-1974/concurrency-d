@@ -23,4 +23,15 @@ for kind in M1P06Start M1P06Fatal; do
     # aborts or deadlocks. It must exit normally for this research gate.
     timeout --signal=TERM --kill-after=2s 20s "$TMP/$kind"
     echo "P06 $kind: PASS"
+
+    if [[ "$(basename -- "$DC")" == ldc2* ]]; then
+        # Optimized correctness with assertions enabled: -release would
+        # suppress the deliberately injected assertion-Error.
+        "$DC" -O3 -unittest -main "${PREFIX}${kind}" -preview=dip1000 \
+            "-I$ROOT/source" "-I$BASE" "-of=$TMP/$kind-optimized" \
+            "$ROOT/source/concurrency/internal/task_record.d" \
+            "$BASE/concurrency/research/m1_value_scope.d"
+        timeout --signal=TERM --kill-after=2s 20s "$TMP/$kind-optimized"
+        echo "P06 $kind LDC -O3 assertions-on: PASS"
+    fi
 done
