@@ -293,6 +293,16 @@ private struct Portal
     }
 }
 
+// Against the actual P03 portal (not a synthetic slice-only fixture), an
+// @safe caller must not silently gain cross-thread submission capability.
+// This checks only the attribute boundary, NOT arbitrary lifetime/race safety.
+static assert(!__traits(compiles, {
+    void attemptedSafeSpawn(ref Portal p) @safe
+    {
+        p.trySpawn(() @safe {});
+    }
+}), "P03 @system submission must remain unavailable to @safe callers");
+
 private alias Build = void delegate(Portal*) @system;
 
 /++
