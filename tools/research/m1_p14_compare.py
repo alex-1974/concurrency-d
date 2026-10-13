@@ -21,7 +21,8 @@ EVENTS = (
     "close_signals", "park_waits", "local_hits", "local_misses",
     "batch_attempts", "batch_claims", "batch_tasks", "local_pushes",
     "local_push_failures", "steal_attempts", "steal_successes",
-    "park_attempts", "executed",
+    "park_attempts", "executed", "worker_count",
+    *(f"worker{i}_executed" for i in range(16)),
 )
 
 def read(path: Path) -> list[dict[str, str]]:
@@ -40,6 +41,7 @@ def compare(control_path: Path, trace_path: Path, min_rows: int) -> None:
         raise ValueError("P14 control and trace do not have the same row count")
     overhead = defaultdict(list)
     steals = defaultdict(list)
+    worker_spreads = defaultdict(list)
     total_trace_tasks = 0
     for index, (plain, trace) in enumerate(zip(original, traced)):
         context = f"row {index}: "
@@ -72,6 +74,13 @@ def compare(control_path: Path, trace_path: Path, min_rows: int) -> None:
         if int(trace["steal_successes"]) > int(trace["steal_attempts"]):
             raise ValueError(context + "steal accounting mismatch")
 
+        worker_count = int(trace["worker_count"])
+        if worker_count != int(trace["workers"]) or not 1 <= worker_count <= 16:
+            raise ValueError(context + "incorrect worker distribution shape")
+        workers = [int(trace[f"worker{i}_executed"]) for i in range(16)]
+        if sum(workers) != total or any(workers[worker_count:]):
+            raise ValueError(context + "per-worker completion total mismatch")
+
         ctrl_time = int(plain["waves_ns"])
         trace_time = int(trace["waves_ns"])
         if ctrl_time <= 0 or trace_time <= 0:
@@ -80,6 +89,8 @@ def compare(control_path: Path, trace_path: Path, min_rows: int) -> None:
             key = (int(trace["workers"]), int(trace["iterations"]),
                    int(trace["ingress"]))
             overhead[key].append(trace_time / ctrl_time)
+            worker_spreads[key].append((min(workers[:worker_count]),
+                                        max(workers[:worker_count])))
             steals[key].append(
                 (int(trace["steal_successes"]), int(trace["steal_attempts"]),
                  int(trace["batch_claims"]), int(trace["park_waits"])))
@@ -90,10 +101,13 @@ def compare(control_path: Path, trace_path: Path, min_rows: int) -> None:
         attempts = sum(x[1] for x in steals[key])
         claims = sum(x[2] for x in steals[key])
         parks = sum(x[3] for x in steals[key])
+        min_work = int(median(x[0] for x in worker_spreads[key]))
+        max_work = int(median(x[1] for x in worker_spreads[key]))
         print(f"P14 CI-DIAGNOSTIC workers={key[0]} iters={key[1]} "
               f"ingress={key[2]} trace/control-wave median={median(samples):.3f} "
               f"stolen={successes} attempts={attempts} "
-              f"claimed_batches={claims} park_waits={parks} n={len(samples)}")
+              f"claimed_batches={claims} park_waits={parks} "
+              f"per_worker_min_max_medians={min_work}/{max_work} n={len(samples)}")
     print(f"P14 PASS identical scenario/checksum order, trace conservation: "
           f"rows={len(original)}, logical_tasks_per_arm={total_trace_tasks}, "
           f"configurations={len(overhead)}")
