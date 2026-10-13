@@ -127,7 +127,8 @@ private Sample processRecords(
                     break;
                 if (admission == SubmissionResult.closed)
                     throw new Exception("P12 unexpected closed pool");
-                assert(admission == SubmissionResult.full);
+                if (admission != SubmissionResult.full)
+                    throw new Exception("P12 unexpected admission state");
                 ++sample.retries;
                 Thread.yield();
             }
@@ -138,21 +139,26 @@ private Sample processRecords(
 
     const joinedTicks = MonoTime.currTime.ticks;
     sample.submitAndJoinNs = elapsed(startedTicks, joinedTicks);
-    assert(pool.acceptedCount() == count);
-    assert(pool.completedCount() == count);
+    if (pool.acceptedCount() != count ||
+        pool.completedCount() != count)
+        throw new Exception("P12 missing accepted/completed task");
 
     long expected;
     foreach (i; 0 .. count)
     {
-        assert(atomicLoad!(MemoryOrder.acq)(records[i].returned) == 1u);
+        if (atomicLoad!(MemoryOrder.acq)(records[i].returned) != 1u)
+            throw new Exception("P12 missing afterExecution return flag");
         const original = cast(int)(i * 3) - 300;
-        assert(records[i].input == original);
+        if (records[i].input != original)
+            throw new Exception("P12 corrupted task input");
         const oracle = kernel(original);
-        assert(records[i].result == oracle);
+        if (records[i].result != oracle)
+            throw new Exception("P12 wrong worker result");
         expected += oracle;
         sample.checksum += records[i].result;
     }
-    assert(sample.checksum == expected);
+    if (sample.checksum != expected)
+        throw new Exception("P12 checksum mismatch");
     const verifiedTicks = MonoTime.currTime.ticks;
     sample.verifyNs = elapsed(joinedTicks, verifiedTicks);
     sample.totalNs = elapsed(begunTicks, verifiedTicks);
