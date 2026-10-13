@@ -278,18 +278,18 @@ private struct Portal
 
     Outcome summary() @system
     {
-        Outcome out;
-        out.admitted = engine.acceptedCount();
-        out.quiescent = engine.returnedCount();
-        out.rejected = rejected;
-        assert(out.admitted == slots);
+        Outcome result;
+        result.admitted = engine.acceptedCount();
+        result.quiescent = engine.returnedCount();
+        result.rejected = rejected;
+        assert(result.admitted == slots);
         foreach (i; 0 .. slots)
         {
             assert(records[i].hasReturned());
             if (records[i].failure !is null)
-                ++out.childExceptions;
+                ++result.childExceptions;
         }
-        return out;
+        return result;
     }
 }
 
