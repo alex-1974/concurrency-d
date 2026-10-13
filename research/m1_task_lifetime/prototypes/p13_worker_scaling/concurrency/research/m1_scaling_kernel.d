@@ -159,6 +159,7 @@ ScalingSample measure(
     const started = MonoTime.currTime.ticks;
     sample.poolStartNs = elapsed(prepared, started);
 
+    long wavesFinished = started;
     try
     {
         foreach (wave; 0 .. waves)
@@ -191,15 +192,14 @@ ScalingSample measure(
                 Thread.yield();
             }
         }
+        wavesFinished = MonoTime.currTime.ticks;
     }
     finally
         closeOrAbort(pool);
 
     const joined = MonoTime.currTime.ticks;
-    sample.wavesNs = elapsed(started, joined);
-    // This includes closeAndJoin at present; split the stage below for
-    // the true work+wait interval, without changing worker work.
-    // Store a separate post-work join delta in a later revision.
+    sample.wavesNs = elapsed(started, wavesFinished);
+    sample.joinNs = elapsed(wavesFinished, joined);
     if (pool.acceptedCount() != all || pool.completedCount() != all)
         throw new Exception("P13 real pool lost accepted work");
     sample.parkCount = pool.parkCount();
