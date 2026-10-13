@@ -20,3 +20,5 @@ concurrency-d-test-*
 research/m1_task_lifetime/prototypes/p14_scheduler_events/generated/
 research/m1_task_lifetime/prototypes/p15_mutex_timing/generated/
 research/m1_task_lifetime/prototypes/p16_completion_sampling/generated/
+
+research/m1_task_lifetime/prototypes/p16_2_atomic_completion/generated/
