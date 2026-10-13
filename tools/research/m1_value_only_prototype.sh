@@ -54,7 +54,12 @@ echo "P05 trusted-entry invalid count/null guards: PASS"
 
 # Test-only injected failure after 0, 1 and 3 accepted TaskRefs.
 # closeAndJoin must drain/return before executeCopied rethrows.
-"$DC" -unittest -main -version=M1P05Fault -preview=dip1000 \
+# DMD uses -version; LDC uses -d-version (where -version is --version).
+VERSION_FLAG="-version=M1P05Fault"
+if [[ "$(basename -- "$DC")" == ldc2* ]]; then
+    VERSION_FLAG="-d-version=M1P05Fault"
+fi
+"$DC" -unittest -main "$VERSION_FLAG" -preview=dip1000 \
     "-I$ROOT/source" "-I$BASE" \
     "-of=$TMP/m1-p05-partial-enqueue-unittests" \
     "$ROOT/source/concurrency/internal/task_record.d" \
