@@ -211,10 +211,10 @@ private final class WorkerBatch
                 --pending;
             }
 
-            // This executes when dispatchTask returns *or unwinds with
-            // a Throwable*. The counter never needs to access the record.
-            // An unhandled child Error still makes its Thread terminate;
-            // closeAndJoin() waits for all workers before rethrowing it.
+            // Count normally returned work. Error unwinding may bypass
+            // expected accounting; never infer task success or record
+            // lifetime from this counter on a fatal worker exit.
+            // closeAndJoin() uses actual native joins as its barrier.
             scope(exit)
             {
                 synchronized (mutex)
@@ -418,8 +418,23 @@ unittest
     assert(p06LastJoined == WorkerCount);
     assert(p06LastAccepted == inputs.length);
     assert(p06LastCompleted <= inputs.length);
-    // A successful second call proves that no worker retains stale pointers
-    // to the prior lexical scope even when the previous worker terminated.
+
+    // Both workers can terminate with an Error while queued work remains.
+    // It must be rejected as an unsuccessful batch, yet both threads must
+    // still be joined before unwinding the stack records.
+    int[4] fatalBoth = [int.min, int.min, 7, 9];
+    bool caughtDoubleError;
+    try
+        evaluateScalars(fatalBoth[], &p05Identity);
+    catch (Error ex)
+        caughtDoubleError = true;
+    assert(caughtDoubleError);
+    assert(p06LastJoined == WorkerCount);
+    assert(p06LastAccepted == fatalBoth.length);
+    assert(p06LastCompleted <= fatalBoth.length);
+
+    // A successful fresh call checks that the failed scope did not leave
+    // active users of its former stack records.
     int[2] next = [7, 9];
     auto after = evaluateScalars(next[], &p05Identity);
     assert(after.count == 2 && after.values[0] == 7 && after.values[1] == 9);
