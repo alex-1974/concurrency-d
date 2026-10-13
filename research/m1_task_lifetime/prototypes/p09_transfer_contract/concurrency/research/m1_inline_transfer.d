@@ -12,7 +12,7 @@
 +/
 module concurrency.research.m1_inline_transfer;
 
-import std.traits : Fields, hasNested, isPOD;
+import std.traits : Fields, hasNested;
 
 private template isPrimitiveInline(T)
 {
