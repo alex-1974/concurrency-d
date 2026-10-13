@@ -15,6 +15,7 @@ on:
       - "tools/research/m1_native_lifecycle_failstop.sh"
       - "tools/research/m1_owned_vs_borrowed_prototype.sh"
       - "tools/research/m1_inline_transfer_and_uncertain.sh"
+      - "tools/research/m1_typed_transport_prototype.sh"
       - ".github/workflows/m1-task-lifetime-probes.yml"
   pull_request:
     branches:
@@ -30,6 +31,7 @@ on:
       - "tools/research/m1_native_lifecycle_failstop.sh"
       - "tools/research/m1_owned_vs_borrowed_prototype.sh"
       - "tools/research/m1_inline_transfer_and_uncertain.sh"
+      - "tools/research/m1_typed_transport_prototype.sh"
       - ".github/workflows/m1-task-lifetime-probes.yml"
   workflow_dispatch:
 
@@ -91,3 +93,7 @@ jobs:
       - name: P09 inline transfer and uncertainty supervisor (research only)
         shell: bash
         run: bash tools/research/m1_inline_transfer_and_uncertain.sh "$DC"
+
+      - name: P10 typed inline TaskRef transport (research only)
+        shell: bash
+        run: bash tools/research/m1_typed_transport_prototype.sh "$DC"
