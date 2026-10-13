@@ -1,7 +1,7 @@
 # P16.2 — Atomic-completion / closed-state handshake (research only)
 
 **Date:** 2026-10-13  
-**Status:** candidate **CORRECTNESS-QUALIFIED on pinned DMD/LDC** ([CI #38459761896](https://github.com/alex-1974/concurrency-d/actions/runs/38459761896)); native Dell-XPS uninstrumented A/B results **NOT YET AVAILABLE**. Candidate **NOT promoted**; this is an isolated alternate completion-state machine, not a production API or a repaired native-start/join exceptional contract.  
+**Status:** candidate **CORRECTNESS-QUALIFIED on pinned DMD/LDC** ([CI #38459761896](https://github.com/alex-1974/concurrency-d/actions/runs/38459761896)); the full native Dell-XPS uninstrumented A/B archive is now **RECEIVED and independently analyzed**. Candidate remains **NOT promoted** because performance is workload-dependent and the target CPU was at its reported thermal high threshold in all saved snapshots. This is an isolated alternate completion-state machine, not a production API or a repaired native-start/join exceptional contract.  
 **Baseline:** original M0 `source/concurrency/internal/submission_pool.d` Git blob `b7d8fafcb3179f00cba7e89e28c6d6b9b676353a`.  
 **Input evidence:** [P16.1 complete XPS evidence](../p16_completion_sampling/evidence/xps-2026-10-13-analysis.md), [P14 path events](../p14_scheduler_events/evidence/xps-2026-10-13-analysis.md), [ADR-0001 PROPOSED](../../../../docs/adr/ADR-0001-task-lifetime-families.md), [Issue #17](https://github.com/alex-1974/concurrency-d/issues/17), [Draft PR #38](https://github.com/alex-1974/concurrency-d/pull/38).
 
@@ -95,7 +95,7 @@ bash tools/research/m1_p16_2_xps.sh \
     ldc2 /tmp/p16-2-xps-2026-10-13
 ```
 
-The XPS runner refuses to overwrite an output path. It saves a manifest, full per-sample CSV/raw logs, comparison and sensor snapshots, and a `/tmp/p16-2-xps-2026-10-13.tar.gz` archive. Local raw logs contain host/username/path data; review before public publishing. It has **not** been executed on the Dell XPS from CI. No performance winner can be claimed until a real native artifact is provided and audited.
+The XPS runner refuses to overwrite an output path. It saves a manifest, full per-sample CSV/raw logs, comparison and sensor snapshots, and a `/tmp/p16-2-xps-2026-10-13.tar.gz` archive. Local raw logs contain host/username/path data; review before public publishing. The runner was executed on the Dell XPS independently of CI; the complete native artifact was subsequently provided and audited. CI does **not** execute remotely on that machine. See the received XPS evidence section below for the actual outcome and its limitations.
 
 ## Promotion limits
 
@@ -104,3 +104,26 @@ The XPS runner refuses to overwrite an output path. It saves a manifest, full pe
 **DEFER:** calling this **lock-free** (other paths are mutex-protected), weakening seq-cst, redesigning shutdown/ingress/parking, production promotion, public `@safe TaskScope`, native start/join exception recovery and C++ parity. The alternate candidate may be slower due to seq-cst fence/atomic cache-line contention; a speed win in a single narrow microbenchmark would not justify merging to `develop`.
 
 Any further work must separately qualify **task latency**, worst-case shutdown, exact accepted/completed obligations under repeated close and adversarial scheduling, and optimized LDC release performance versus unchanged M0. ADR-0001 remains **PROPOSED**, Issue #17 **OPEN**, Draft PR #38 **DRAFT**, and the grandfathered R0.5 work and `develop` are untouched.
+
+
+## P16.2 native XPS evidence received and qualified — 2026-10-13
+
+**[Complete original-artifact integrity, paired performance and safety interpretation](evidence/xps-2026-10-13-analysis.md).** User-supplied `p16-2-xps-2026-10-13.tar.gz`, SHA-256 **`b56aeb2ee0c0ff3ba49946865b4646ed3d0afae149d7487c74bf1ea7f294758a`**, produced from pinned source commit **`000ca04d7a4f3d2e63e22826dca75b959c06eb0d`** using LDC 1.41.0 whole-release on i7-9750H. **The original raw archive/manifest are not in public GitHub** because they contain local user/host/path metadata.
+
+**Integrity PASS:** all six per-mode/session CSVs matched the CSV output from corresponding original raw logs exactly. **2,430 original rows** = 540 warm-ups + **945 measured original M0 controls** + **945 measured seq-cst candidates**, with every one of the 54 full sweeps containing the expected 45 configurations. All paired `phase/round/order/seed/workers/count/waves/iterations/ingress/checksum` and sum-of-stages timing equations match, preserving the existing P13 result/oracle and TaskRef/native join success semantics. The runner includes adversarial close/completion/producer races before timing; their console transcripts were **not archived**. The previous [DMD/LDC race/optimized/release CI #38459761896](https://github.com/alex-1974/concurrency-d/actions/runs/38459761896) remains the explicit captured race-gate evidence.
+
+**Observed uninstrumented atomic/original wave-time ratios**: aggregate median **0.926×** across all 945 matching measured workcases (atomic wins 592/945), but strong nonuniformity by worker and task size:
+
+| Workers | 0 iterations | 8 | 32 | 128 | 512 | Median over all kernels |
+|---:|---:|---:|---:|---:|---:|---:|
+| 1 | 0.831× | 0.831× | 0.862× | 0.561× | 0.947× | **0.837×** |
+| 2 | **1.165×** | **1.144×** | **1.093×** | 0.649× | 0.840× | **1.028×** |
+| 4 | **1.100×** | **1.111×** | **1.105×** | 0.935× | 0.691× | **1.027×** |
+
+Each worker/kernel cell is a **median over 63 matching samples** (3 sessions × 7 measured sweeps × 3 ingress settings); **less than one favors the candidate**. Tiny TaskRefs at 2 or 4 workers usually regress, despite the removed common completion Mutex acquisition. The original four-worker/two-worker crossover persists; the seq-cst candidate's tiny-task four-worker throughput is still worse than at two workers. Some larger-task gains are striking and warrant compiler/codegen/thermal investigation, not unqualified credit to a single synchronization mechanism.
+
+**Scheduler event differences:** at 4 workers, 0 iterations, median observed park entries increased from **169** (original) to **317** (candidate), while median producer retries fell from **32** to **15**, across 63 different-workload/ingress measurements. The source observation does **not** time parked duration or identify a causal mechanism; it establishes that the candidate changed scheduling interleavings, not only lock implementation cost.
+
+**CRITICAL native performance gate:** all **six** saved per-session before/after `coretemp` snapshots show **CPU Package +100.0°C (reported high=100.0°C)**, with fans near the reported upper speed. There is no in-run frequency/thermal-throttling trace, so sustained throttling is **not proven**, but this benchmark must **NOT** be promoted as thermally stable optimized-release evidence. Three sequential sessions with alternating whole-process mode order do not eliminate temperature/frequency and OS scheduling confounders.
+
+**Decision:** KEEP P16.2 as a correctness-qualified **RESEARCH hypothesis** and archive its native A/B evidence; **NO-GO** for unconditional production promotion, changing the MemoryOrder.seq handshake, general public `@safe TaskScope`, new worker defaults or C++ parity. Next evaluate stable-frequency XPS sessions and compiler optimized-code differences, particularly 1-worker/128-iteration acceleration and increased tiny-task parking. The original M0, production code, `develop` and grandfathered R0.5 work are untouched; ADR-0001 remains PROPOSED, Issue #17 OPEN and PR #38 DRAFT.
