@@ -34,6 +34,18 @@ if [[ "$(basename -- "$DC")" == ldc2* ]]; then
     grep -E '^(phase,round,|warmup,|measure,)' "$TMP/release.raw" >"$TMP/release.csv"
 fi
 
+# Compiler and parser qualification of the FULL native experiment matrix,
+# but with tiny bounded work — not a usable CI performance sample.
+timeout --signal=TERM --kill-after=5s 120s \
+    dub run --root="$BASE" --compiler="$DC" --build=debug \
+        --config=smoke -- --profile native --count 64 --waves 2 \
+        --warmup 0 --rounds 2 --seed 332922417 >"$TMP/native-matrix.raw"
+grep -E '^(phase,round,|warmup,|measure,)' \
+    "$TMP/native-matrix.raw" >"$TMP/native-matrix.csv"
+python3 "$ROOT/tools/research/m1_worker_scaling_analyze.py" \
+    --minimum-rounds 2 --require-profile native \
+    "$TMP/native-matrix.csv"
+
 python3 "$ROOT/tools/research/m1_worker_scaling_analyze.py" \
     --minimum-rounds 2 --require-profile smoke \
     "$TMP/smoke.csv" \
