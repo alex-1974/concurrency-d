@@ -10,6 +10,7 @@ on:
       - "tools/research/m1_scoped_join_prototype.sh"
       - "tools/research/m1_lexical_batch_prototype.sh"
       - "tools/research/m1_dynamic_scope_prototype.sh"
+      - "tools/research/m1_value_only_prototype.sh"
       - ".github/workflows/m1-task-lifetime-probes.yml"
   pull_request:
     branches:
@@ -20,6 +21,7 @@ on:
       - "tools/research/m1_scoped_join_prototype.sh"
       - "tools/research/m1_lexical_batch_prototype.sh"
       - "tools/research/m1_dynamic_scope_prototype.sh"
+      - "tools/research/m1_value_only_prototype.sh"
       - ".github/workflows/m1-task-lifetime-probes.yml"
   workflow_dispatch:
 
@@ -61,3 +63,7 @@ jobs:
       - name: P03 bounded dynamic lexical scope (research only)
         shell: bash
         run: bash tools/research/m1_dynamic_scope_prototype.sh "$DC"
+
+      - name: P04 @safe scalar-only external consumer (research only)
+        shell: bash
+        run: bash tools/research/m1_value_only_prototype.sh "$DC"
