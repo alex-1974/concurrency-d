@@ -1,6 +1,8 @@
 name "m1-p11-real-pool"
 description "Research-only typed M0 work-stealing consumer; not a public package"
 targetType "executable"
+// Research fixture only: preview flags must NOT enter the published package.
+dflags "-preview=dip1000"
 mainSourceFile "consumer/main.d"
 sourcePaths "concurrency" "../p09_transfer_contract/concurrency"
 importPaths "." "../p09_transfer_contract"
