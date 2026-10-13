@@ -109,7 +109,7 @@ import core.atomic : atomicStore;
                 atomicLoad!(MemoryOrder.seq)(_completedAtomic);
             assert(completedNow <= _accepted);""")
     c = replace_one(c,
-        """                    !(_closed && _completed == _accepted))""",
+        """                   !(_closed && _completed == _accepted))""",
         """                    !(_closed &&
                       atomicLoad!(MemoryOrder.seq)(_completedAtomic) == _accepted))""")
     c = replace_one(c,
