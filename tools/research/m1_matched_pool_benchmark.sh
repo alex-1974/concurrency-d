@@ -23,14 +23,17 @@ fi
 timeout --signal=TERM --kill-after=5s 150s \
     dub run --root="$BASE" --compiler="$DC" --build=debug \
         --config=smoke -- --count 2048 --warmup 1 --rounds 3 \
-        --workers 2 --ingress 64 >"$TMP/smoke.csv"
+        --workers 2 --ingress 64 >"$TMP/smoke.raw"
+# DUB may write build/run status to stdout; accept CSV records only.
+grep -E '^(phase,pair,mode,|warmup,|measure,)' "$TMP/smoke.raw" >"$TMP/smoke.csv"
 cat "$TMP/smoke.csv"
 
 if [[ "$(basename -- "$DC")" == ldc2* ]]; then
     timeout --signal=TERM --kill-after=5s 150s \
         dub run --root="$BASE" --compiler="$DC" --build=debug \
             --config=optimized -- --count 8192 --warmup 2 --rounds 5 \
-            --workers 2 --ingress 64 >"$TMP/optimized.csv"
+            --workers 2 --ingress 64 >"$TMP/optimized.raw"
+    grep -E '^(phase,pair,mode,|warmup,|measure,)' "$TMP/optimized.raw" >"$TMP/optimized.csv"
     cat "$TMP/optimized.csv"
 fi
 
