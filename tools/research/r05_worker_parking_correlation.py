@@ -384,6 +384,72 @@ def main():
                         r["worker_over_plain"] for r in group)))
     write_csv(out / "pairs.csv", pairs)
     write_csv(out / "summary.csv", summary)
+
+    # Pure post-processing: use only existing worker-owned counters from
+    # completed/joined 'combined' cases. No new D task or mutex probes.
+    # Ratios are calculated within each process, then medians of those
+    # independent process ratios are taken (never quotient of medians).
+    acquisition = []
+    for r in rows:
+        if r["mode"] != "combined":
+            continue
+        attempts = r["steal_attempts"]
+        successes = r["steal_successes"]
+        final_exits = r["final_wait_exits"]
+        if (r["failed_steals"] != attempts - successes or
+                r["claimed_tasks"] != a.tasks or
+                r["executions"] != a.tasks or
+                r["claimed_batches"] <= 0):
+            raise RuntimeError("work acquisition conservation mismatch")
+        record = dict(
+            round=r["round"], workload=r["workload"],
+            producers=r["producers"], policy=r["policy"],
+            tasks=a.tasks,
+            local_misses_per_task=r["local_misses"] / a.tasks,
+            ingress_misses_per_task=r["ingress_misses"] / a.tasks,
+            steal_attempts_per_task=attempts / a.tasks,
+            failed_steals_per_task=r["failed_steals"] / a.tasks,
+            steal_success_fraction=(
+                successes / attempts if attempts else ""),
+            failed_per_successful_steal=(
+                r["failed_steals"] / successes if successes else ""),
+            park_checks_per_task=r["park_checks"] / a.tasks,
+            condition_waits_per_task=r["condition_waits"] / a.tasks,
+            tasks_per_claimed_batch=a.tasks / r["claimed_batches"],
+            first_search_empty_fraction=(
+                r["no_work"] / final_exits if final_exits else ""),
+        )
+        acquisition.append(record)
+    if len(acquisition) != expected // 3:
+        raise RuntimeError("missing acquisition diagnostic cases")
+    write_csv(out / "acquisition.csv", acquisition)
+    acquired = []
+    for workload in a.workloads:
+        for producers in a.producers:
+            for policy in a.policies:
+                group = [r for r in acquisition
+                         if r["workload"] == workload and
+                         r["producers"] == producers and
+                         r["policy"] == policy]
+                if len(group) != a.rounds:
+                    raise RuntimeError("incomplete acquisition group")
+                item = dict(workload=workload, producers=producers,
+                            policy=policy, runs=len(group))
+                for metric in (
+                    "local_misses_per_task", "ingress_misses_per_task",
+                    "steal_attempts_per_task", "failed_steals_per_task",
+                    "steal_success_fraction", "failed_per_successful_steal",
+                    "park_checks_per_task", "condition_waits_per_task",
+                    "tasks_per_claimed_batch",
+                    "first_search_empty_fraction",
+                ):
+                    measured = [r[metric] for r in group
+                                if r[metric] != ""]
+                    item["median_" + metric] = (
+                        statistics.median(measured) if measured else "")
+                acquired.append(item)
+    write_csv(out / "acquisition_summary.csv", acquired)
+
     with (out / "environment.txt").open("w") as f:
         f.write("benchmark=r05-full-victim-worker-parking-correlation\n")
         f.write("research_head=" + command_output(
@@ -403,6 +469,8 @@ def main():
                 " preexisting parkingProfile runtime counters.\n")
         f.write("Combined worker CPU and switches can be perturbed by"
                 " the parking counters, unlike the worker-only control.\n")
+        f.write("acquisition.csv and acquisition_summary.csv are "
+                "post-join derived measurements from combined-mode counters\\n")
         f.write("Condition waits are NOT equivalent to voluntary"
                 " context switches or notified worker handoffs.\n")
         for cmd in ([a.compiler, "--version"], ["dub", "--version"],
