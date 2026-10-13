@@ -69,6 +69,10 @@ compare matrix 90
 if [[ "$(basename -- "$DC")" == ldc2* ]]; then
     run_profile control-optimized smoke 128 3 3 debug 332924512 O3
     run_profile grace-optimized smoke 128 3 3 debug 332924512 O3
+    # DUB configuration is part of the generated filename; normalize only
+    # the CI comparison aliases. The raw optimized logs remain preserved.
+    cp "$TMP/O3-control-optimized.csv" "$TMP/O3-control.csv"
+    cp "$TMP/O3-grace-optimized.csv" "$TMP/O3-grace.csv"
     compare O3 18
     run_races release 5
     run_profile control smoke 128 3 3 release 332924513 release
