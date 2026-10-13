@@ -1,0 +1,46 @@
+name: R0.5 reservation state-model audit
+
+on:
+  push:
+    branches:
+      - perf/r05-owned-task-pipeline
+    paths:
+      - "tools/research/r05_reservation_state_model.py"
+      - ".github/workflows/r05-reservation-state-model.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  model:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout grandfathered research branch
+        uses: actions/checkout@v7
+      - name: Check Python syntax and bounded safety invariants
+        run: |
+          python3 -m py_compile tools/research/r05_reservation_state_model.py
+          python3 tools/research/r05_reservation_state_model.py
+          python3 tools/research/r05_reservation_state_model.py --max-commits=4
+      - name: Reject premature close, unrooted TaskRef and broken capacity
+        run: |
+          python3 - <<'PY'
+          from importlib.util import module_from_spec, spec_from_file_location
+          spec = spec_from_file_location(
+              "r05model", "tools/research/r05_reservation_state_model.py")
+          model = module_from_spec(spec)
+          import sys
+          sys.modules["r05model"] = model
+          spec.loader.exec_module(model)
+          model.naive_counterexamples()
+          valid = model.State(
+              lifecycle="draining", producers=(model.BUILT,),
+          )
+          assert "close_inbox" not in {
+              event for event, _ in model.edges(valid, 1, 1, 1, 1)
+          }
+          model.invariants(valid, 1, 1, 1, 1)
+          print("PASS: explicit unsafe-shortcut counterexamples")
+          PY
