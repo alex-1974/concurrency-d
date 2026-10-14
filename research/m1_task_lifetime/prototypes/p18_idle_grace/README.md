@@ -3,7 +3,7 @@
 **Research date:** 2026-10-13  
 **Scope:** one scheduling transition, not a new executor family.  
 **Branch:** `research/m1-task-lifetime-boundaries`, [Draft PR #38](https://github.com/alex-1974/concurrency-d/pull/38).  
-**Status:** exact-source candidate and original-M0 control **CORRECTNESS-QUALIFIED** on DMD 2.111.0 / LDC 1.41.0 ([CI #38469074496](https://github.com/alex-1974/concurrency-d/actions/runs/38469074496), including LDC `-O3` and full release); **no native P18 XPS performance evidence yet**. Do not promote this candidate to production.
+**Status:** exact-source candidate and original-M0 control **CORRECTNESS-QUALIFIED** on DMD 2.111.0 / LDC 1.41.0 ([CI #38469074496](https://github.com/alex-1974/concurrency-d/actions/runs/38469074496), including LDC `-O3` and full release); **native P18 XPS partial and complete observational evidence now retained** (see below). Do not promote this candidate to production.
 
 ## Evidence motivating P18
 
@@ -54,7 +54,7 @@ The [independent CSV validator](../../../../tools/research/m1_p18_compare.py) re
 
 [Foreground P18 XPS runner](../../../../tools/research/m1_p18_xps.sh) compares two **uninstrumented** LDC whole-release binaries with identical P13 2,048 × 3-wave TaskRefs, 45 configurations, four default sessions, two warm-ups and five measured shuffled sweeps. Within a session, both modes use the same seed and shuffled order. Their **whole-process** order alternates: original→grace and grace→original. The process CPU mask selects four Linux-allowed CPUs from distinct physical cores; **native workers are not pinned to specific cores**.
 
-Before each session/process the runner uses the existing [read-only P17 sysfs telemetry](../../../../tools/research/m1_p17_telemetry.py) to reject initial package temperatures ≥95°C or missing package sensors (unless `P18_ALLOW_HOT=1` is explicitly set, marking results **diagnostic only**). For every process it logs separate 500-ms reported CPU frequency, package temperature and readable thermal-throttle count samples, then [summarizes per-process thermal screening](../../../../tools/research/m1_p17_thermal_review.py). Monitor work is applied symmetrically to both versions. A screening pass is **not proof of stable per-worker clock frequency**, and an incremented throttle counter or hot/missing sensor is **NO-GO for a production performance verdict**.
+Before each session/process the P18 runner invokes the [P18-specific observational thermal audit](../../../../tools/research/m1_p18_thermal_audit.py). The default `P18_THERMAL_MODE=observe` records initial temperature (or missing sensor) as a flag and does **not** refuse admission solely for temperature. `P18_THERMAL_MODE=strict` optionally preserves the previous ≥95 °C/missing-sensor admission refusal; `P18_THERMAL_ALERT_C` changes the documented warning/strict threshold (default 95). The legacy `P18_ALLOW_HOT` override remains accepted and recorded for old commands but is not required in observation mode. Every process retains 500-ms sysfs-reported CPU frequency, package temperature and throttle-counter samples. The P18 reviewer flags high samples, counter changes, missing readings and sparse samples for inspection; it **does not issue an automatic performance verdict**. Monitoring is symmetric but cannot prove stable per-worker clocks or rule out unobserved transients. Evidence quality, run-order sensitivity, frequency drift and actual measured performance must still be reviewed. **The historical P17 gate/reviewer and their evidence remain unchanged.**
 
 The runner also executes the source-identical real close/producer race consumers on the target **before** starting timing. Recorded benchmark data include normalized CSV, original raw logs, source/toolchain/affinity metadata, per-session comparison diagnostics and thermal/frequency traces. Both variants are *not* instrumented for steal events (adding such instrumentation would confound the throughput test); actual M0 `parkCount` and producer retry counts remain available.
 
@@ -70,12 +70,19 @@ bash tools/research/m1_p18_xps.sh \
     ldc2 /tmp/p18-xps-2026-10-13
 ```
 
-Output is **`/tmp/p18-xps-2026-10-13.tar.gz`**. The script refuses to overwrite evidence. Review the manifest and DUB raw logs for local host/user/path identifiers before public publication. **There are no P18 native data yet.**
+Output is **`/tmp/p18-xps-2026-10-13.tar.gz`**. The script refuses to overwrite evidence. Review the manifest and DUB raw logs for local host/user/path identifiers before public publication. Partial and complete P18 XPS data have now been independently audited; the original raw archives are not committed to Git.
 
 ## Acceptance and rejection criteria
 
-**KEEP as a candidate only** if the exact task oracle/close/park/admission/native joins pass in both compiler configurations and the independent XPS A/B control demonstrates a material throughput/latency benefit on its target workloads under adequate thermal headroom, without unacceptable regression for longer work, multi-worker contention or 1-worker idle power. Smaller `parkCount` is only secondary evidence.
+**KEEP as a candidate only** if the exact task oracle/close/park/admission/native joins pass in both compiler configurations and the independent XPS A/B control demonstrates a material throughput/latency benefit on its target workloads with thermal/frequency drift and process-order sensitivity explicitly assessed, without unacceptable regression for longer work, multi-worker contention or 1-worker idle power. Smaller `parkCount` is only secondary evidence.
 
-**REJECT or DEFER** if one extra search reduces sleeps but increases latency, spin/search overhead, power or thermal load; if a lost wake, accepted/completed mismatch, failure-path ownership problem or worse latency appears; or if XPS thermal/frequency screening is insufficient. A one-worker grace may have no productive steal targets and can be intrinsically wasteful.
+**REJECT or DEFER** if one extra search reduces sleeps but increases latency, spin/search overhead, power or thermal load; if a lost wake, accepted/completed mismatch, failure-path ownership problem or worse latency appears; or if environmental observations and paired comparison controls cannot distinguish drift from a candidate effect. A one-worker grace may have no productive steal targets and can be intrinsically wasteful.
 
 Any accepted scheduler work must still be separately proven for the existing unresolved native start/join exceptional lifecycle and public `@safe` borrowing before promotion. ADR-0001 remains **PROPOSED**, Issue #17 OPEN and PR #38 DRAFT. Do not change production M0, `develop` or grandfathered R0.5 PR #35.
+
+## Actual native XPS evidence and disposition (2026-10-14)
+
+- [October 13 partial run](evidence/xps-2026-10-13-partial-review.md): two complete A/B sessions, 450 measured pairs; thermally burdened and stopped by historical 98 °C preflight; **KEEP research / DEFER production**.
+- [October 14 complete run](evidence/xps-2026-10-14-hot-review.md): four alternating A/B sessions; **900 valid matched measured pairs**, overall `grace/original waves_ns` median **0.935882**, P18 faster in 675/900 pairs, ingress-8 median **0.76538**. Sampled 72–83 °C across eight process traces, zero observed thermal throttle-counter increments. The historical invocation set `P18_ALLOW_HOT=1`; this does *not* mean an actual hot CPU was observed. With 512 iterations, 1- and 2-worker medians remain slightly slower. The finding is **research only**, not general speed/power/lifetime qualification.
+
+The P18-only runner now separates **observed thermal attention flags** from **optional strict admission**. It does not reinterpret P17 research or retroactively alter the original October 14 benchmark harness. No production scheduling change or P19 is authorized by these results.
