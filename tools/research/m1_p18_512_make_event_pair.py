@@ -226,7 +226,7 @@ struct P18TraceSnapshot
         # The P18 candidate resets idleRetries before executing local work.
         # Retain that statement exactly; the candidate-specific diagnostic
         # below will count a successful second-pass local recovery.
-        local_success_prefix = ("                idleRetries = 0;\\n"
+        local_success_prefix = ("                idleRetries = 0;\n"
                                 "                executeOne(local.value, self);")
     text = once(text,
         """            auto local = _queues[self].pop();
