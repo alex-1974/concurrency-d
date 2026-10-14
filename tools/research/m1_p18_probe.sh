@@ -55,6 +55,19 @@ python3 "$ROOT/tools/research/m1_p18_pi_make_fixture.py" \
     "$P13/concurrency/research/m1_scaling_kernel.d" \
     "$P13/consumer/main.d" "$BASE/generated"
 
+# Phase-boundary copies must reject any modified P13 driver, not just
+# preserve the TaskRef checksum under a mismatched generated experiment.
+cp "$P13/consumer/main.d" "$TMP/phase-driver-drift.d"
+printf '\n// injected phase-driver source drift\n' >>"$TMP/phase-driver-drift.d"
+if python3 "$ROOT/tools/research/m1_p18_phase_make_fixture.py" \
+    "$P13/concurrency/research/m1_scaling_kernel.d" \
+    "$TMP/phase-driver-drift.d" "$P162/race/main.d" \
+    "$TMP/forbidden-phase" >"$TMP/phase-negative.log" 2>&1; then
+    echo "P18 FAIL: phase generator accepted modified P13 driver" >&2
+    exit 1
+fi
+test ! -e "$TMP/forbidden-phase"
+
 # Explicit fail-closed source-drift negative test.
 cp "$ROOT/source/concurrency/internal/submission_pool.d" "$TMP/drift.d"
 printf '\n// synthetic source drift for P18 negative qualification\n' >>"$TMP/drift.d"
