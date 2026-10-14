@@ -40,7 +40,13 @@ for mode in idle-control idle-grace; do
         >"$TMP/$mode.log"
     test "$(grep -c '^measure,' "$TMP/$mode.log")" = 3
     grep -q '^P18_IDLE_PASS' "$TMP/$mode.log"
+    grep -E '^(phase,workers,|measure,)' "$TMP/$mode.log" \
+        >"$TMP/$mode.csv"
 done
+python3 "$ROOT/tools/research/m1_p18_idle_compare.py" --self-test
+python3 "$ROOT/tools/research/m1_p18_idle_compare.py" \
+    "$TMP/idle-control.csv" "$TMP/idle-grace.csv" --min-rows 3
+bash -n "$ROOT/tools/research/m1_p18_idle_xps.sh"
 
 run_profile() {
     local mode="$1" profile="$2" count="$3" waves="$4" rounds="$5"
