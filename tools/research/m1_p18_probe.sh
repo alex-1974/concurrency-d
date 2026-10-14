@@ -74,6 +74,8 @@ python3 "$ROOT/tools/research/m1_p18_idle_compare.py" \
 bash -n "$ROOT/tools/research/m1_p18_idle_xps.sh"
 bash -n "$ROOT/tools/research/m1_p18_512_abba_xps.sh"
 bash -n "$ROOT/tools/research/m1_p18_512_trace_xps.sh"
+bash -n "$ROOT/tools/research/m1_p18_512_single_ingress_xps.sh"
+python3 "$ROOT/tools/research/m1_p18_single_ingress_check.py" --self-test
 python3 "$ROOT/tools/research/m1_p18_512_trace_compare.py" --self-test
 
 # Trace arms execute EXACT TaskRef work, but their wall-clock time is
@@ -137,6 +139,17 @@ run_profile control focus512 16 2 1 debug 332924516 focus512
 run_profile grace focus512 16 2 1 debug 332924516 focus512
 compare focus512 54
 
+# One-worker exact P13 TaskRef producer/ingress study, 12 cells:
+# 128/512/1024 iterations x 8/64/256/2048 ingress capacities.
+# The 2048-slot case cannot reject the 16-task CI wave as full.
+for mode in control grace; do
+    run_profile "$mode" singleingress 16 2 1 debug 332924520 singleingress
+    python3 "$ROOT/tools/research/m1_p18_single_ingress_check.py" \
+        "$TMP/singleingress-$mode.csv" --count 16 --waves 2 \
+        --warmup 1 --rounds 1
+done
+compare singleingress 24
+
 if [[ "$(basename -- "$DC")" == ldc2* ]]; then
     run_profile control-optimized smoke 128 3 3 debug 332924512 O3
     run_profile grace-optimized smoke 128 3 3 debug 332924512 O3
@@ -171,6 +184,14 @@ if [[ "$(basename -- "$DC")" == ldc2* ]]; then
     python3 "$ROOT/tools/research/m1_p18_512_trace_compare.py" \
         "$TMP/release-trace-control.csv" \
         "$TMP/release-trace-grace.csv" --min-rows 54
+    # Independent LDC whole-release single-ingress semantic smoke.
+    for mode in control grace; do
+        run_profile "$mode" singleingress 32 2 1 release 332924521 release-singleingress
+        python3 "$ROOT/tools/research/m1_p18_single_ingress_check.py" \
+            "$TMP/release-singleingress-$mode.csv" --count 32 --waves 2 \
+            --warmup 1 --rounds 1
+    done
+    compare release-singleingress 24
     run_races release 5
     run_profile control smoke 128 3 3 release 332924513 release
     run_profile grace smoke 128 3 3 release 332924513 release
