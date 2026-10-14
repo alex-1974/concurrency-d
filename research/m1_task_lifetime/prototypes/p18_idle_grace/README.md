@@ -137,3 +137,14 @@ The measured median `grace/M0 waves_ns` ratios are **128 iterations 0.9559**, **
 Thermal attention: **session3-grace1** sampled 95 °C with a package thermal-throttle counter increase of +36; 15 other process traces have no observed increase. Excluding only the flagged half yields 512 median **1.0108** (315 pairs), while excluding all session 3 yields **0.9998**. Neither treatment makes the original full data thermally clean or proves cause. There is no stable clock, GUI-workload or power evidence.
 
 **Decision: KEEP narrow research / DEFER universal production.** Next, separate exact-source *event-only* local/inbox/steal/search/retry/park counters from already-collected **uninstrumented** speed evidence; never rank instrumented timing. No production scheduler/API/lifetime change, P19 or merge from this result.
+
+
+## Focus512 event-only trace follow-up — prepared 2026-10-14
+
+The complete [ABBA native audit](evidence/xps-2026-10-14-focus512-abba-review.md) shows a median **512-iteration P18/M0 ratio of 1.0119**, versus **0.9559 at 128** and **0.9829 at 1024**, with strong session effects. One of sixteen original per-process thermal traces observed 95 °C and a package-throttle counter increment of +36. All 1,080 uninstrumented measured TaskRef pairs passed exact source/workload/result checks. No causal scheduler or power verdict follows.
+
+The separate [event-only protocol](evidence/focus512-event-trace-protocol.md) adds **trace-control** and **trace-grace** research copies with exact-source/byte-identical source regeneration and independently generated pinned P13 TaskRef workloads. The single-writer, post-join counters separate local/inbox/steal recovery after the bounded grace yield from a failed second scan, drain exits, park attempts and actual Condition waits with/without outstanding tasks. Event conservation is checked both in the generator's trace consumer and by the strict CSV comparator.
+
+The dedicated [native XPS collector](../../../../tools/research/m1_p18_512_trace_xps.sh) prebuilds both instrumented release binaries, alternates process order, retains per-process raw telemetry and archives original traces. **Instrumented elapsed times must never be ranked against the existing uninstrumented ABBA speed data.** A new XPS trace archive is needed before investigating event distributions; none has yet been supplied.
+
+The production M0 scheduler and its original P18 one-retry candidate remain unchanged, and general production promotion is **DEFERRED**.
