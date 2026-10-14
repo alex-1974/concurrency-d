@@ -53,6 +53,14 @@ else
             "module concurrency.research.p18_consumer;")
     d = one(d, "import concurrency.research.m1_scaling_kernel :",
             "import concurrency.research.m1_p18_kernel :")
+    # Focused larger-work kernel family. Only the generated P18 driver is
+    # extended; the exact source-checked P13 driver remains unchanged.
+    d = one(d,
+        'options.profile != "smoke" && options.profile != "native"',
+        'options.profile != "smoke" && options.profile != "native" && options.profile != "long"')
+    d = one(d,
+        '? [0, 128] : [0, 8, 32, 128, 512];',
+        '? [0, 128] : profile == "long" ? [128, 256, 512, 1024, 2048] : [0, 8, 32, 128, 512];')
     d = one(d,
         'stderr.writeln("P13 CI measurements are DIAGNOSTIC ONLY; ",',
         'stderr.writeln("P18 bounded idle grace RESEARCH only; ",')

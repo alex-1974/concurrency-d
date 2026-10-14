@@ -22,6 +22,13 @@ configuration "grace-optimized" {
     dflags "-O3"
     versions "P18Grace"
 }
+configuration "idle-control" {
+    mainSourceFile "idle/main.d"
+}
+configuration "idle-grace" {
+    mainSourceFile "idle/main.d"
+    versions "P18Grace"
+}
 configuration "race-control" {
     mainSourceFile "generated/race/main.d"
 }

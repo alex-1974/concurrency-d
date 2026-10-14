@@ -31,6 +31,16 @@ fi
 test ! -e "$TMP/forbidden.d"
 bash -n "$ROOT/tools/research/m1_p18_xps.sh"
 python3 "$ROOT/tools/research/m1_p18_thermal_audit.py" self-test
+# Exercise both real native worker pools while admitting zero TaskRefs.
+# CI wall-clock/process-CPU values are not performance evidence.
+for mode in idle-control idle-grace; do
+    timeout --signal=TERM --kill-after=5s 80s \
+        dub run --root="$BASE" --compiler="$DC" --build=debug \
+        --config="$mode" -- --settle-ms 60 --hold-ms 80 --rounds 1 \
+        >"$TMP/$mode.log"
+    test "$(grep -c '^measure,' "$TMP/$mode.log")" = 3
+    grep -q '^P18_IDLE_PASS' "$TMP/$mode.log"
+done
 
 run_profile() {
     local mode="$1" profile="$2" count="$3" waves="$4" rounds="$5"
@@ -66,6 +76,12 @@ compare smoke 18
 run_profile control native 64 2 2 debug 332924511 matrix
 run_profile grace native 64 2 2 debug 332924511 matrix
 compare matrix 90
+
+# Source-pinned P18 driver supports a separate long-task profile:
+# 1/2/4 workers x 128/256/512/1024/2048 iterations x 8/64/256 ingress.
+run_profile control long 16 2 1 debug 332924515 long
+run_profile grace long 16 2 1 debug 332924515 long
+compare long 90
 
 if [[ "$(basename -- "$DC")" == ldc2* ]]; then
     run_profile control-optimized smoke 128 3 3 debug 332924512 O3

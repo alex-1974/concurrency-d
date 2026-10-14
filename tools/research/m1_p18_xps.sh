@@ -9,6 +9,7 @@ set -euo pipefail
 DC="${1:-ldc2}"
 DEST="${2:-/tmp/p18-idle-grace-$(date +%Y%m%d-%H%M%S)}"
 SESSIONS="${P18_SESSIONS:-4}"
+PROFILE="${P18_PROFILE:-native}"
 ALLOW_HOT="${P18_ALLOW_HOT:-unset}" # historical admission override; recorded only
 THERMAL_MODE="${P18_THERMAL_MODE:-observe}"
 THERMAL_ALERT_C="${P18_THERMAL_ALERT_C:-95}"
@@ -32,6 +33,10 @@ if [[ ! "$SESSIONS" =~ ^[1-9][0-9]*$ ]] || (( SESSIONS > 8 )); then
 fi
 if [[ "$ALLOW_HOT" != "unset" && "$ALLOW_HOT" != "0" && "$ALLOW_HOT" != "1" ]]; then
     echo "P18_ALLOW_HOT legacy flag must be 0 or 1" >&2
+    exit 2
+fi
+if [[ "$PROFILE" != "native" && "$PROFILE" != "long" ]]; then
+    echo "P18_PROFILE must be native or long" >&2
     exit 2
 fi
 if [[ "$THERMAL_MODE" != "observe" && "$THERMAL_MODE" != "strict" ]]; then
@@ -119,7 +124,12 @@ done
     echo "measured_sweeps=5"
     echo "workers=1,2,4"
     echo "ingress=8,64,256"
-    echo "iterations=0,8,32,128,512"
+    echo "profile=$PROFILE"
+    if [[ "$PROFILE" == "long" ]]; then
+        echo "iterations=128,256,512,1024,2048"
+    else
+        echo "iterations=0,8,32,128,512"
+    fi
     echo "tasks_per_wave=2048"
     echo "waves=3"
     echo "P18_ALLOW_HOT=$ALLOW_HOT (legacy, recorded only)"
@@ -157,7 +167,7 @@ for session in $(seq 1 "$SESSIONS"); do
         MONITOR=$!
         if taskset -c "$CPUSET" \
             dub run --root="$BASE" --compiler="$DC" --build=release \
-            --config="$mode" -- --profile native --count 2048 \
+            --config="$mode" -- --profile "$PROFILE" --count 2048 \
             --waves 3 --warmup 2 --rounds 5 --seed "$seed" \
             >"$raw" 2>&1; then
             stop_monitor
