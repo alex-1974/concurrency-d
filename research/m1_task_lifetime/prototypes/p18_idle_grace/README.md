@@ -241,3 +241,14 @@ A **separately user-opted-in** [read-only per-thread `/proc` protocol](evidence/
 The user can first run `P18_PROC_PREFLIGHT_ONLY=1 bash tools/research/m1_p18_sched_proc_xps.sh ldc2 /tmp/not-used` in a pinned detached research worktree, without building. A full optional run is a **new experiment**: 4 sessions, 2 ingress profiles (`sched8`, `sched2048`), the same exact-source TaskRefs and alternating ABBA/BAAB M0/P18 schedule; expected **384 paired measured TaskRef comparisons**. **No native /proc observation has yet been received**. The original `perf` runner is preserved unchanged and never silently replaced.
 
 **P18 disposition unchanged: KEEP narrow research / DEFER universal production**. Production source, `develop`, public lifetime contracts, ADR-0001 PROPOSED, Issue #17 OPEN, Draft PR #38 and grandfathered PR #35 remain untouched.
+
+
+## Native P18 `/proc` partial: collector JSON Path failure — 2026-10-14
+
+The first user-provided optional `/proc` observation attempt stopped **after completing only the original-M0 `sched8` process**, not because the scheduler failed. [Independent partial-archive review](evidence/xps-2026-10-14-procfs-partial-json-failure.md), original archive SHA-256 `d51ff78705efd1c041a05feb1df481854ac8dd551a348a31e3a7265f00832a36`, source `0adf2e80`, unchanged M0 blob `b7d8fafcb3179f00cba7e89e28c6d6b9b676353a`: both native race/close preflights PASS, first M0 run includes 2 complete warm-ups and 24 complete measured rounds with TaskRef/stage conservation, plus 592 sampled `/proc` rows over 38 transient TIDs. **No grace arm ran; no ABBA speed or scheduling conclusion is possible.**
+
+The Python 3.14 observer failed at `json.dumps(metadata)` because retained command argv included a `pathlib.PosixPath` executable entry. The research-only fix converts it to `str(args.binary)`, and the self-test now executes the **same command builder** and JSON round-trip used by the real collector. The error is in the observer's provenance serialization, not D scheduling. **Preserve the raw partial outside Git**.
+
+The XPS reports `kernel.sched_schedstats=0`; Runqueue-wait duration is **unavailable**, not zero. Even after fixing JSON, optional polling can observe only incomplete per-thread CPU, context-switch and migration samples and cannot establish runnable delay. No kernel settings or root privileges were changed.
+
+**KEEP narrow research / DEFER unconditional production.** A fresh user-authorized observation run, if desired despite its reduced diagnostic scope, must use the new exact research commit and a new output path; never append to the partial archive or equate polling-instrumented elapsed time with original performance.
