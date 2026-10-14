@@ -20,6 +20,21 @@ python3 "$ROOT/tools/research/m1_p18_make_fixture.py" \
     "$P13/consumer/main.d" \
     "$P162/race/main.d" "$BASE/generated"
 
+# Separately generated, source-locked event-only copies. They are never
+# compared for runtime speed with the existing uninstrumented M0/P18 pair.
+for mode in control grace; do
+    if [[ "$mode" == control ]]; then
+        input="$ROOT/source/concurrency/internal/submission_pool.d"
+    else
+        input="$BASE/generated/concurrency/research/m1_p18_grace_pool.d"
+    fi
+    python3 "$ROOT/tools/research/m1_p18_512_make_event_pair.py" "$mode" \
+        "$input" "$BASE/generated/concurrency/research/m1_p18_trace_${mode}_pool.d"
+done
+python3 "$ROOT/tools/research/m1_p18_512_make_trace_fixture.py" \
+    "$P13/concurrency/research/m1_scaling_kernel.d" \
+    "$P13/consumer/main.d" "$BASE/generated"
+
 # Explicit fail-closed source-drift negative test.
 cp "$ROOT/source/concurrency/internal/submission_pool.d" "$TMP/drift.d"
 printf '\n// synthetic source drift for P18 negative qualification\n' >>"$TMP/drift.d"
@@ -29,6 +44,16 @@ if python3 "$ROOT/tools/research/m1_p18_make_grace_pool.py" \
     exit 1
 fi
 test ! -e "$TMP/forbidden.d"
+
+cp "$BASE/generated/concurrency/research/m1_p18_grace_pool.d" "$TMP/grace-drift.d"
+printf '\n// synthetic P18 trace provenance drift\n' >>"$TMP/grace-drift.d"
+if python3 "$ROOT/tools/research/m1_p18_512_make_event_pair.py" grace \
+    "$TMP/grace-drift.d" "$TMP/forbidden-trace.d" >"$TMP/trace-negative.log" 2>&1; then
+    echo "P18 FAIL: modified grace input was not rejected" >&2
+    exit 1
+fi
+test ! -e "$TMP/forbidden-trace.d"
+
 bash -n "$ROOT/tools/research/m1_p18_xps.sh"
 python3 "$ROOT/tools/research/m1_p18_thermal_audit.py" self-test
 # Exercise both real native worker pools while admitting zero TaskRefs.
@@ -48,6 +73,21 @@ python3 "$ROOT/tools/research/m1_p18_idle_compare.py" \
     "$TMP/idle-control.csv" "$TMP/idle-grace.csv" --min-rows 3
 bash -n "$ROOT/tools/research/m1_p18_idle_xps.sh"
 bash -n "$ROOT/tools/research/m1_p18_512_abba_xps.sh"
+python3 "$ROOT/tools/research/m1_p18_512_trace_compare.py" --self-test
+
+# Trace arms execute EXACT TaskRef work, but their wall-clock time is
+# instrumentation-confounded and MUST NEVER qualify scheduler speed.
+for mode in trace-control trace-grace; do
+    timeout --signal=TERM --kill-after=5s 175s \
+        dub run --root="$BASE" --compiler="$DC" --build=debug \
+        --config="$mode" -- --profile focus512 --count 64 \
+        --waves 2 --warmup 1 --rounds 1 --seed 332924518 \
+        >"$TMP/$mode.log"
+    grep -E '^(phase,round,|warmup,|measure,)' \
+        "$TMP/$mode.log" >"$TMP/$mode.csv"
+done
+python3 "$ROOT/tools/research/m1_p18_512_trace_compare.py" \
+    "$TMP/trace-control.csv" "$TMP/trace-grace.csv" --min-rows 54
 
 run_profile() {
     local mode="$1" profile="$2" count="$3" waves="$4" rounds="$5"
