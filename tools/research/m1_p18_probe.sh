@@ -30,6 +30,7 @@ if python3 "$ROOT/tools/research/m1_p18_make_grace_pool.py" \
 fi
 test ! -e "$TMP/forbidden.d"
 bash -n "$ROOT/tools/research/m1_p18_xps.sh"
+python3 "$ROOT/tools/research/m1_p18_thermal_audit.py" self-test
 
 run_profile() {
     local mode="$1" profile="$2" count="$3" waves="$4" rounds="$5"
