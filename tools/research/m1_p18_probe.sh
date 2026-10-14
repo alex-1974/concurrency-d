@@ -19,6 +19,11 @@ python3 "$ROOT/tools/research/m1_p18_make_fixture.py" \
     "$P13/concurrency/research/m1_scaling_kernel.d" \
     "$P13/consumer/main.d" \
     "$P162/race/main.d" "$BASE/generated"
+# Separately timestamped research-only P13 driver: NOT the historical
+# uninstrumented timing baseline. Both arms get identical phase instrumentation.
+python3 "$ROOT/tools/research/m1_p18_phase_make_fixture.py" \
+    "$P13/concurrency/research/m1_scaling_kernel.d" \
+    "$P13/consumer/main.d" "$P162/race/main.d" "$BASE/generated"
 
 # Separately generated, source-locked event-only copies. They are never
 # compared for runtime speed with the existing uninstrumented M0/P18 pair.
@@ -97,6 +102,8 @@ bash -n "$ROOT/tools/research/m1_p18_512_abba_xps.sh"
 bash -n "$ROOT/tools/research/m1_p18_512_trace_xps.sh"
 bash -n "$ROOT/tools/research/m1_p18_512_single_ingress_xps.sh"
 bash -n "$ROOT/tools/research/m1_p18_pi_xps.sh"
+bash -n "$ROOT/tools/research/m1_p18_phase_xps.sh"
+python3 "$ROOT/tools/research/m1_p18_phase_compare.py" --self-test
 python3 "$ROOT/tools/research/m1_p18_single_ingress_check.py" --self-test
 python3 "$ROOT/tools/research/m1_p18_512_trace_compare.py" --self-test
 
@@ -126,6 +133,21 @@ for mode in pi-control pi-grace; do
 done
 python3 "$ROOT/tools/research/m1_p18_pi_compare.py" \
     "$TMP/pi-control.csv" "$TMP/pi-grace.csv" \
+    --min-rows 24 --count 16 --waves 2
+
+
+# Exact TaskRef and phase conservation on both instrumented arms.
+for mode in phase-control phase-grace; do
+    timeout --signal=TERM --kill-after=5s 175s \
+        dub run --root="$BASE" --compiler="$DC" --build=debug \
+        --config="$mode" -- --profile singleingress --count 16 \
+        --waves 2 --warmup 1 --rounds 1 --seed 332924524 \
+        >"$TMP/$mode.log"
+    grep -E '^(phase,round,|warmup,|measure,)' \
+        "$TMP/$mode.log" >"$TMP/$mode.csv"
+done
+python3 "$ROOT/tools/research/m1_p18_phase_compare.py" \
+    "$TMP/phase-control.csv" "$TMP/phase-grace.csv" \
     --min-rows 24 --count 16 --waves 2
 
 # Negative oracle: a fabricated full-inbox event must fail against both the
@@ -262,6 +284,20 @@ if [[ "$(basename -- "$DC")" == ldc2* ]]; then
     done
     python3 "$ROOT/tools/research/m1_p18_pi_compare.py" \
         "$TMP/release-pi-control.csv" "$TMP/release-pi-grace.csv" \
+        --min-rows 24 --count 32 --waves 2
+    # Phase-boundary snapshots also compile and conserve work in LDC release.
+    # Phase-timed binaries are NOT direct historical throughput baselines.
+    for mode in phase-control phase-grace; do
+        timeout --signal=TERM --kill-after=5s 175s \
+            dub run --root="$BASE" --compiler="$DC" --build=release \
+            --config="$mode" -- --profile singleingress --count 32 \
+            --waves 2 --warmup 1 --rounds 1 --seed 332924525 \
+            >"$TMP/release-$mode.log"
+        grep -E '^(phase,round,|warmup,|measure,)' \
+            "$TMP/release-$mode.log" >"$TMP/release-$mode.csv"
+    done
+    python3 "$ROOT/tools/research/m1_p18_phase_compare.py" \
+        "$TMP/release-phase-control.csv" "$TMP/release-phase-grace.csv" \
         --min-rows 24 --count 32 --waves 2
     run_races release 5
     run_profile control smoke 128 3 3 release 332924513 release
