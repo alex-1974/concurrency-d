@@ -157,6 +157,20 @@ if [[ "$(basename -- "$DC")" == ldc2* ]]; then
     run_profile control focus512 16 2 1 release 332924517 release-focus512
     run_profile grace focus512 16 2 1 release 332924517 release-focus512
     compare release-focus512 54
+    # Event-only trace module and exact-work oracle in whole LDC release.
+    # Its measured wall times are NOT speed evidence.
+    for mode in trace-control trace-grace; do
+        timeout --signal=TERM --kill-after=5s 175s \
+            dub run --root="$BASE" --compiler="$DC" --build=release \
+            --config="$mode" -- --profile focus512 --count 64 \
+            --waves 2 --warmup 1 --rounds 1 --seed 332924519 \
+            >"$TMP/release-$mode.log"
+        grep -E '^(phase,round,|warmup,|measure,)' \
+            "$TMP/release-$mode.log" >"$TMP/release-$mode.csv"
+    done
+    python3 "$ROOT/tools/research/m1_p18_512_trace_compare.py" \
+        "$TMP/release-trace-control.csv" \
+        "$TMP/release-trace-grace.csv" --min-rows 54
     run_races release 5
     run_profile control smoke 128 3 3 release 332924513 release
     run_profile grace smoke 128 3 3 release 332924513 release
