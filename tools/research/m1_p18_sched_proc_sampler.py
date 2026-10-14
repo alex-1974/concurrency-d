@@ -199,6 +199,18 @@ def probe():
     return 0 if ok and result["linux"] else 3
 
 
+def build_command(args):
+    # Popen accepts os.PathLike values; JSON provenance does not.
+    # Keep the command construction shared by the actual record path and
+    # regression self-test rather than independently recreating its shape.
+    return [
+        "taskset", "-c", args.cpus, str(args.binary),
+        "--profile", args.profile, "--count", str(args.count),
+        "--waves", str(args.waves), "--warmup", "2",
+        "--rounds", str(args.rounds), "--seed", str(args.seed)
+    ]
+
+
 def record(args):
     if not sys.platform.startswith("linux"):
         raise RuntimeError("Linux /proc required")
@@ -212,12 +224,7 @@ def record(args):
     args.samples.parent.mkdir(parents=True, exist_ok=True)
     args.summary.parent.mkdir(parents=True, exist_ok=True)
     args.stdout.parent.mkdir(parents=True, exist_ok=True)
-    command = [
-        "taskset", "-c", args.cpus, str(args.binary),
-        "--profile", args.profile, "--count", str(args.count),
-        "--waves", str(args.waves), "--warmup", "2",
-        "--rounds", str(args.rounds), "--seed", str(args.seed)
-    ]
+    command = build_command(args)
     metadata = {
         "backend": "procfs_thread_polling_EXPLICIT_OPT_IN_NOT_PERF",
         "requested_interval_ms": args.interval_ms,
@@ -301,9 +308,11 @@ def self_test():
     # A subprocess can accept pathlib.Path in its argv, but json.dumps
     # cannot. Exercise the same metadata schema that previously failed on
     # Dell XPS Python 3.14, including a genuine Path input.
-    with subprocess.Popen([sys.executable, "-c", "pass"]) as process:
-        assert process.wait() == 0
-    synthetic_command = ["taskset", "-c", "0,1,2,3", str(Path("/tmp/p18-control"))]
+    synthetic_command = build_command(argparse.Namespace(
+        cpus="0,1,2,3", binary=Path("/tmp/p18-control"),
+        profile="sched8", count=16, waves=2, rounds=1, seed=42,
+    ))
+    assert all(isinstance(item, str) for item in synthetic_command)
     record_metadata = {
         "command": synthetic_command,
         "pid": 421,
