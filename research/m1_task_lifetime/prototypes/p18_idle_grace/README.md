@@ -148,3 +148,13 @@ The separate [event-only protocol](evidence/focus512-event-trace-protocol.md) ad
 The dedicated [native XPS collector](../../../../tools/research/m1_p18_512_trace_xps.sh) prebuilds both instrumented release binaries, alternates process order, retains per-process raw telemetry and archives original traces. **Instrumented elapsed times must never be ranked against the existing uninstrumented ABBA speed data.** A new XPS trace archive is needed before investigating event distributions; none has yet been supplied.
 
 The production M0 scheduler and its original P18 one-retry candidate remain unchanged, and general production promotion is **DEFERRED**.
+
+## XPS P18 event-only Focus512 audit — 2026-10-14
+
+[Full independent native trace audit](evidence/xps-2026-10-14-focus512-event-trace-review.md): exact-source LDC 1.41.0 Dell-XPS event-only archive SHA-256 `14161de32b9119323994eab22c2e08097880c4e0238421eead93677130af8004`, source `6217bc62`, original M0 blob `b7d8fafcb3179f00cba7e89e28c6d6b9b676353a`. Four complete sessions, eight raw-process logs, **540 exact-work measured pairs** and 216 warm-up pairs, strict task/event conservation and 68–83 °C sampled with **no observed throttle-counter increments**. Original raw evidence remains outside public Git.
+
+P18 counted **28,915 second search attempts**, recovering useful ingress/steal work **17,663 times (61.09%)**, encountering exhausted searches **10,426 times**, and exiting a drained pool **826 times**. Source-pinned M0/P18 instrumented arms recorded **62,021/143,847 failed foreign steal attempts** and **13,025/8,245 actual Condition.wait entries** respectively. These are **event counts, never elapsed-time qualification**.
+
+Success by iteration is 68.8% / 54.5% / 50.9% for **128 / 512 / 1024**, so success rate alone does **not** explain the independent uninstrumented 512-work slowdown. At **four workers**, P18 actually parks *more often* in the event trace at 512 and 1024, and 1-worker 512 native ABBA slowdown cannot arise from foreign-steal overhead because there are zero foreign-steal attempts. No causal scheduler or energy conclusion has been established.
+
+**Decision remains KEEP narrow research / DEFER unconditional production.** Suggested next isolated focus: one-worker producer/ingress path versus multiworker steal/park interactions, without using trace-arm wave timings as speed evidence. Production M0 and TaskRef semantics unchanged.
