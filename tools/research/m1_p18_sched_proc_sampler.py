@@ -291,7 +291,7 @@ def self_test():
         "191 (worker with ) char) S " + " ".join(str(i) for i in range(1, 47))
     )
     assert state == "S"
-    assert starttime == 20 and cpu == 37
+    assert starttime == 19 and cpu == 36
     assert status_switches(
         "voluntary_ctxt_switches:\t13\nnonvoluntary_ctxt_switches:\t7\n"
     ) == {"voluntary_switches":13, "involuntary_switches":7}
