@@ -29,6 +29,14 @@ configuration "idle-grace" {
     mainSourceFile "idle/main.d"
     versions "P18Grace"
 }
+configuration "trace-control" {
+    mainSourceFile "generated/trace/consumer/main.d"
+    versions "P18TraceControl"
+}
+configuration "trace-grace" {
+    mainSourceFile "generated/trace/consumer/main.d"
+    versions "P18TraceGrace"
+}
 configuration "race-control" {
     mainSourceFile "generated/race/main.d"
 }
