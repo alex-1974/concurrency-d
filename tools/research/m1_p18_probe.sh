@@ -47,6 +47,7 @@ python3 "$ROOT/tools/research/m1_p18_idle_compare.py" --self-test
 python3 "$ROOT/tools/research/m1_p18_idle_compare.py" \
     "$TMP/idle-control.csv" "$TMP/idle-grace.csv" --min-rows 3
 bash -n "$ROOT/tools/research/m1_p18_idle_xps.sh"
+bash -n "$ROOT/tools/research/m1_p18_512_abba_xps.sh"
 
 run_profile() {
     local mode="$1" profile="$2" count="$3" waves="$4" rounds="$5"
@@ -89,6 +90,12 @@ run_profile control long 16 2 1 debug 332924515 long
 run_profile grace long 16 2 1 debug 332924515 long
 compare long 90
 
+# Unmodified P13 kernel; generated-only focus512 (128/512/1024) regression
+# study with 1/2/4 workers and ingress 8/64/256, 27 cases.
+run_profile control focus512 16 2 1 debug 332924516 focus512
+run_profile grace focus512 16 2 1 debug 332924516 focus512
+compare focus512 54
+
 if [[ "$(basename -- "$DC")" == ldc2* ]]; then
     run_profile control-optimized smoke 128 3 3 debug 332924512 O3
     run_profile grace-optimized smoke 128 3 3 debug 332924512 O3
@@ -105,6 +112,10 @@ if [[ "$(basename -- "$DC")" == ldc2* ]]; then
             >"$TMP/release-$mode.log"
         grep -q '^P18_IDLE_PASS' "$TMP/release-$mode.log"
     done
+    # Same fixed work and checksum in whole LDC release.
+    run_profile control focus512 16 2 1 release 332924517 release-focus512
+    run_profile grace focus512 16 2 1 release 332924517 release-focus512
+    compare release-focus512 54
     run_races release 5
     run_profile control smoke 128 3 3 release 332924513 release
     run_profile grace smoke 128 3 3 release 332924513 release
