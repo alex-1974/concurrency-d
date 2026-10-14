@@ -97,6 +97,14 @@ if [[ "$(basename -- "$DC")" == ldc2* ]]; then
     cp "$TMP/O3-control-optimized.csv" "$TMP/O3-control.csv"
     cp "$TMP/O3-grace-optimized.csv" "$TMP/O3-grace.csv"
     compare O3 18
+    # Check native release build/exec for the two no-task idle configurations.
+    for mode in idle-control idle-grace; do
+        timeout --signal=TERM --kill-after=5s 80s \
+            dub run --root="$BASE" --compiler="$DC" --build=release \
+            --config="$mode" -- --settle-ms 60 --hold-ms 80 --rounds 1 \
+            >"$TMP/release-$mode.log"
+        grep -q '^P18_IDLE_PASS' "$TMP/release-$mode.log"
+    done
     run_races release 5
     run_profile control smoke 128 3 3 release 332924513 release
     run_profile grace smoke 128 3 3 release 332924513 release

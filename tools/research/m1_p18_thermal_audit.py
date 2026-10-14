@@ -18,7 +18,7 @@ def snapshot(cpus_text, mode, alert):
     row = telemetry.sample(cpus, telemetry.discover_package_sensor())
     raw = row['package_mC']
     temp = None if raw in ('', None) else int(raw) / 1000
-    label = 'unknown' if temp is None else f'{temp:.1f}'
+    label = 'unknown' if temp is None else f'{temp:.3f}'
     flag = ('SENSOR_MISSING' if temp is None else
             'HIGH_SAMPLE' if temp >= alert else 'OBSERVED_BELOW_ALERT')
     print(f'P18 preflight utc={row["utc"]} package_c={label} '
