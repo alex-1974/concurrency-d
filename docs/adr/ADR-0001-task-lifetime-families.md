@@ -448,3 +448,11 @@ Although the original run specified `P18_ALLOW_HOT=1`, its eight nominally 500-m
 Both variants' 1/2/4 actual native workers have already parked and make no further park entries during settled idle windows. Measured process CPU use is only ~12–61 μs/s; the differences **do not prove energy savings or a power bound**. Long and idle thermal samples show no observed package-throttle counter increases but do not prove stable per-worker clocks.
 
 **KEEP P18 as research for short/bursty ingress; DEFER any universal scheduler promotion**, particularly without focused 512-work causal analysis. Public task-lifetime and `@safe TaskScope` evidence remains unchanged, original M0/production untouched, ADR still **PROPOSED**, #17 OPEN, PR #38 DRAFT.
+
+## P18 Focus512 ABBA native follow-up — 2026-10-14
+
+[Focus512 four-session ABBA audit](../../research/m1_task_lifetime/prototypes/p18_idle_grace/evidence/xps-2026-10-14-focus512-abba-review.md): original archive SHA-256 `df4b1e1f60a0f95d4e7a6523f8af3e390e1138402fa1ab3e0718a77f84a61da6`; source head `0f85b1cb`, unchanged M0 blob `b7d8fafcb3179f00cba7e89e28c6d6b9b676353a`, LDC 1.41.0 whole release. **1,080/1,080 matched pairs**, 16 whole processes, four alternating ABBA/BAAB sessions, 27 configurations and exact oracle. Median P18/M0 wave-time ratios: **128: 0.9559; 512: 1.0119; 1024: 0.9829**. 512 effect reverses over sessions; an ABBA-half geometric-collapsed median is **1.0230**, a strictly diagnostic paired target/control contrast `R512/sqrt(R128*R1024)` is **1.0472**. This is not proof of mechanistic source nor a basis to normalize away actual 512 time.
+
+One 500-ms thermal trace (`session3-grace1`) sampled 95 °C with a **+36 package-throttle count change**; full thermally unaffected operation is **not** established. Excluding this flagged process's 45 pairs retains a 512 median of **1.0108**, but session selection is material. Lower producer retries and parks do not identify the cause; an isolated event-only M0/P18 trace is the next research gate.
+
+**Disposition: KEEP narrow research / DEFER universal production**, with ADR still **PROPOSED**, Issue #17 OPEN, Draft PR #38 DRAFT and unchanged production source/`develop`/grandfathered R0.5 PR #35.
