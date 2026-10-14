@@ -57,10 +57,10 @@ else
     # extended; the exact source-checked P13 driver remains unchanged.
     d = one(d,
         'options.profile != "smoke" && options.profile != "native"',
-        'options.profile != "smoke" && options.profile != "native" && options.profile != "long"')
+        'options.profile != "smoke" && options.profile != "native" && options.profile != "long" && options.profile != "focus512"')
     d = one(d,
         '? [0, 128] : [0, 8, 32, 128, 512];',
-        '? [0, 128] : profile == "long" ? [128, 256, 512, 1024, 2048] : [0, 8, 32, 128, 512];')
+        '? [0, 128] : profile == "long" ? [128, 256, 512, 1024, 2048] : profile == "focus512" ? [128, 512, 1024] : [0, 8, 32, 128, 512];')
     d = one(d,
         'stderr.writeln("P13 CI measurements are DIAGNOSTIC ONLY; ",',
         'stderr.writeln("P18 bounded idle grace RESEARCH only; ",')
