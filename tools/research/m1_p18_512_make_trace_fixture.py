@@ -40,7 +40,8 @@ else version (P18TraceGrace)
 }
 else
 {
-    static assert(false, "P18 trace requires its dedicated DUB configuration");
+    import concurrency.internal.submission_pool :
+        SubmissionResult, SubmissionWorkerPool;
 }""")
     s = once(s, "    ulong checksum;\n    long prepareNs;",
         """    ulong checksum;
