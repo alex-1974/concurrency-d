@@ -116,6 +116,8 @@ bash -n "$ROOT/tools/research/m1_p18_512_trace_xps.sh"
 bash -n "$ROOT/tools/research/m1_p18_512_single_ingress_xps.sh"
 bash -n "$ROOT/tools/research/m1_p18_pi_xps.sh"
 bash -n "$ROOT/tools/research/m1_p18_phase_xps.sh"
+bash -n "$ROOT/tools/research/m1_p18_sched_perf_xps.sh"
+python3 "$ROOT/tools/research/m1_p18_sched_check.py" --self-test
 python3 "$ROOT/tools/research/m1_p18_phase_compare.py" --self-test
 python3 "$ROOT/tools/research/m1_p18_single_ingress_check.py" --self-test
 python3 "$ROOT/tools/research/m1_p18_512_trace_compare.py" --self-test
@@ -162,6 +164,24 @@ done
 python3 "$ROOT/tools/research/m1_p18_phase_compare.py" \
     "$TMP/phase-control.csv" "$TMP/phase-grace.csv" \
     --min-rows 24 --count 16 --waves 2
+
+# One-worker external Linux perf scheduler trace uses TWO generated-only
+# one-case profiles. CI verifies TaskRef equality and source generation;
+# perf tracepoints require native host privileges and are NOT run in CI.
+for profile in sched8 sched2048; do
+    for mode in control grace; do
+        timeout --signal=TERM --kill-after=5s 175s \
+            dub run --root="$BASE" --compiler="$DC" --build=debug \
+            --config="$mode" -- --profile "$profile" --count 16 \
+            --waves 2 --warmup 2 --rounds 1 --seed 332924526 \
+            >"$TMP/$profile-$mode.log"
+        grep -E '^(phase,round,|warmup,|measure,)' \
+            "$TMP/$profile-$mode.log" >"$TMP/$profile-$mode.csv"
+    done
+    python3 "$ROOT/tools/research/m1_p18_sched_check.py" \
+        "$TMP/$profile-control.csv" "$TMP/$profile-grace.csv" \
+        --profile "$profile" --count 16 --waves 2 --rounds 1
+done
 
 # Negative oracle: a fabricated full-inbox event must fail against both the
 # producer's unchanged retry count and submit outcome conservation.
@@ -298,6 +318,24 @@ if [[ "$(basename -- "$DC")" == ldc2* ]]; then
     python3 "$ROOT/tools/research/m1_p18_pi_compare.py" \
         "$TMP/release-pi-control.csv" "$TMP/release-pi-grace.csv" \
         --min-rows 24 --count 32 --waves 2
+    # Release-mode scheduler-trace case generator smoke. The kernel-event
+    # profiler is host-specific and MUST NOT run inside shared CI.
+    for profile in sched8 sched2048; do
+        for mode in control grace; do
+            timeout --signal=TERM --kill-after=5s 175s \
+                dub run --root="$BASE" --compiler="$DC" --build=release \
+                --config="$mode" -- --profile "$profile" --count 32 \
+                --waves 2 --warmup 2 --rounds 1 --seed 332924527 \
+                >"$TMP/release-$profile-$mode.log"
+            grep -E '^(phase,round,|warmup,|measure,)' \
+                "$TMP/release-$profile-$mode.log" \
+                >"$TMP/release-$profile-$mode.csv"
+        done
+        python3 "$ROOT/tools/research/m1_p18_sched_check.py" \
+            "$TMP/release-$profile-control.csv" \
+            "$TMP/release-$profile-grace.csv" \
+            --profile "$profile" --count 32 --waves 2 --rounds 1
+    done
     # Phase-boundary snapshots also compile and conserve work in LDC release.
     # Phase-timed binaries are NOT direct historical throughput baselines.
     for mode in phase-control phase-grace; do
