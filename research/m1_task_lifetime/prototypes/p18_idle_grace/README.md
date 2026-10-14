@@ -158,3 +158,14 @@ P18 counted **28,915 second search attempts**, recovering useful ingress/steal w
 Success by iteration is 68.8% / 54.5% / 50.9% for **128 / 512 / 1024**, so success rate alone does **not** explain the independent uninstrumented 512-work slowdown. At **four workers**, P18 actually parks *more often* in the event trace at 512 and 1024, and 1-worker 512 native ABBA slowdown cannot arise from foreign-steal overhead because there are zero foreign-steal attempts. No causal scheduler or energy conclusion has been established.
 
 **Decision remains KEEP narrow research / DEFER unconditional production.** Suggested next isolated focus: one-worker producer/ingress path versus multiworker steal/park interactions, without using trace-arm wave timings as speed evidence. Production M0 and TaskRef semantics unchanged.
+
+
+## P18 one-worker ingress/backpressure isolation — prepared 2026-10-14
+
+The [dedicated single-worker protocol](evidence/single-worker-ingress-protocol.md) follows the independently verified [event-only trace](evidence/xps-2026-10-14-focus512-event-trace-review.md) without modifying M0 or P18. At 512 iterations the independent uninstrumented one-worker Focus512 ABBA corpus had median P18/M0 `waves_ns = 1.0119` (120 pairs), with substantial per-session variation. M0/P18 median per-measurement full-inbox retry counts were about 5,812/5,556; P18 event-only trace recorded about three extra worker searches per 512/one-worker measurement and **no foreign steals**. The retry and event counts are from different instrumented/non-instrumented processes; they do not prove an instruction-level cost.
+
+The new generated-only `singleingress` P13 profile holds the **same one worker, TaskRef kernel, 2,048 tasks/wave and three waves** while comparing 128/512/1024 iterations under ingress capacities **8, 64, 256, 2048**. A 2048-slot inbox can accept a complete 2048-task wave without `SubmissionResult.full` regardless of worker progress. The [strict independent CSV checker](../../../../tools/research/m1_p18_single_ingress_check.py) validates that zero-retry property in every control and grace process. The [native A/B/B/A XPS collector](../../../../tools/research/m1_p18_512_single_ingress_xps.sh) prebuilds immutable release binaries, rotates process order, executes native close/producer races, and retains full workload-oracle and thermal evidence.
+
+**No new native single-ingress archive has yet been collected.** Its capacity contrast is a test of the producer/worker backpressure interaction, not a claim to isolate the expense of one `Thread.yield()` or to control wall-clock frequency. A result favoring either hypothesis still requires matching uninstrumented performance evidence and source/lifetime correctness.
+
+**Disposition unchanged: KEEP narrow research / DEFER general scheduler promotion.**
