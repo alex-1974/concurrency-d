@@ -118,3 +118,12 @@ It prebuilds both release binaries **before** measurements, alternates M0/P18 pr
 The 900 matched long-work release pairs have overall median `grace/M0 waves_ns = 1.0081`; 512-iteration medians are **1.0484/1.0494/1.0269** for 1/2/4 workers. 1024 and 2048 iterations are near parity, with large session-to-session variation. The 36 paired one-second settled zero-TaskRef idle intervals show no new park events and extremely small process CPU times (12–61 μs/second), insufficient to claim energy improvement or power parity. All sampled long/idle traces have zero observed package-throttle counter increment but varying temperatures (long 73–94 °C, idle 52–89 °C), **not** proof of stable worker clocks.
 
 **Decision: KEEP P18 as narrow short-burst research; DEFER unconditional production promotion.** 512-work attribution, idle transients and actual power remain outside available evidence. Do not confuse these observations with TaskScope or native Thread.start/join lifetime proofs.
+
+
+## P18 focused 512-work ABBA requalification — prepared 2026-10-14
+
+The [source-pinned ABBA protocol](evidence/focus512-abba-protocol.md) tests the existing 512-iteration regression with **128 and 1024 iteration controls**, not a new scheduler. Its [dedicated XPS collector](../../../../tools/research/m1_p18_512_abba_xps.sh) compiles original M0 and P18 into immutable separate LDC release binaries before measurement and runs alternating ABBA/BAAB whole-process sequences. Four sessions × two nearby pairs × 27 cases × five measured rounds yield **1,080 strictly matched measured comparisons**. The existing checker enforces exact work/checksum/timing partition; the runner rejects incomplete 189-row process CSVs and records host/binary/environment/thermal provenance.
+
+Original P13, source-locked M0, TaskRef and both scheduler algorithms remain unchanged. **DMD/LDC CI tests exercise the generated focus512 profile and LDC release; CI speed values are diagnostics only.** A new Dell-XPS native archive is necessary before any performance verdict from this protocol. Steal/re-search event probes, if justified by the result, must be collected separately from uninstrumented throughput.
+
+**Current disposition: KEEP P18 for short-burst research; DEFER universal production promotion.** No accepted scope/lifetime or public `@safe` claim and no P19.
