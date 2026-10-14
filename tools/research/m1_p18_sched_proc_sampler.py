@@ -213,7 +213,7 @@ def record(args):
     args.summary.parent.mkdir(parents=True, exist_ok=True)
     args.stdout.parent.mkdir(parents=True, exist_ok=True)
     command = [
-        "taskset", "-c", args.cpus, args.binary,
+        "taskset", "-c", args.cpus, str(args.binary),
         "--profile", args.profile, "--count", str(args.count),
         "--waves", str(args.waves), "--warmup", "2",
         "--rounds", str(args.rounds), "--seed", str(args.seed)
@@ -298,6 +298,32 @@ def self_test():
     assert sched_migrations("nr_migrations : 4\n") == 4
     assert sched_migrations("se.nr_migrations : 9\n") == 9
     assert sched_migrations("other : 0\n") is None
+    # A subprocess can accept pathlib.Path in its argv, but json.dumps
+    # cannot. Exercise the same metadata schema that previously failed on
+    # Dell XPS Python 3.14, including a genuine Path input.
+    with subprocess.Popen([sys.executable, "-c", "pass"]) as process:
+        assert process.wait() == 0
+    synthetic_command = ["taskset", "-c", "0,1,2,3", str(Path("/tmp/p18-control"))]
+    record_metadata = {
+        "command": synthetic_command,
+        "pid": 421,
+        "total_samples": 2,
+        "process_exit_code": 0,
+        "kernel_sched_schedstats_enabled": False,
+    }
+    sample = dict.fromkeys(COLUMNS, "0")
+    sample.update(sample_ns="1", pid="421", tid="421",
+                  starttime="99", run_ns="100", last_cpu="1")
+    later = dict(sample, sample_ns="2", run_ns="200")
+    json_payload = json.dumps(
+        summarize([sample, later], 421, record_metadata),
+        indent=2, sort_keys=True,
+    )
+    roundtrip = json.loads(json_payload)
+    assert roundtrip["command"][3] == "/tmp/p18-control"
+    assert roundtrip["threads"][0]["observed_run_ns_delta"] == 100
+    assert roundtrip["threads"][0]["observed_runqueue_wait_ns_delta"] is None
+    assert roundtrip["process_exit_code"] == 0
     assert deltas({"a":4},{"a":7},"a") == 3
     assert deltas({"a":7},{"a":4},"a") is None
     a = dict.fromkeys(COLUMNS, "0")
