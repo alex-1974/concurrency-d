@@ -71,6 +71,8 @@ def compare(left, right, minimum):
                             ("workers", "iterations", "ingress"))
                 for event in EVENTS:
                     sampled[key][mode + "_" + event].append(v[event])
+                sampled[key][mode + "_failed_steals"].append(
+                    v["steal_attempts"] - v["steal_successes"])
         # No traced timing comparisons: instrumentation alters scheduling.
     if not sampled:
         raise ValueError("P18 trace lacks measured cases")
@@ -86,8 +88,8 @@ def compare(left, right, minimum):
               f"grace_failed={m('grace_grace_fallbacks'):.1f} "
               f"grace_drained={m('grace_grace_drain_exits'):.1f} "
               f"failed_steals_M0/grace="
-              f"{m('control_steal_attempts') - m('control_steal_successes'):.1f}/"
-              f"{m('grace_steal_attempts') - m('grace_steal_successes'):.1f} "
+              f"{m('control_failed_steals'):.1f}/"
+              f"{m('grace_failed_steals'):.1f} "
               f"park_no_outstanding_M0/grace="
               f"{m('control_park_no_outstanding'):.1f}/"
               f"{m('grace_park_no_outstanding'):.1f} "
