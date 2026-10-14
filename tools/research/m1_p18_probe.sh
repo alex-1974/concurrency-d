@@ -35,6 +35,21 @@ python3 "$ROOT/tools/research/m1_p18_512_make_trace_fixture.py" \
     "$P13/concurrency/research/m1_scaling_kernel.d" \
     "$P13/consumer/main.d" "$BASE/generated"
 
+# PI counters are a NEW event-only overlay of source-pinned trace copies.
+# Preserve both old trace and uninstrumented M0/P18 exactly as recorded.
+for mode in control grace; do
+    if [[ "$mode" == control ]]; then
+        input="$ROOT/source/concurrency/internal/submission_pool.d"
+    else
+        input="$BASE/generated/concurrency/research/m1_p18_grace_pool.d"
+    fi
+    python3 "$ROOT/tools/research/m1_p18_pi_make_pair.py" "$mode" \
+        "$input" "$BASE/generated/concurrency/research/m1_p18_pi_${mode}_pool.d"
+done
+python3 "$ROOT/tools/research/m1_p18_pi_make_fixture.py" \
+    "$P13/concurrency/research/m1_scaling_kernel.d" \
+    "$P13/consumer/main.d" "$BASE/generated"
+
 # Explicit fail-closed source-drift negative test.
 cp "$ROOT/source/concurrency/internal/submission_pool.d" "$TMP/drift.d"
 printf '\n// synthetic source drift for P18 negative qualification\n' >>"$TMP/drift.d"
@@ -53,6 +68,12 @@ if python3 "$ROOT/tools/research/m1_p18_512_make_event_pair.py" grace \
     exit 1
 fi
 test ! -e "$TMP/forbidden-trace.d"
+if python3 "$ROOT/tools/research/m1_p18_pi_make_pair.py" grace \
+    "$TMP/grace-drift.d" "$TMP/forbidden-pi.d" >"$TMP/pi-negative.log" 2>&1; then
+    echo "P18 FAIL: PI overlay accepted altered P18 source" >&2
+    exit 1
+fi
+test ! -e "$TMP/forbidden-pi.d"
 
 bash -n "$ROOT/tools/research/m1_p18_xps.sh"
 python3 "$ROOT/tools/research/m1_p18_thermal_audit.py" self-test
@@ -91,6 +112,20 @@ for mode in trace-control trace-grace; do
 done
 python3 "$ROOT/tools/research/m1_p18_512_trace_compare.py" \
     "$TMP/trace-control.csv" "$TMP/trace-grace.csv" --min-rows 54
+
+# Exactly one-worker producer/ingress event snapshot, no wall-clock claim.
+for mode in pi-control pi-grace; do
+    timeout --signal=TERM --kill-after=5s 175s \
+        dub run --root="$BASE" --compiler="$DC" --build=debug \
+        --config="$mode" -- --profile singleingress --count 16 \
+        --waves 2 --warmup 1 --rounds 1 --seed 332924522 \
+        >"$TMP/$mode.log"
+    grep -E '^(phase,round,|warmup,|measure,)' \
+        "$TMP/$mode.log" >"$TMP/$mode.csv"
+done
+python3 "$ROOT/tools/research/m1_p18_pi_compare.py" \
+    "$TMP/pi-control.csv" "$TMP/pi-grace.csv" \
+    --min-rows 24 --count 16 --waves 2
 
 run_profile() {
     local mode="$1" profile="$2" count="$3" waves="$4" rounds="$5"
@@ -192,6 +227,19 @@ if [[ "$(basename -- "$DC")" == ldc2* ]]; then
             --warmup 1 --rounds 1
     done
     compare release-singleingress 24
+    # LDC release: separately instrumented, no throughput qualification.
+    for mode in pi-control pi-grace; do
+        timeout --signal=TERM --kill-after=5s 175s \
+            dub run --root="$BASE" --compiler="$DC" --build=release \
+            --config="$mode" -- --profile singleingress --count 32 \
+            --waves 2 --warmup 1 --rounds 1 --seed 332924523 \
+            >"$TMP/release-$mode.log"
+        grep -E '^(phase,round,|warmup,|measure,)' \
+            "$TMP/release-$mode.log" >"$TMP/release-$mode.csv"
+    done
+    python3 "$ROOT/tools/research/m1_p18_pi_compare.py" \
+        "$TMP/release-pi-control.csv" "$TMP/release-pi-grace.csv" \
+        --min-rows 24 --count 32 --waves 2
     run_races release 5
     run_profile control smoke 128 3 3 release 332924513 release
     run_profile grace smoke 128 3 3 release 332924513 release
