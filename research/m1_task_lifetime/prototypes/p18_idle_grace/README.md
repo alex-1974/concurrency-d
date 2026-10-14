@@ -169,3 +169,13 @@ The new generated-only `singleingress` P13 profile holds the **same one worker, 
 **No new native single-ingress archive has yet been collected.** Its capacity contrast is a test of the producer/worker backpressure interaction, not a claim to isolate the expense of one `Thread.yield()` or to control wall-clock frequency. A result favoring either hypothesis still requires matching uninstrumented performance evidence and source/lifetime correctness.
 
 **Disposition unchanged: KEEP narrow research / DEFER general scheduler promotion.**
+
+## Native XPS single-worker ingress/backpressure result — 2026-10-14
+
+[Independent full archive audit](evidence/xps-2026-10-14-single-ingress-review.md) covers `p18-single-ingress-20261014-124632.tar.gz` SHA-256 `a907752110398293825b5938de86f064dca6d81594a7cc182031f0d41840ee63`, source `e91c4eb9` and unchanged M0 blob `b7d8fafcb3179f00cba7e89e28c6d6b9b676353a`, LDC 1.41.0 release. Four complete ABBA/BAAB sessions yield **480 exact-work paired measurements** from 16 whole processes; all checksums, timing-stage/seed/order and original raw/CSV comparisons PASS. **Ingress 2048 has exactly zero producer `full` retries** in every control and P18 process and every round.
+
+The **512-iteration uninstrumented P18/M0 median wave-time ratios**, by ingress **8/64/256/2048**, are **1.0627 / 1.0392 / 1.0539 / 0.9875**, 40 matched pairs per cell. At **128**: 0.9280/0.9273/0.9577/0.9567; at **1024**: 0.9913/1.0027/0.9941/1.0131. All four sessions regress at every tighter ingress, but the 2048 cell shifts between parity/slight regressions (S1/S2) and a P18 advantage (S3/S4). Collapsing adjacent ABBA halves retains the same finding. Full-inbox retries drop to zero at ingress 2048 while median parks remain 3 M0/0 P18.
+
+Thermal samples are **sparse** (2/process), observed **78–88°C**, no observed throttle-counter increment; no fixed per-worker clock or energy claim. The intervention changes ingress capacity and **thus** backpressure, queue occupancy and interleavings together. It supports a producer/ingress interaction hypothesis, **not** an isolated cost proof for producer `Thread.yield()`.
+
+**KEEP narrow P18 research / DEFER universal scheduler promotion**; next bounded study should separate producer retry/yield and ingress residency effects before any scheduler policy change. Historical research, production M0, `develop`, ADR, PR #35 unaffected.
