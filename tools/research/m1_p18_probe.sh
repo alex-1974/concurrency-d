@@ -128,6 +128,28 @@ python3 "$ROOT/tools/research/m1_p18_pi_compare.py" \
     "$TMP/pi-control.csv" "$TMP/pi-grace.csv" \
     --min-rows 24 --count 16 --waves 2
 
+# Negative oracle: a fabricated full-inbox event must fail against both the
+# producer's unchanged retry count and submit outcome conservation.
+python3 - "$TMP/pi-grace.csv" "$TMP/pi-mutated.csv" <<'PY'
+import csv
+import sys
+with open(sys.argv[1], newline="") as source:
+    rd = csv.DictReader(source)
+    fields = rd.fieldnames
+    rows = list(rd)
+rows[0]["submitFull"] = str(int(rows[0]["submitFull"]) + 1)
+with open(sys.argv[2], "w", newline="") as target:
+    wr = csv.DictWriter(target, fieldnames=fields)
+    wr.writeheader()
+    wr.writerows(rows)
+PY
+if python3 "$ROOT/tools/research/m1_p18_pi_compare.py" \
+    "$TMP/pi-control.csv" "$TMP/pi-mutated.csv" \
+    --min-rows 24 --count 16 --waves 2 >"$TMP/pi-invalid.log" 2>&1; then
+    echo "P18 FAIL: corrupted producer/ingress event trace was accepted" >&2
+    exit 1
+fi
+
 run_profile() {
     local mode="$1" profile="$2" count="$3" waves="$4" rounds="$5"
     local build="$6" seed="$7" label="$8"
