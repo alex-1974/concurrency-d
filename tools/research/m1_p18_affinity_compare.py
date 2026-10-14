@@ -162,7 +162,6 @@ def self_test():
         audit(folder,sessions=1,warmups=1,rounds=1,count=16,waves=2)
         invalid=folder/"session1-cpu2-grace2.csv"
         content=invalid.read_text()
-        incorrect=content.replace(",1512,8,",",1512,8,",1) # no-op placeholder
         lines=content.splitlines()
         ix=lines[0].split(",").index("checksum")
         cells=lines[1].split(","); cells[ix]="WRONG"; lines[1]=",".join(cells)
