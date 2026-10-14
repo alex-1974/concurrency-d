@@ -37,6 +37,14 @@ configuration "trace-grace" {
     mainSourceFile "generated/trace/consumer/main.d"
     versions "P18TraceGrace"
 }
+configuration "pi-control" {
+    mainSourceFile "generated/pi/consumer/main.d"
+    versions "P18TraceControl"
+}
+configuration "pi-grace" {
+    mainSourceFile "generated/pi/consumer/main.d"
+    versions "P18TraceGrace"
+}
 configuration "race-control" {
     mainSourceFile "generated/race/main.d"
 }
