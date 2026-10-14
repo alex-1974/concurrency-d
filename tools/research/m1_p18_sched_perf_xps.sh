@@ -74,6 +74,12 @@ if ! grep -q '[[:digit:]]' "$DEST/diagnostics/perf-preflight-summary.txt"; then
     exit 3
 fi
 
+if [[ "${P18_SCHED_PREFLIGHT_ONLY:-0}" == 1 ]]; then
+    echo "P18 PERF preflight PASS; no DUB build or TaskRefs started"
+    echo "Capability evidence: $DEST/diagnostics/"
+    exit 0
+fi
+
 python3 "$ROOT/tools/research/m1_p18_make_grace_pool.py" \
     "$ROOT/source/concurrency/internal/submission_pool.d" \
     "$BASE/generated/concurrency/research/m1_p18_grace_pool.d"
