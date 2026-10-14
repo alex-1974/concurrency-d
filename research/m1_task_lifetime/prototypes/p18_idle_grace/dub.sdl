@@ -45,6 +45,13 @@ configuration "pi-grace" {
     mainSourceFile "generated/pi/consumer/main.d"
     versions "P18TraceGrace"
 }
+configuration "phase-control" {
+    mainSourceFile "generated/phase/consumer/main.d"
+}
+configuration "phase-grace" {
+    mainSourceFile "generated/phase/consumer/main.d"
+    versions "P18Grace"
+}
 configuration "race-control" {
     mainSourceFile "generated/race/main.d"
 }
