@@ -37,7 +37,7 @@ For every one-worker 2,048-TaskRef wave with 2,048 ingress slots, `submitFull=0`
 
 [Foreground PI XPS collector](../../../../tools/research/m1_p18_pi_xps.sh) regenerates both exact-source arms, compiles independent immutable whole-release binaries **before** measurement, runs both original native close/producer race fixtures, and records four sessions of alternating M0-trace/P18-trace process orders, one worker, iterations 128/512/1024, ingress capacities 8/64/256/2048, 2,048 Tasks per wave × three waves, two warm-ups and five measured rounds per setting. It retains source/binary/compiler/affinity metadata, raw process CSV and symmetric 500-ms temperature/frequency/thermal-throttle traces.
 
-Expected collection: **8 complete processes × 12 cases × (2 + 5) rounds = 672 per-arm records total**, comprising **96 matched warm-up and 240 matched measured event pairs** (not the 480 ABBA speed pairs of the earlier uninstrumented experiment). The collector requires exact 85-line process CSVs and both the original per-case zero-full admission oracle and new PI event conservation.
+Expected collection: **8 complete processes × 12 cases × (2 + 5) rounds = 672 scenario records across both arms (336 per arm)**, comprising **96 matched warm-up and 240 matched measured event pairs** (not the 480 ABBA speed pairs of the earlier uninstrumented experiment). The collector requires exact 85-line process CSVs and both the original per-case zero-full admission oracle and new PI event conservation.
 
 Use a *fresh detached worktree* pinned to the exact research HEAD, preserving existing worktrees and all raw artifacts:
 
