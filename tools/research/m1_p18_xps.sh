@@ -1,15 +1,17 @@
 #!/usr/bin/env bash
 # P18 Dell-XPS foreground matched native M0 vs one-retry idle grace.
-# Requires CPU package <95 C before sessions unless P18_ALLOW_HOT=1.
+# Observational temperature flagging by default; optional explicit strict admission.
 # Both variants uninstrumented. Read-only thermal sampling is symmetric.
 # Usage: bash tools/research/m1_p18_xps.sh ldc2 /tmp/p18-xps-2026-10-13
-# P18_CPUSET=... P18_SESSIONS=4 optional.
+# P18_CPUSET=... P18_SESSIONS=4 P18_THERMAL_MODE=observe|strict optional.
 set -euo pipefail
 
 DC="${1:-ldc2}"
 DEST="${2:-/tmp/p18-idle-grace-$(date +%Y%m%d-%H%M%S)}"
 SESSIONS="${P18_SESSIONS:-4}"
-ALLOW_HOT="${P18_ALLOW_HOT:-0}"
+ALLOW_HOT="${P18_ALLOW_HOT:-unset}" # historical admission override; recorded only
+THERMAL_MODE="${P18_THERMAL_MODE:-observe}"
+THERMAL_ALERT_C="${P18_THERMAL_ALERT_C:-95}"
 ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)"
 BASE="$ROOT/research/m1_task_lifetime/prototypes/p18_idle_grace"
 P13="$ROOT/research/m1_task_lifetime/prototypes/p13_worker_scaling"
@@ -28,8 +30,16 @@ if [[ ! "$SESSIONS" =~ ^[1-9][0-9]*$ ]] || (( SESSIONS > 8 )); then
     echo "P18 invalid P18_SESSIONS=$SESSIONS" >&2
     exit 2
 fi
-if [[ "$ALLOW_HOT" != "0" && "$ALLOW_HOT" != "1" ]]; then
-    echo "P18_ALLOW_HOT must be 0 or 1" >&2
+if [[ "$ALLOW_HOT" != "unset" && "$ALLOW_HOT" != "0" && "$ALLOW_HOT" != "1" ]]; then
+    echo "P18_ALLOW_HOT legacy flag must be 0 or 1" >&2
+    exit 2
+fi
+if [[ "$THERMAL_MODE" != "observe" && "$THERMAL_MODE" != "strict" ]]; then
+    echo "P18_THERMAL_MODE must be observe or strict" >&2
+    exit 2
+fi
+if [[ "$ALLOW_HOT" == "1" && "$THERMAL_MODE" == "strict" ]]; then
+    echo "P18_ALLOW_HOT=1 contradicts P18_THERMAL_MODE=strict" >&2
     exit 2
 fi
 if [[ -e "$DEST" || -e "$DEST.tar.gz" ]]; then
@@ -65,13 +75,15 @@ PY
 fi
 taskset -c "$CPUSET" true
 
+# P18-specific observational preflight. The P17 gate remains unchanged.
+# Optional strict mode enforces the historical >=95 C/missing-sensor refusal.
+mkdir -p "$DEST"/{raw,csv,telemetry,diagnostics}
+DEST="$(cd "$DEST" && pwd)"
 thermal_preflight() {
-    if [[ "$ALLOW_HOT" == "0" ]]; then
-        python3 "$ROOT/tools/research/m1_p17_telemetry.py" \
-            --cpus "$CPUSET" --max-package-c 95 --check
-    else
-        echo "P18_ALLOW_HOT=1: DIAGNOSTIC ONLY; NOT THERMALLY QUALIFIED" >&2
-    fi
+    python3 "$ROOT/tools/research/m1_p18_thermal_audit.py" snapshot \
+        --cpus "$CPUSET" --mode "$THERMAL_MODE" \
+        --alert-package-c "$THERMAL_ALERT_C" \
+        | tee -a "$DEST/diagnostics/thermal-preflight.log"
 }
 thermal_preflight
 
@@ -91,8 +103,6 @@ for mode in race-control race-grace; do
         --config="$mode" -- 12
 done
 
-mkdir -p "$DEST"/{raw,csv,telemetry,diagnostics}
-DEST="$(cd "$DEST" && pwd)"
 {
     echo "P18 one bounded extra idle search after yield, research-only"
     echo "started_utc=$(date -u -Iseconds)"
@@ -112,7 +122,11 @@ DEST="$(cd "$DEST" && pwd)"
     echo "iterations=0,8,32,128,512"
     echo "tasks_per_wave=2048"
     echo "waves=3"
-    echo "P18_ALLOW_HOT=$ALLOW_HOT"
+    echo "P18_ALLOW_HOT=$ALLOW_HOT (legacy, recorded only)"
+    echo "P18_THERMAL_MODE=$THERMAL_MODE"
+    echo "P18_THERMAL_ALERT_C=$THERMAL_ALERT_C"
+    echo "thermal_snapshots_are_observational_by_default=true"
+    echo "thermal_admission_is_not_performance_qualification=true"
     echo "reported_cpu_frequency_sampling_interval=500ms"
     echo "read_only_telemetry_overhead_applies_both_arms=true"
     echo "only_uninstrumented_arm_timings_are_compared=true"
@@ -162,8 +176,9 @@ for session in $(seq 1 "$SESSIONS"); do
         >"$DEST/diagnostics/session$session-compare.txt"
 done
 
-python3 "$ROOT/tools/research/m1_p17_thermal_review.py" \
+python3 "$ROOT/tools/research/m1_p18_thermal_audit.py" review \
     "$DEST/telemetry" "$DEST/thermal-summary.csv" \
+    --alert-package-c "$THERMAL_ALERT_C" \
     >"$DEST/thermal-review.txt"
 {
     for session in $(seq 1 "$SESSIONS"); do
@@ -175,4 +190,4 @@ python3 "$ROOT/tools/research/m1_p17_thermal_review.py" \
 tar -czf "$DEST.tar.gz" -C "$(dirname "$DEST")" "$(basename "$DEST")"
 echo "P18 research evidence archive: $DEST.tar.gz"
 echo "Privacy: review manifest/raw logs before external publication."
-echo "Read thermal-review.txt; any hot/limited screening remains a NO-GO for performance promotion."
+echo "Read thermal-review.txt; sensor flags trigger evidence review, not a blanket speed verdict."
