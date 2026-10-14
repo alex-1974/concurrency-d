@@ -40,6 +40,7 @@ def compare(original, grace, minimum, count, waves):
     if len(left) != len(right) or len(left) < minimum:
         raise ValueError("P18 phase rows mismatch or incomplete")
     summaries = defaultdict(lambda: defaultdict(list))
+    paired = defaultdict(lambda: defaultdict(list))
     for index, (a, b) in enumerate(zip(left, right)):
         if any(a[key] != b[key] for key in KEY):
             raise ValueError(f"P18 phase changed TaskRef/seed/order at {index}")
@@ -70,6 +71,15 @@ def compare(original, grace, minimum, count, waves):
                 for field in EXTRA:
                     summaries[key][arm + "_" + field].append(int(rec[field]))
                 summaries[key][arm + "_retries"].append(retries)
+        if a["phase"] == "measure":
+            for field in EXTRA:
+                paired[key][field].append(int(b[field]) - int(a[field]))
+            # The numerator is the sum over waves of acquired counts.
+            # Percentage points, not timing, and no independent session claim.
+            denom = count * waves
+            paired[key]["overlap_delta_pp"].append(
+                100.0 * (int(b["completed_at_submit"]) -
+                         int(a["completed_at_submit"])) / denom)
     if set(summaries) != CASES:
         raise ValueError("P18 phase missing one-worker iteration/ingress cells")
     for (worker, iteration, ingress), fields in sorted(summaries.items()):
@@ -88,6 +98,14 @@ def compare(original, grace, minimum, count, waves):
               f"{m('P18','completed_at_submit'):.0f} "
               f"retries_M0/P18="
               f"{m('M0','retries'):.0f}/{m('P18','retries'):.0f} "
+              f"paired_delta_submit_span_ns="
+              f"{median(paired[(worker,iteration,ingress)]['submit_span_ns']):+.0f} "
+              f"paired_delta_completion_wait_ns="
+              f"{median(paired[(worker,iteration,ingress)]['completion_wait_ns']):+.0f} "
+              f"paired_delta_completed_at_submit="
+              f"{median(paired[(worker,iteration,ingress)]['completed_at_submit']):+.0f} "
+              f"paired_delta_completed_fraction_pp="
+              f"{median(paired[(worker,iteration,ingress)]['overlap_delta_pp']):+.3f} "
               f"n={len(fields['M0_first_accept_ns'])}")
     print(f"P18 PHASE PASS exact TaskRef, stage + phase conservation "
           f"rows={len(left)} measured_cells={len(summaries)} "
