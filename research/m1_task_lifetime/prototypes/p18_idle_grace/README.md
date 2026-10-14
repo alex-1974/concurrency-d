@@ -127,3 +127,13 @@ The [source-pinned ABBA protocol](evidence/focus512-abba-protocol.md) tests the 
 Original P13, source-locked M0, TaskRef and both scheduler algorithms remain unchanged. **DMD/LDC CI tests exercise the generated focus512 profile and LDC release; CI speed values are diagnostics only.** A new Dell-XPS native archive is necessary before any performance verdict from this protocol. Steal/re-search event probes, if justified by the result, must be collected separately from uninstrumented throughput.
 
 **Current disposition: KEEP P18 for short-burst research; DEFER universal production promotion.** No accepted scope/lifetime or public `@safe` claim and no P19.
+
+## P18 focused ABBA XPS result — reviewed 2026-10-14
+
+The [complete independent Focus512 ABBA audit](evidence/xps-2026-10-14-focus512-abba-review.md) covers original archive SHA-256 `df4b1e1f60a0f95d4e7a6523f8af3e390e1138402fa1ab3e0718a77f84a61da6`, exact study source `0f85b1cb`, source-pinned unchanged M0, LDC 1.41.0 release, four sessions × ABBA/BAAB, 16 complete process CSVs and **1,080 matched measured pairs**, all exact-work, checksum, record-count and timing-conservation checks PASS.
+
+The measured median `grace/M0 waves_ns` ratios are **128 iterations 0.9559**, **512 iterations 1.0119**, **1024 iterations 0.9829**. The **512 regression is small and session-dependent** (sessions 1–2 favor P18, sessions 3–4 favor M0). ABBA-pair-collapsed median at 512 is **1.0230**; the within-session/half/workload diagnostic contrast `R512/sqrt(R128*R1024)` has median **1.0472** but **is not an automatic normalization of the actual 512 regression**. Producer retry/park counts often fall despite slower 512 wave time.
+
+Thermal attention: **session3-grace1** sampled 95 °C with a package thermal-throttle counter increase of +36; 15 other process traces have no observed increase. Excluding only the flagged half yields 512 median **1.0108** (315 pairs), while excluding all session 3 yields **0.9998**. Neither treatment makes the original full data thermally clean or proves cause. There is no stable clock, GUI-workload or power evidence.
+
+**Decision: KEEP narrow research / DEFER universal production.** Next, separate exact-source *event-only* local/inbox/steal/search/retry/park counters from already-collected **uninstrumented** speed evidence; never rank instrumented timing. No production scheduler/API/lifetime change, P19 or merge from this result.
