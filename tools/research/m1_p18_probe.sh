@@ -120,6 +120,7 @@ bash -n "$ROOT/tools/research/m1_p18_sched_perf_xps.sh"
 python3 "$ROOT/tools/research/m1_p18_sched_check.py" --self-test
 python3 "$ROOT/tools/research/m1_p18_sched_proc_sampler.py" self-test
 python3 "$ROOT/tools/research/m1_p18_sched_proc_sampler.py" probe >"$TMP/proc-capability.json"
+bash -n "$ROOT/tools/research/m1_p18_sched_proc_xps.sh"
 python3 "$ROOT/tools/research/m1_p18_phase_compare.py" --self-test
 python3 "$ROOT/tools/research/m1_p18_single_ingress_check.py" --self-test
 python3 "$ROOT/tools/research/m1_p18_512_trace_compare.py" --self-test
