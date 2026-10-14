@@ -73,6 +73,7 @@ python3 "$ROOT/tools/research/m1_p18_idle_compare.py" \
     "$TMP/idle-control.csv" "$TMP/idle-grace.csv" --min-rows 3
 bash -n "$ROOT/tools/research/m1_p18_idle_xps.sh"
 bash -n "$ROOT/tools/research/m1_p18_512_abba_xps.sh"
+bash -n "$ROOT/tools/research/m1_p18_512_trace_xps.sh"
 python3 "$ROOT/tools/research/m1_p18_512_trace_compare.py" --self-test
 
 # Trace arms execute EXACT TaskRef work, but their wall-clock time is
