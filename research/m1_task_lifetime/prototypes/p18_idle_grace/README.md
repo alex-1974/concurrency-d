@@ -110,3 +110,11 @@ P18_SESSIONS=4 P18_CPUSET=0,1,2,3 P18_IDLE_HOLD_MS=1000 \
 It prebuilds both release binaries **before** measurements, alternates M0/P18 process order each session, logs original stdout and per-process temperature/frequency/throttle telemetry, retains exact compiler and source identity, and archives summaries and raw data. CI uses bounded debug-time smoke only; **CI clock values must not support performance claims**. Fully validate the host-collected archive before inferring if one additional yield/search changes sustained idle CPU time. Native Worker Thread join failures remain fail-stop, and there is still no generic `@safe TaskScope` claim.
 
 **Decision remains DEFER for production.** The long-task follow-up and zero-task idle XPS archives are not yet available. No energy efficiency, power reduction, idle energy impact, or general throughput promise is established by these probes alone.
+
+## Native XPS P18 long-work and idle follow-up — reviewed 2026-10-14
+
+[Independent archive-based review](evidence/xps-2026-10-14-long-idle-review.md) covers two complete source-pinned LDC release artifacts from exact head `8efb55dd`: long-work SHA-256 `13134165acf1014cff5f64daf479fbb4f1d19ad745b90fc0e76dc4bf7b67c21f`; zero-work idle SHA-256 `42332be5efca76291fb8422b597b02154e844f0f445f35a552608fd92d27455f`. Both have four complete rotating-order A/B sessions, unchanged M0 control, no unsafe/partial CSV records; raw data are retained outside Git.
+
+The 900 matched long-work release pairs have overall median `grace/M0 waves_ns = 1.0081`; 512-iteration medians are **1.0484/1.0494/1.0269** for 1/2/4 workers. 1024 and 2048 iterations are near parity, with large session-to-session variation. The 36 paired one-second settled zero-TaskRef idle intervals show no new park events and extremely small process CPU times (12–61 μs/second), insufficient to claim energy improvement or power parity. All sampled long/idle traces have zero observed package-throttle counter increment but varying temperatures (long 73–94 °C, idle 52–89 °C), **not** proof of stable worker clocks.
+
+**Decision: KEEP P18 as narrow short-burst research; DEFER unconditional production promotion.** 512-work attribution, idle transients and actual power remain outside available evidence. Do not confuse these observations with TaskScope or native Thread.start/join lifetime proofs.
