@@ -114,6 +114,10 @@ bash -n "$ROOT/tools/research/m1_p18_idle_xps.sh"
 bash -n "$ROOT/tools/research/m1_p18_512_abba_xps.sh"
 bash -n "$ROOT/tools/research/m1_p18_512_trace_xps.sh"
 bash -n "$ROOT/tools/research/m1_p18_512_single_ingress_xps.sh"
+# Balanced one/two/four-core affinity study is source/TaskRef identical,
+# needs no privileged kernel tracepoints and never changes producer policy.
+bash -n "$ROOT/tools/research/m1_p18_affinity_xps.sh"
+python3 "$ROOT/tools/research/m1_p18_affinity_compare.py" --self-test
 bash -n "$ROOT/tools/research/m1_p18_pi_xps.sh"
 bash -n "$ROOT/tools/research/m1_p18_phase_xps.sh"
 bash -n "$ROOT/tools/research/m1_p18_sched_perf_xps.sh"
