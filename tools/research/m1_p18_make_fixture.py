@@ -57,12 +57,23 @@ else
     # extended; the exact source-checked P13 driver remains unchanged.
     d = one(d,
         'options.profile != "smoke" && options.profile != "native"',
-        'options.profile != "smoke" && options.profile != "native" && options.profile != "long" && options.profile != "focus512"')
+        'options.profile != "smoke" && options.profile != "native" && options.profile != "long" && options.profile != "focus512" && options.profile != "singleingress"')
     d = one(d,
         '? [0, 128] : [0, 8, 32, 128, 512];',
-        '? [0, 128] : profile == "long" ? [128, 256, 512, 1024, 2048] : profile == "focus512" ? [128, 512, 1024] : [0, 8, 32, 128, 512];')
+        '? [0, 128] : profile == "long" ? [128, 256, 512, 1024, 2048] : profile == "focus512" || profile == "singleingress" ? [128, 512, 1024] : [0, 8, 32, 128, 512];')
+    # One real worker removes the stealing path entirely. A 2048-slot
+    # ingress can admit a full 2048-TaskRef wave without any producer-full
+    # retries; 8/64/256 retain producer backpressure and yield behavior.
+    # These modifications apply only to the generated research driver.
     d = one(d,
-        'stderr.writeln("P13 CI measurements are DIAGNOSTIC ONLY; ",',
+        'const size_t[] workers = [1, 2, 4];',
+        'const size_t[] workers = profile == "singleingress" ? [1] : [1, 2, 4];')
+    d = one(d,
+        '? [64] : [8, 64, 256];',
+        '? [64] : profile == "singleingress" ? [8, 64, 256, 2048] : [8, 64, 256];')
+    d = one(d,
+        'stderr.writeln("P13 CI measurements are DIAGNOSTIC ONLY; ",'
+,
         'stderr.writeln("P18 bounded idle grace RESEARCH only; ",')
     a = one(a, "module concurrency.research.p16_2_close_races;",
             "module concurrency.research.p18_close_races;")
