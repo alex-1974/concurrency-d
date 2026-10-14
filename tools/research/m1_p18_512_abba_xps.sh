@@ -32,7 +32,7 @@ if [[ -e "$DEST" || -e "$DEST.tar.gz" ]]; then
     echo "P18 focus512 refuses to overwrite: $DEST" >&2
     exit 2
 fi
-for cmd in "$DC" dub taskset timeout python3 sha256sum tar; do
+for cmd in "$DC" dub taskset timeout python3 sha256sum tar cmp; do
     command -v "$cmd" >/dev/null
 done
 taskset -c "$CPUSET" true
@@ -139,6 +139,14 @@ for session in $(seq 1 "$SESSIONS"); do
         fi
         grep -E '^(phase,round,|warmup,|measure,)' \
             "$DEST/raw/$label.log" >"$DEST/csv/$label.csv"
+        # Exactly 27 configurations x (2 warm-up + 5 measured) rounds,
+        # plus one header. A truncated or changed fixture must fail closed.
+        if [[ "$(wc -l <"$DEST/csv/$label.csv")" -ne 190 ]] ||
+           [[ "$(grep -c '^warmup,' "$DEST/csv/$label.csv")" -ne 54 ]] ||
+           [[ "$(grep -c '^measure,' "$DEST/csv/$label.csv")" -ne 135 ]]; then
+            echo "P18 focus512 incomplete/modified CSV: $label" >&2
+            exit 4
+        fi
     done
     for rep in 1 2; do
         python3 "$ROOT/tools/research/m1_p18_compare.py" \
