@@ -220,18 +220,26 @@ struct P18TraceSnapshot
         ("executeOne(stolen.value);", "executeOne(stolen.value, self);"),
     ):
         text = once(text, old, new)
+    if kind == "control":
+        local_success_prefix = "                executeOne(local.value, self);"
+    else:
+        # The P18 candidate resets idleRetries before executing local work.
+        # Retain that statement exactly; the candidate-specific diagnostic
+        # below will count a successful second-pass local recovery.
+        local_success_prefix = ("                idleRetries = 0;\\n"
+                                "                executeOne(local.value, self);")
     text = once(text,
         """            auto local = _queues[self].pop();
             if (local.found)
             {
-                executeOne(local.value, self);
+""" + local_success_prefix + """
                 continue;
             }""",
         """            auto local = _queues[self].pop();
             if (local.found)
             {
                 ++_p18TraceWorkers[self].localHits;
-                executeOne(local.value, self);
+""" + local_success_prefix + """
                 continue;
             }
             ++_p18TraceWorkers[self].localMisses;""")
