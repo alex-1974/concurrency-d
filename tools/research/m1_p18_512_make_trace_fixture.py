@@ -134,6 +134,14 @@ else
              "module concurrency.research.p18_trace_consumer;")
     t = once(t, "import concurrency.research.m1_scaling_kernel :",
              "import concurrency.research.m1_p18_trace_kernel :")
+    # Keep P13 source immutable; only the generated TRACE driver extends
+    # the same 128 / 512 / 1024 focused workload.
+    t = once(t,
+        'options.profile != "smoke" && options.profile != "native"',
+        'options.profile != "smoke" && options.profile != "native" && options.profile != "focus512"')
+    t = once(t,
+        '? [0, 128] : [0, 8, 32, 128, 512];',
+        '? [0, 128] : profile == "focus512" ? [128, 512, 1024] : [0, 8, 32, 128, 512];')
     t = once(t,
         """        sample.retries, ",", sample.parkCount, ",", sample.checksum);""",
         """        sample.retries, ",", sample.parkCount, ",", sample.checksum,
