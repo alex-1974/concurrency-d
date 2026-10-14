@@ -57,7 +57,20 @@ for cpu in 0 1 2 3; do
     fi
     physical["$physical_key"]=1
 done
-taskset -c "$CPUSET" true
+# Linux cpuset/cgroup policy may silently narrow a requested mask.
+# Verify the EFFECTIVE mask of a child process equals every proposed mask.
+for cpumask in 0 0,1 0,1,2,3; do
+    taskset -c "$cpumask" python3 - "$cpumask" <<'PY'
+import os
+import sys
+expected = {int(x) for x in sys.argv[1].split(",")}
+observed = os.sched_getaffinity(0)
+if observed != expected:
+    raise SystemExit(
+        f"P18 CPU-affinity intervention unavailable: "
+        f"requested={sorted(expected)} effective={sorted(observed)}")
+PY
+done
 
 python3 "$ROOT/tools/research/m1_p18_make_grace_pool.py" \
     "$ROOT/source/concurrency/internal/submission_pool.d" \
