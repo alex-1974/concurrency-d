@@ -107,6 +107,18 @@ def self_test():
         assert rows[1]['max_throttle_delta'] == 2
         assert rows[2]['flags'] == 'SENSOR_MISSING;THROTTLE_COUNTER_UNAVAILABLE;SPARSE_SAMPLES'
         assert len(list(csv.DictReader((folder / 'out.csv').open()))) == 3
+    original_sample = telemetry.sample
+    original_sensor = telemetry.discover_package_sensor
+    try:
+        telemetry.discover_package_sensor = lambda: None
+        for raw, strict_rc in (('', 4), (94999, 0), (95000, 4)):
+            telemetry.sample = lambda cpus, sensor, value=raw: {
+                'utc': '2026-10-14T00:00:00Z', 'package_mC': value}
+            assert snapshot('0', 'observe', 95) == 0
+            assert snapshot('0', 'strict', 95) == strict_rc
+    finally:
+        telemetry.sample = original_sample
+        telemetry.discover_package_sensor = original_sensor
     print('P18 thermal audit synthetic self-test PASS')
 
 
