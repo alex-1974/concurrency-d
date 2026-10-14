@@ -273,3 +273,13 @@ Six balanced mask-order sessions, alternating ABBA/BAAB, execute 72 processes ×
 **Interpretation:** a changing regression across CPU masks would support a **CPU-availability/producer-worker-overlap interaction**; it would NOT prove the intrinsic cost of Yield, lock contention, runqueue delay or energy. Different masks also affect OS scheduling and turbo/frequency behavior. No native CPU-affinity XPS evidence has been received yet.
 
 **KEEP P18 narrowly in research / DEFER general production**. Original M0/`source/`, `develop`, ADR-0001 PROPOSED, #17 OPEN, Draft PR #38, grandfathered PR #35 and all historical benchmark archives remain unchanged.
+
+## Native one-/two-/four-core CPU affinity result — 2026-10-14
+
+See the [complete independent Dell-XPS audit](evidence/xps-2026-10-14-cpu-affinity-review.md), original archive SHA-256 `5aed3e015e6a82d2c6a93f276ddc1192492dd5ac72fc3f4916723212c1a2bcb1`, original source `1a8b0eab30f8f7a46057f22b8cbead23375e7683`, M0 blob `b7d8fafcb3179f00cba7e89e28c6d6b9b676353a`. Six complete balanced CPU-mask sessions, **72/72 whole-release processes, 2,160 exact-work measured pairs / 864 warm-up pairs**, complete raw/CSV agreement and TaskRef/checksum/stage-time conservation PASS. Both arms are the same immutable binaries on all three masks, and 2048-inbox capacity has zero producer-full retries throughout.
+
+**Major new result:** At 512 iterations, ingress 8, P18/M0 median paired uninstrumented `waves_ns` ratios by 1/2/4 physical-core masks are **0.121511 / 1.044167 / 1.036506**. Median M0 actual Condition parks **5899 / 3 / 3** compared with P18 **0 / 0 / 0**. Ingress 64/256 show the same qualitative reversal. With one core, P18's large advantage also holds at 128 and 1024 iterations; 512 is a special *modest penalty* only under available multi-core concurrency. This strongly supports **CPU availability × backpressure × actual parking interaction**, **not** an isolated per-wait, yield or lock cost. The one-core effect holds in all six sessions.
+
+Two one-core M0 session-6 processes have sparse sampled package peaks **97 °C** (`HIGH_SAMPLE`), no observed throttle-count increases; dropping **the entire session 6** retains the one-core 512/ingress-8 ratio **0.11983**. Package/frequency samples do not establish constant clock, energy or transient-throttle absence. Raw host-containing archives remain outside Git; no new production policy is justified.
+
+**KEEP narrow P18 research / DEFER production.** The new result is not a general application benchmark, fairness guarantee, public `@safe TaskScope` claim or universal single-core policy. Original `source/`, `develop`, ADR PROPOSED, Issue #17 OPEN, PR #38 DRAFT and grandfathered PR #35 unchanged.
