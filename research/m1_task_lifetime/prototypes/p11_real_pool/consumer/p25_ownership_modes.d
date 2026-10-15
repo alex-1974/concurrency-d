@@ -435,6 +435,12 @@ private void p26MoveOwnership()
     // Both destructors must now complete without fail-stop.
 }
 
+private void p26CloseOrAbort(OwnedTaskExecutor executor)
+{
+    try executor.closeAndJoin();
+    catch (Throwable) abort();
+}
+
 private void p26ExceptionWithJoinedCleanup()
 {
     LifetimeToken token;
@@ -446,8 +452,7 @@ private void p26ExceptionWithJoinedCleanup()
         throw new Exception("P26_expected_unwind");
     finally
     {
-        try token.borrow().closeAndJoin();
-        catch (Throwable) abort();
+        p26CloseOrAbort(token.borrow());
         require(token.tryRelease(), "P26 finally failed native join cleanup");
     }
 }
