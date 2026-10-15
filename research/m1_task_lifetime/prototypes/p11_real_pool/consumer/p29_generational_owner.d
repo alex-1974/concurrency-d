@@ -1012,7 +1012,7 @@ else version (P31Benchmark)
         foreach (i; 0 .. producers)
         {
             stats[i] = new P31Stats();
-            const counter = work == P31Work.sharedTwoAtomics
+            auto counter = work == P31Work.sharedTwoAtomics
                 ? sharedCounter : counters[i];
             threads[i] = p31Producer(mode, work, baseline, real,
                 manager, h, counter, taskCount / producers, stats[i]);
