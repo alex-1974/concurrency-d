@@ -115,9 +115,15 @@ Timing measurements use `MonoTime.currTime`:
 It does **not** measure full live heap, process RSS or native
 scheduler allocations. The benchmark does not claim RSS figures.
 
-All three modes run within each triplet. Order rotates among
-`m0→deferred→managed`, `managed→deferred→m0`, and
-`deferred→m0→managed` to mitigate consistent ordering effects.
+All three modes run within each triplet. **Following the
+2026-10-15 XPS baseline**, the order uses the balanced cyclic
+Latin square `m0→deferred→managed`,
+`deferred→managed→m0`, and
+`managed→m0→deferred`. Each mode occupies each position
+exactly once in every block of three triplets; an always-evaluated
+test checks that property. The archived first XPS run used the
+older imbalanced order and must not be retroactively described as
+balanced.
 Warm-up pairs are recorded separately and excluded from
 medians. Results are compared **per-round under the same workload**,
 not from unrelated independent batches.
@@ -163,6 +169,25 @@ and possible GC interference. Repeat runs under matched
 thermal conditions. Compare with C++ only after matching
 ownership/lifetime semantics and the same TaskRef work; no
 "native C++ parity" claim is made here.
+
+## First native XPS evidence (historical unbalanced baseline)
+
+The user-supplied archive `concurrency-p30-xps-20261015T134105Z.tar.gz`
+passed independent SHA-256 verification
+(`2252c2b81b7d5894578dd3dc82158c2a83763f78a592a4f17b6a2bb1af9b14c3`).
+The original measurement ran at
+[`33d4e17b`](https://github.com/alex-1974/concurrency-d/commit/33d4e17b088460bd0489688af6482eb2d560ae9b)
+on an i7-9750H XPS 15 with LDC 1.41.0.
+
+[Full measured evidence and limitations](evidence/xps-2026-10-15-results.md)
+preserve the nine-round median submission times and paired ratios,
+the position-imbalance discovery, source pins and the decision to
+retain P29's safety machinery until a balanced repeat.
+
+The first XPS benchmark does **not** establish a stable P29
+throughput penalty. The larger concern is the poor multi-producer
+profile throughput in all three implementations; that mechanism
+needs isolation under fixed task/worker dimensions.
 
 ## Decision status
 
