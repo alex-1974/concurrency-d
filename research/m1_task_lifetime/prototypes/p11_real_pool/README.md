@@ -146,8 +146,7 @@ The new gate is correctness-only. No semantic change to `TaskRef`, M0
 `SubmissionWorkerPool`, GC-owned task nodes or producer admission; no
 cross-family throughput claim. P11 remains deliberately `@system`, and
 its native failure/borrowed lifetime promises are **not upgraded**.
-The executed source-commit and CI result must be checked before marking
-this added whole-release gate qualified.
+**Executed and qualified:** [GitHub Actions #38714944406](https://github.com/alex-1974/concurrency-d/actions/runs/38714944406) is **SUCCESS** at exact code commit `ae0a6a23b617b162a8a4eb6ee15b737ad2ead4a3`. Both pinned `DIP1000 / dmd-2.111.0` and `DIP1000 / ldc-1.41.0` jobs built and **actually ran** P11 in debug and full DUB release. LDC additionally ran optimized debug `-O3`. All separate P11 compile-negative consumers and remaining P01–P18 research gates passed. The first CI attempt encountered a research-only `requireSteal(bool)` signature mismatch with a pre-existing diagnostic argument; it was corrected to preserve that argument before qualification. No production scheduler failure was identified.
 
 ## Safety verdict
 
