@@ -18,6 +18,7 @@ on:
       - "tools/research/m1_typed_transport_prototype.sh"
       - "tools/research/m1_real_pool_prototype.sh"
       - "tools/research/m1_p20_owned_fault.sh"
+      - "tools/research/m1_p21_shutdown_contract.sh"
       - "tools/research/m1_p20_make_owned_fault.py"
       - "tools/research/m1_owned_gc_real_pool.sh"
       - "tools/research/m1_matched_pool_benchmark.sh"
@@ -75,6 +76,7 @@ on:
       - "tools/research/m1_typed_transport_prototype.sh"
       - "tools/research/m1_real_pool_prototype.sh"
       - "tools/research/m1_p20_owned_fault.sh"
+      - "tools/research/m1_p21_shutdown_contract.sh"
       - "tools/research/m1_p20_make_owned_fault.py"
       - "tools/research/m1_owned_gc_real_pool.sh"
       - "tools/research/m1_matched_pool_benchmark.sh"
@@ -191,6 +193,10 @@ jobs:
       - name: P20 actual owned M0 early-stop fault injection (research only)
         shell: bash
         run: bash tools/research/m1_p20_owned_fault.sh "$DC"
+
+      - name: P21 shutdown proof and ownership state contract (research only)
+        shell: bash
+        run: bash tools/research/m1_p21_shutdown_contract.sh "$DC"
 
       - name: P12 paired matched M0 work-stealing benchmark (CI diagnostic only)
         shell: bash
