@@ -190,6 +190,18 @@ generic scoped-borrow unwinding, unbounded orphaned tasks, cross-platform
 native shutdown contracts, and production adoption without matched
 release-mode performance evidence.
 
+## P28 bounded owner follow-up
+
+[P28](../p28_bounded_orphans/README.md) turns the P27
+application-close finding into a **two-executor fixed-capacity
+managed-owner experiment** on the same source-pinned real M0 pool.
+It tests explicit orphan handoff, concurrent *supervisor-driven*
+native joins, non-evictable uncertain worker obligations, budget
+rejection before worker launch, slot reuse after successful join
+or certified never-started cancellation, and two direct native
+application-exit fail-stop cases. No automatic GC-finalizer orphan
+detection, native join-error retry or performance claim follows.
+
 **Next gate** should consider the availability and root-capacity
 policy for real abandoned owners (including shutdown orchestration
 and bounded resource usage), plus matched optimized XPS throughput
