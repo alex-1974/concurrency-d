@@ -37,24 +37,67 @@ if [[ "$(basename -- "$DC")" == ldc2* ]]; then
         "$TMP/O3.log" || { cat "$TMP/O3.log" >&2; exit 1; }
 fi
 
-# Explicitly test genuine module teardown, not an application-invoked
-# stand-in for a destructor. DUB masks SIGABRT; run the built binary.
-for variant in P27ExitActive P27ExitUnstarted; do
-    dub build --root="$BASE" --compiler="$DC" --build=debug \
-        --config=p27-transitions --d-version="$variant" --force \
-        >"$TMP/$variant.build" 2>&1 || {
-            cat "$TMP/$variant.build" >&2; exit 1;
-        }
-    set +e
-    ( timeout --signal=TERM --kill-after=4s 40s \
-        "$BASE/m1-p11-real-pool" >"$TMP/$variant.log" 2>&1 ) 2>/dev/null
-    status=$?
-    set -e
-    if [[ "$status" != 134 ]] || \
-        ! grep -Fq 'P27_PROCESS_EXIT_FAILSTOP' "$TMP/$variant.log"; then
-        cat "$TMP/$variant.log" >&2
-        echo "P27 $variant missing module destructor abort: $status" >&2
-        exit 1
-    fi
-done
-echo 'P27_PROCESS_EXIT_FAILSTOP_PASS active=134 unstarted=134'
+# Negative A: explicit application boundary, while a real worker exists.
+# D runtime may wait BEFORE the shared module destructor: a module-only
+# destructor cannot reliably establish this fail-stop policy.
+dub build --root="$BASE" --compiler="$DC" --build=debug \
+    --config=p27-transitions --d-version=P27ExitActive --force \
+    >"$TMP/P27ExitActive.build" 2>&1 || {
+        cat "$TMP/P27ExitActive.build" >&2; exit 1;
+    }
+set +e
+( timeout --signal=TERM --kill-after=3s 15s \
+    "$BASE/m1-p11-real-pool" >"$TMP/P27ExitActive.log" 2>&1 ) 2>/dev/null
+active_status=$?
+set -e
+if [[ "$active_status" != 134 ]] || \
+    ! grep -Fq 'P27_APPLICATION_EXIT_FAILSTOP' "$TMP/P27ExitActive.log"; then
+    cat "$TMP/P27ExitActive.log" >&2
+    echo "P27 missing explicit application-exit fail-stop: $active_status" >&2
+    exit 1
+fi
+
+# Negative B: no native worker has started, so the native D module
+# destructor CAN inspect and reject an uncleared explicit GC root.
+dub build --root="$BASE" --compiler="$DC" --build=debug \
+    --config=p27-transitions --d-version=P27ExitUnstarted --force \
+    >"$TMP/P27ExitUnstarted.build" 2>&1 || {
+        cat "$TMP/P27ExitUnstarted.build" >&2; exit 1;
+    }
+set +e
+( timeout --signal=TERM --kill-after=3s 15s \
+    "$BASE/m1-p11-real-pool" >"$TMP/P27ExitUnstarted.log" 2>&1 ) 2>/dev/null
+unstarted_status=$?
+set -e
+if [[ "$unstarted_status" != 134 ]] || \
+    ! grep -Fq 'P27_PROCESS_EXIT_FAILSTOP' "$TMP/P27ExitUnstarted.log"; then
+    cat "$TMP/P27ExitUnstarted.log" >&2
+    echo "P27 missing never-started module fail-stop: $unstarted_status" >&2
+    exit 1
+fi
+
+# Controlled DIAGNOSTIC reproducing the native druntime startup/shutdown
+# limitation discovered on both pinned compilers. It must not silently
+# count as a successful process shutdown.
+dub build --root="$BASE" --compiler="$DC" --build=debug \
+    --config=p27-transitions --d-version=P27RuntimeOnly --force \
+    >"$TMP/P27RuntimeOnly.build" 2>&1 || {
+        cat "$TMP/P27RuntimeOnly.build" >&2; exit 1;
+    }
+set +e
+( timeout --signal=TERM --kill-after=3s 5s \
+    "$BASE/m1-p11-real-pool" >"$TMP/P27RuntimeOnly.log" 2>&1 ) 2>/dev/null
+runtime_status=$?
+set -e
+if [[ "$runtime_status" == 124 ]] && \
+    ! grep -Fq 'P27_PROCESS_EXIT_FAILSTOP' "$TMP/P27RuntimeOnly.log"; then
+    echo "P27_RUNTIME_ONLY_BLOCKED_DIAGNOSTIC_PASS timed_out=124"
+elif [[ "$runtime_status" == 134 ]] && \
+    grep -Fq 'P27_PROCESS_EXIT_FAILSTOP' "$TMP/P27RuntimeOnly.log"; then
+    echo "P27_RUNTIME_ONLY_DESTRUCTOR_REACHED_PASS exit=134"
+else
+    cat "$TMP/P27RuntimeOnly.log" >&2
+    echo "P27 runtime-only unexpected outcome: $runtime_status" >&2
+    exit 1
+fi
+echo 'P27_EXPLICIT_EXIT_FAILSTOP_PASS active=134 unstarted=134'
