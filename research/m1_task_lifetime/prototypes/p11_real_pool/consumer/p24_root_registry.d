@@ -336,6 +336,68 @@ private void testSyntheticUncertain()
     require(registry().tryRelease(id), "known synthetic roots not released");
 }
 
+private void testIndependentRoots()
+{
+    auto first = new OwnedTaskExecutor(1, 4, 4);
+    auto second = new OwnedTaskExecutor(1, 4, 4);
+    const firstId = registry().register(first);
+    const secondId = registry().register(second);
+    require(firstId != secondId && registry().live() == 2,
+        "two simultaneously registered roots alias");
+    first = null;
+    second = null;
+    registry().start(firstId);
+    registry().start(secondId);
+
+    auto firstGate = new Gate();
+    auto secondGate = new Gate();
+    auto firstReceipt = new Receipt();
+    auto secondReceipt = new Receipt();
+    Task a;
+    a.gate = firstGate;
+    a.graph = new Graph(13, new Graph(17));
+    a.receipt = firstReceipt;
+    Task b;
+    b.gate = secondGate;
+    b.graph = new Graph(19, new Graph(23));
+    b.receipt = secondReceipt;
+    {
+        auto h1 = registry().borrow(firstId).submit(a);
+        auto h2 = registry().borrow(secondId).submit(b);
+        require(h1 !is null && h2 !is null,
+            "two simultaneous real M0 owners rejected work");
+        h1 = null;
+        h2 = null;
+    }
+    awaitEnter(firstGate);
+    awaitEnter(secondGate);
+
+    secondGate.openOrAbort();
+    registry().borrow(secondId).closeAndJoin();
+    require(registry().tryRelease(secondId),
+        "second joined executor root not released");
+    require(registry().live() == 1,
+        "joined executor release cleared unrelated active root");
+    checkReceipt(secondReceipt, 88u);
+
+    foreach (_; 0 .. 4)
+    {
+        GC.collect();
+        require(registry().borrow(firstId).retainedCount() == 1 &&
+            registry().borrow(firstId).completedCount() == 0,
+            "active first owner lost graph after second root removal");
+        require(!registry().tryRelease(firstId),
+            "remaining active executor root released");
+    }
+
+    firstGate.openOrAbort();
+    registry().borrow(firstId).closeAndJoin();
+    checkReceipt(firstReceipt, 64u);
+    require(registry().tryRelease(firstId),
+        "remaining joined owner root not released");
+    require(registry().live() == 0, "registry still owns released group");
+}
+
 void main()
 {
     processRoots = new RootRegistry();
@@ -344,8 +406,10 @@ void main()
         testNormal();
         testSyntheticUncertain();
     }
+    foreach (_; 0 .. 4)
+        testIndependentRoots();
     require(registry().live() == 0, "registry retained joined executors");
-    require(registry().added() == 12 && registry().removed() == 12,
+    require(registry().added() == 20 && registry().removed() == 20,
         "explicit GC.addRoot/removeRoot accounting not balanced");
-    writeln("P24_DURABLE_ROOT_PASS normal=6 uncertain=6 roots=12 removed=12");
+    writeln("P24_DURABLE_ROOT_PASS normal=6 uncertain=6 independent=4 roots=20 removed=20");
 }
