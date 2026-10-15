@@ -148,6 +148,18 @@ cross-family throughput claim. P11 remains deliberately `@system`, and
 its native failure/borrowed lifetime promises are **not upgraded**.
 **Executed and qualified:** [GitHub Actions #38714944406](https://github.com/alex-1974/concurrency-d/actions/runs/38714944406) is **SUCCESS** at exact code commit `ae0a6a23b617b162a8a4eb6ee15b737ad2ead4a3`. Both pinned `DIP1000 / dmd-2.111.0` and `DIP1000 / ldc-1.41.0` jobs built and **actually ran** P11 in debug and full DUB release. LDC additionally ran optimized debug `-O3`. All separate P11 compile-negative consumers and remaining P01–P18 research gates passed. The first CI attempt encountered a research-only `requireSteal(bool)` signature mismatch with a pre-existing diagnostic argument; it was corrected to preserve that argument before qualification. No production scheduler failure was identified.
 
+## P19 complement — owned task graph retention
+
+[P19's real-M0 owned GC-graph experiment](../p19_real_owned_gc/README.md)
+extends this P11 result-parity research with one blocked worker,
+eight queued nested three-class GC payload graphs, abandoned submission
+handles, four forced GC collections, exactly-once execution, and
+independent result-cell observation after post-dispatch record reaping.
+The test's explicit, always-evaluated oracles execute in whole release,
+and its external `@safe` generic-owned submission is compile-rejected.
+This is a **bounded ordinary lifecycle test**, not a compiler-verified
+transitive ownership rule or native-failure recovery.
+
 ## Safety verdict
 
 **KEEP P11** as a reproducible, compiler-qualified integration of P09/P10 typed records with the *real* M0 scheduler and concrete steal path. The P11 API is intentionally `@system` and supported by three negative consumers; no public-facing type/API is frozen.
