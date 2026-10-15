@@ -528,8 +528,61 @@ private void testGcCaptureAndDestructorOrder() @system
     ensure(atomicLoad!(MemoryOrder.acq)(badOrdering) == 0u);
 }
 
+
+/++
+ A real-worker ordering witness for P03's outer joined lifetime.
+ A nested guard ends before the worker completes; all shared state
+ observed by the worker is retained by the enclosing test frame.
+ This intentionally performs no access to an expired referent.
++/
+private void testNestedBlockOrdering() @system
+{
+    Gate gate = new Gate();
+    shared uint nestedEnded;
+    shared uint observedAfterEnd;
+    auto outcome = runScoped((Portal* portal) @system
+    {
+        try
+        {
+            {
+                struct InnerGuard
+                {
+                    @disable this(this);
+                    shared(uint)* marker;
+
+                    ~this() @system
+                    {
+                        atomicStore!(MemoryOrder.rel)(*marker, 1u);
+                    }
+                }
+                InnerGuard guard;
+                guard.marker = &nestedEnded;
+                ensure(portal.trySpawn(() @safe
+                {
+                    gate.block();
+                    if (atomicLoad!(MemoryOrder.acq)(nestedEnded) == 1u)
+                        atomicStore!(MemoryOrder.rel)(
+                            observedAfterEnd, 1u);
+                }));
+                gate.waitFor(1);
+                ensure(atomicLoad!(MemoryOrder.acq)(nestedEnded) == 0u);
+            }
+            ensure(atomicLoad!(MemoryOrder.acq)(nestedEnded) == 1u);
+            ensure(portal.acceptedCount() == 1);
+        }
+        finally
+            gate.release();
+    });
+    ensure(outcome.admitted == 1 && outcome.quiescent == 1);
+    ensure(outcome.childExceptions == 0 && outcome.rejected == 0);
+    ensure(atomicLoad!(MemoryOrder.acq)(nestedEnded) == 1u);
+    ensure(atomicLoad!(MemoryOrder.acq)(observedAfterEnd) == 1u);
+    writeln("P03_NESTED_SCOPE_ORDER_PASS");
+}
+
 void main()
 {
+    testNestedBlockOrdering();
     testDynamicBackpressure();
     testIncrementalAdmissionAndBudget();
     testThrowingBuilderJoins();
