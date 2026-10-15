@@ -118,6 +118,18 @@ thread schedules, arbitrary number of workers, memory ordering or OS error
 semantics. Results are counts of explored states and transitions, not
 runtime performance metrics.
 
+## P22 native supervisor follow-up
+
+[P22](../p22_native_supervisor/README.md) implements a bounded version
+of this proposal with **real druntime Threads**, an independently held
+owner, three concurrent shutdown callers, mandatory waiter rendezvous,
+and separate synthetic pre-native-join and post-successful-launch cases.
+It repeats these controls under DMD/LDC, whole release and LDC
+optimized correctness. Actual native start/join failures remain
+**fail-stop**, not recoverable; no general M0 TaskRef or `@safe` API
+follows. P22 is a separately named research-only implementation,
+**not the production worker pool**.
+
 ## Implementation boundary for an eventual production change
 
 **Proposed minimum components**, subject to a separate approved ADR and
