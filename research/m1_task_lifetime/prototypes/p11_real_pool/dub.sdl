@@ -103,3 +103,19 @@ configuration "p33-phases-optimized" {
     mainSourceFile "consumer/p33_generational_owner.d"
     dflags "-O3"
 }
+
+configuration "p34-null" {
+    mainSourceFile "consumer/p34_generational_owner.d"
+}
+configuration "p34-timed" {
+    mainSourceFile "consumer/p34_generational_owner.d"
+    dflags "-version=P34Timed"
+}
+configuration "p34-null-optimized" {
+    mainSourceFile "consumer/p34_generational_owner.d"
+    dflags "-O3"
+}
+configuration "p34-timed-optimized" {
+    mainSourceFile "consumer/p34_generational_owner.d"
+    dflags "-O3" "-version=P34Timed"
+}
