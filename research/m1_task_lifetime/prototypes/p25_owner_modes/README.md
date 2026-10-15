@@ -172,6 +172,24 @@ No speed ratios or C++ parity estimates are inferred from CI wall time.
 P25 positive and negative steps passed on DMD/LDC. Check the
 entire P01–P25 matrix separately before declaring final-HEAD green.
 
+## P26 move and contention follow-up
+
+[P26](../p26_token_registry_safety/README.md) qualifies the same
+original-M0 owner-token/registry source under additional DMD/LDC
+security and error-boundary gates: legal
+[`std.algorithm.mutation.move`](https://dlang.org/library/std/algorithm/mutation/move.html)
+of a token carrying an explicit GC root, compiler rejection of
+copying a borrowed token by a ref-parameter return, ordinary exception
+unwinding with successful native join in `finally`, fail-stop when
+unwinding without native quiescence, and simultaneous registry lookups
+and releases over a **fully joined** executor. The source P25 normal
+and synthetic-fault gates remain in CI unchanged.
+
+These are deliberately **bounded source-form and native scheduling
+witnesses**. They do not establish a general `@safe` token escape
+checker, safe concurrent release of an *active* worker, real native
+join-error recovery, or a performance win for one owner model.
+
 ## Disposition and next gate
 
 **KEEP research evidence; DEFER choice of one universal owner.**
