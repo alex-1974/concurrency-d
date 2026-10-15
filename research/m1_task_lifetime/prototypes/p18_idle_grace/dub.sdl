@@ -54,6 +54,14 @@ configuration "phase-grace" {
 }
 // Source-locked research-only intentional producer admission pacing.
 // The original configurations above remain byte-identical speed baselines.
+configuration "cadence0-control" {
+    mainSourceFile "generated/cadence/consumer/main.d"
+    versions "P18CadenceNone"
+}
+configuration "cadence0-grace" {
+    mainSourceFile "generated/cadence/consumer/main.d"
+    versions "P18CadenceNone" "P18Grace"
+}
 configuration "cadence8-control" {
     mainSourceFile "generated/cadence/consumer/main.d"
     versions "P18Cadence8"
