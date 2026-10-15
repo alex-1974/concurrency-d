@@ -25,6 +25,27 @@ python3 "$ROOT/tools/research/m1_p18_phase_make_fixture.py" \
     "$P13/concurrency/research/m1_scaling_kernel.d" \
     "$P13/consumer/main.d" "$P162/race/main.d" "$BASE/generated"
 
+# Source-locked producer cadence is a deliberately changed producer workload,
+# never a rewritten scheduler. Verify all three compiler specializations.
+python3 "$ROOT/tools/research/m1_p18_cadence_make_fixture.py" \
+    "$P13/concurrency/research/m1_scaling_kernel.d" \
+    "$P13/consumer/main.d" "$P162/race/main.d" "$BASE/generated"
+python3 "$ROOT/tools/research/m1_p18_cadence_compare.py" --self-test
+for cadence in cadence0 cadence8 cadence64; do
+    for arm in control grace; do
+        timeout --signal=TERM --kill-after=5s 175s \
+            dub run --root="$BASE" --compiler="$DC" --build=debug \
+            --config="$cadence-$arm" -- --profile cadencefocus \
+            --count 128 --waves 2 --warmup 1 --rounds 1 \
+            --seed 332925050 >"$TMP/$cadence-$arm.log"
+        grep -E '^(phase,round,|warmup,|measure,)' \
+            "$TMP/$cadence-$arm.log" >"$TMP/$cadence-$arm.csv"
+        test "$(grep -c '^warmup,' "$TMP/$cadence-$arm.csv")" = 6
+        test "$(grep -c '^measure,' "$TMP/$cadence-$arm.csv")" = 6
+    done
+done
+
+
 # Separately generated, source-locked event-only copies. They are never
 # compared for runtime speed with the existing uninstrumented M0/P18 pair.
 for mode in control grace; do
