@@ -16,10 +16,10 @@ import core.thread : Thread;
 import core.time : MonoTime, dur;
 
 // Always-evaluated correctness checks, including release-mode watchdog.
-private void requireSteal(bool valid)
+private void requireSteal(bool valid, string detail = "invariant")
 {
     if (!valid)
-        throw new Exception("P11 real-steal invariant failed");
+        throw new Exception("P11 real-steal " ~ detail);
 }
 
 private enum uint PrepA = 0;
