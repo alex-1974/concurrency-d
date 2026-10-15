@@ -47,7 +47,7 @@ def self_test():
                 mode="managed",count="8",accepted="8",completed="8",
                 attempts="8",probe_calls="8",probe_ns="0")
     row=",".join(data[k] for k in FIELDS)
-    parsed=parse(io.StringIO(header+"\\n"+row+"\\n"))
+    parsed=parse(io.StringIO(header+"\n"+row+"\n"))
     if ("measure",3,"minimal",2,"managed") not in parsed:
         raise ValueError("P34 numeric profile key normalization failed")
     print("P34_PROFILE_KEY_SELFTEST_PASS")
