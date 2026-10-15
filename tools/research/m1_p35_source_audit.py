@@ -42,8 +42,10 @@ def main():
         "const status = _pool.trySubmit(node.reference());",
         "if (status != SubmissionResult.accepted)",
     )
-    if any(owner.count(x)!=1 for x in checks):
+    if any(owner.count(x)!=(2 if x=="if (_retained.length >= _maxRetained)" else 1) for x in checks):
         raise ValueError("P35 owner critical section changed")
+    if owner.count("if (_retained.length >= _maxRetained)") != 2:
+        raise ValueError("P35 retention second capacity gate missing")
     offsets=[owner.index(x) for x in checks]
     if offsets!=sorted(offsets):
         raise ValueError("P35 owner operation order changed")
