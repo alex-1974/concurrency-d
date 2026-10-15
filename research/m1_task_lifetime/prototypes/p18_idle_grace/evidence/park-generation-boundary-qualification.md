@@ -61,3 +61,12 @@ A PASS supports **specific no-lost-publication and close/notify safety at the te
 A failure must block any proposed scheduling or adaptive-idle policy change, and be triaged with original logs, source hash, and compiler versions **before further benchmarking**. Do not apply blind Yield/spin/power tuning. No new XPS run is required while CPU thermals are uncontrolled. If designing a new policy, qualify fairness, multi-producer/multi-worker, TaskRef/owned-task lifetime, close/race behavior, and uninstrumented native LDC 1/2/4-core performance separately when thermally stable.
 
 **Disposition: KEEP P18 narrow research / DEFER unconditional production.** `source/`, `develop`, main, original M0, grandfathered R0.5 PR #35, ADR-0001 PROPOSED, Issue #17 OPEN, PR #38 DRAFT and all native evidence archives unchanged.
+
+
+## Release-mode test-harness qualification note
+
+The first exact-source native test introduced side-effect-bearing expressions inside D `assert(...)`, for example `assert(inbox.trySubmit(task) == SubmissionResult.accepted)`. In an optimized `-release` build assertions may be elided, including argument evaluation. The original test was therefore **not a valid release correctness probe**: it could omit the essential `trySubmit` and then block forever while using the real `Condition`. An observed 45-second LDC-release execution timeout in that *invalid test harness* does **NOT** demonstrate a lost production wakeup.
+
+The repaired generator converts all **16** research-boundary assertion sites to an explicit `requireParkBoundary(bool, detail)` that always evaluates the condition/side effects and throws on failure in both debug and release builds. It rejects a changed assertion-site count. Build and run are split: the LDC release compiler is allowed to finish separately; only the resulting *prebuilt* native executable gets a 45-second completion deadline. DMD/LDC debugger and optimized execution must all report `P18_PARK_BOUNDARY_PASS scenarios=96` before making any claim that this boundary gate passes.
+
+This does not alter original M0, P18's idle-grace code or any production test. It is an important **test-design regression** for future D whole-release research: do not put necessary state transitions exclusively into code subject to `assert` removal.
