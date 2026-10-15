@@ -54,3 +54,11 @@ configuration "p23-lifecycle-optimized" {
     mainSourceFile "consumer/p23_lifecycle.d"
     dflags "-O3"
 }
+
+configuration "p24-root-registry" {
+    mainSourceFile "consumer/p24_root_registry.d"
+}
+configuration "p24-root-registry-optimized" {
+    mainSourceFile "consumer/p24_root_registry.d"
+    dflags "-O3"
+}
