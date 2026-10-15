@@ -10,6 +10,7 @@ TMP="$(mktemp -d)"
 cleanup() { rm -f -- "$OWNER" "$GEN"; rm -rf -- "$TMP"; }
 trap cleanup EXIT
 [[ ! -e "$OWNER" && ! -e "$GEN" ]] || { echo 'P34 stale generated source' >&2; exit 1; }
+python3 "$ROOT/tools/research/m1_p34_compare.py" --self-test
 python3 "$ROOT/tools/research/m1_p34_source_audit.py"
 python3 "$ROOT/tools/research/m1_p23_make_owned.py" \
  "$ROOT/source/concurrency/internal/owned_task.d" "$OWNER"
