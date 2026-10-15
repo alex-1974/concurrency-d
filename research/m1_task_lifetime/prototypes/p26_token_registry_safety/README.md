@@ -126,12 +126,17 @@ builds and runs debug and whole `-release`, plus LDC debug
 run separately; the test executable is invoked **directly** for
 the fatal gate because `dub run` wraps abnormal child exit codes.
 
-Source after initial P26 gate and runner:
-[`5835f247`](https://github.com/alex-1974/concurrency-d/commit/5835f247dbdf0c3d3a347ac47bc3ad20a58fd787).
-CI: [full M1 workflow #38729758992](https://github.com/alex-1974/concurrency-d/actions/runs/38729758992).
-**Check the actual final-head CI outcome** before claiming that P26
-is compiler qualified. Do not derive throughput or overhead
-measurements from shared-runner CI timing.
+**Corrected executable source commit:**
+[`a69c2334`](https://github.com/alex-1974/concurrency-d/commit/a69c2334c10fa39c4a95ea5fccf1924ebbe52266).
+**Code CI:** [full M1 workflow #38730082266 — SUCCESS](https://github.com/alex-1974/concurrency-d/actions/runs/38730082266).
+Both DMD 2.111.0 and LDC 1.41.0 passed the existing P25 and
+new P26 steps, and the entire source-head M1 CI completed successfully.
+The first runner attempt had a D-language syntax error (a `catch`
+inside `finally`); it was corrected in the cited source commit
+without changing the ownership invariants. Verify the documentation
+HEAD separately before declaring the entire branch green.
+Do not derive throughput or overhead measurements from shared-runner
+CI timing.
 
 ## Assessment and remaining limits
 
