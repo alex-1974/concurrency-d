@@ -22,6 +22,13 @@ version (P30Benchmark)
     import std.conv : to;
 }
 
+version (P31Benchmark)
+{
+    import concurrency.internal.owned_task :
+        OriginalExecutor = OwnedTaskExecutor;
+    import std.conv : to;
+}
+
 private void check(bool correct, string reason)
 {
     if (!correct)
@@ -838,6 +845,335 @@ version (P30Benchmark)
                     tasks, workers, producers, ingress, retained));
         }
         writeln("P30_M0_OWNERSHIP_BENCHMARK_PASS");
+    }
+}
+else version (P31Benchmark)
+{
+    // P31 has no new executor, queue or task-header implementation:
+    // it changes ONLY controlled producer count and task-side atomics
+    // while reusing P29's exact generational manager.
+    private enum P31Mode : ubyte { m0, deferred, managed }
+    private enum P31Work : ubyte { sharedTwoAtomics, shardedTwoAtomics, minimal }
+
+    // Separate heap objects intentionally reduce (but cannot strictly
+    // rule out) cache-line aliasing between producer shards.
+    private final class P31Counter
+    {
+        ubyte[128] padding;
+        shared uint executed;
+        shared ulong checksum;
+    }
+
+    private struct P31CountedJob
+    {
+        P31Counter result;
+        int opCall()
+        {
+            atomicFetchAdd!(MemoryOrder.rel)(result.executed, 1u);
+            atomicFetchAdd!(MemoryOrder.rel)(result.checksum, 60UL);
+            return 60;
+        }
+    }
+
+    private struct P31MinimalJob
+    {
+        int opCall() { return 60; }
+    }
+
+    private final class P31Stats
+    {
+        size_t attempts;
+        size_t accepted;
+        size_t producerBytes;
+    }
+
+    private bool p31Attempt(F)(
+        P31Mode mode, OriginalExecutor baseline,
+        OwnedTaskExecutor real, GenerationalManager manager,
+        OwnerHandle h, F job)
+    {
+        final switch (mode)
+        {
+            case P31Mode.m0:
+            {
+                auto result = baseline.trySubmit(job);
+                return result !is null;
+            }
+            case P31Mode.deferred:
+            {
+                auto result = real.trySubmit(job);
+                return result !is null;
+            }
+            case P31Mode.managed:
+                return manager.publish(h, job);
+        }
+    }
+
+    private Thread p31Producer(
+        P31Mode mode, P31Work work, OriginalExecutor baseline,
+        OwnedTaskExecutor real, GenerationalManager manager,
+        OwnerHandle h, P31Counter counter, size_t count,
+        P31Stats stats)
+    {
+        return new Thread({
+            auto counted = P31CountedJob(counter);
+            P31MinimalJob minimal;
+            const startBytes = GC.allocatedInCurrentThread();
+            const deadline = MonoTime.currTime + dur!"seconds"(40);
+            foreach (_; 0 .. count)
+            {
+                bool accepted;
+                while (!accepted)
+                {
+                    check(MonoTime.currTime < deadline,
+                        "P31 producer admission timeout");
+                    ++stats.attempts;
+                    if (work == P31Work.minimal)
+                        accepted = p31Attempt(mode, baseline, real,
+                            manager, h, minimal);
+                    else
+                        accepted = p31Attempt(mode, baseline, real,
+                            manager, h, counted);
+                    if (!accepted)
+                        Thread.yield();
+                }
+                ++stats.accepted;
+            }
+            const endBytes = GC.allocatedInCurrentThread();
+            stats.producerBytes = endBytes >= startBytes
+                ? endBytes - startBytes : 0;
+        });
+    }
+
+    private string p31ModeName(P31Mode mode)
+    {
+        final switch (mode)
+        {
+            case P31Mode.m0: return "m0";
+            case P31Mode.deferred: return "deferred";
+            case P31Mode.managed: return "managed";
+        }
+    }
+
+    private string p31WorkName(P31Work work)
+    {
+        final switch (work)
+        {
+            case P31Work.sharedTwoAtomics: return "shared_atomic";
+            case P31Work.shardedTwoAtomics: return "sharded_atomic";
+            case P31Work.minimal: return "minimal";
+        }
+    }
+
+    private void p31Measure(
+        string phase, size_t round, P31Mode mode, P31Work work,
+        size_t taskCount, size_t workers, size_t producers,
+        size_t ingress, size_t retained)
+    {
+        check(producers > 0 && taskCount > 0 &&
+            taskCount % producers == 0 &&
+            workers > 0 && ingress > 0 && retained > 0,
+            "P31 fixed-work producer dimensions invalid");
+
+        auto counters = new P31Counter[producers];
+        foreach (i; 0 .. producers)
+            counters[i] = new P31Counter();
+        auto sharedCounter = new P31Counter();
+
+        // Same original / P23 / actual P29 M0 worker pool, same bounded
+        // retention, and same task type for each matched work-kind triple.
+        GC.collect();
+        OriginalExecutor baseline;
+        OwnedTaskExecutor real;
+        GenerationalManager manager;
+        OwnerHandle h;
+
+        const begin = MonoTime.currTime;
+        final switch (mode)
+        {
+            case P31Mode.m0:
+                baseline = new OriginalExecutor(workers, ingress, retained);
+                break;
+            case P31Mode.deferred:
+                real = new OwnedTaskExecutor(workers, ingress, retained);
+                real.researchStart();
+                break;
+            case P31Mode.managed:
+                manager = new GenerationalManager();
+                real = new OwnedTaskExecutor(workers, ingress, retained);
+                check(manager.enroll(real, h) && manager.start(h),
+                    "P31 manager prelaunch/real-start failed");
+                break;
+        }
+        const created = MonoTime.currTime;
+
+        auto threads = new Thread[producers];
+        auto stats = new P31Stats[producers];
+        foreach (i; 0 .. producers)
+        {
+            stats[i] = new P31Stats();
+            const counter = work == P31Work.sharedTwoAtomics
+                ? sharedCounter : counters[i];
+            threads[i] = p31Producer(mode, work, baseline, real,
+                manager, h, counter, taskCount / producers, stats[i]);
+        }
+        foreach (t; threads)
+            launchOrAbort(t);
+        foreach (t; threads)
+            joinOrAbort(t);
+        const submitted = MonoTime.currTime;
+
+        final switch (mode)
+        {
+            case P31Mode.m0:
+                baseline.closeAndJoin();
+                break;
+            case P31Mode.deferred:
+                real.closeAndJoin();
+                break;
+            case P31Mode.managed:
+                check(manager.orphan(h) && manager.joinOrphan(h) &&
+                    manager.reclaim(h) &&
+                    manager.rootAdds() == 1 &&
+                    manager.rootRemovals() == 1,
+                    "P31 joined owner root not reclaimed");
+                break;
+        }
+        const stopped = MonoTime.currTime;
+
+        size_t accepted, completed;
+        if (mode == P31Mode.m0)
+        {
+            accepted = baseline.acceptedCount();
+            completed = baseline.completedCount();
+        }
+        else
+        {
+            accepted = real.acceptedCount();
+            completed = real.completedCount();
+        }
+        size_t attempts, acknowledged, producerBytes;
+        foreach (stat; stats)
+        {
+            attempts += stat.attempts;
+            acknowledged += stat.accepted;
+            producerBytes += stat.producerBytes;
+        }
+        ulong executed, checksum;
+        if (work == P31Work.sharedTwoAtomics)
+        {
+            executed = atomicLoad!(MemoryOrder.acq)(
+                sharedCounter.executed);
+            checksum = atomicLoad!(MemoryOrder.acq)(
+                sharedCounter.checksum);
+        }
+        else if (work == P31Work.shardedTwoAtomics)
+        {
+            foreach (c; counters)
+            {
+                // Every shard receives exactly taskCount/producers
+                // accepted work, irrespective of native worker choice.
+                check(atomicLoad!(MemoryOrder.acq)(c.executed) ==
+                      taskCount / producers &&
+                      atomicLoad!(MemoryOrder.acq)(c.checksum) ==
+                      cast(ulong)(taskCount / producers) * 60UL,
+                      "P31 individual producer shard not settled");
+                executed += atomicLoad!(MemoryOrder.acq)(c.executed);
+                checksum += atomicLoad!(MemoryOrder.acq)(c.checksum);
+            }
+        }
+        // For minimal work, the *native pool's* accepted/completed
+        // accounting is the oracle; no custom shared atomic is present.
+        check(accepted == taskCount && completed == taskCount &&
+            acknowledged == taskCount && attempts >= taskCount,
+            "P31 M0 accepted/completed differs between arms");
+        if (work == P31Work.minimal)
+            check(executed == 0 && checksum == 0,
+                "P31 minimal unexpectedly shared atomic counter");
+        else
+            check(executed == taskCount &&
+                checksum == cast(ulong)taskCount * 60UL,
+                "P31 counted task checksum or execution mismatch");
+        check(created >= begin && submitted >= created &&
+            stopped >= submitted, "P31 invalid monotonic phase order");
+
+        writeln(phase, ",", round, ",", p31WorkName(work), ",",
+            producers, ",", p31ModeName(mode), ",",
+            taskCount, ",", workers, ",", ingress, ",", retained, ",",
+            accepted, ",", completed, ",", executed, ",", checksum, ",",
+            attempts, ",", producerBytes, ",",
+            (created - begin).total!"nsecs", ",",
+            (submitted - created).total!"nsecs", ",",
+            (stopped - submitted).total!"nsecs", ",",
+            (stopped - begin).total!"nsecs");
+    }
+
+    void main(string[] args)
+    {
+        size_t taskCount = 512, workers = 4, ingress = 64,
+            retained = 256, warmup = 1, rounds = 3;
+        foreach (i, arg; args[1 .. $])
+        {
+            // Parser below uses the original args array; i is
+            // intentionally not used to avoid compiler mode drift.
+        }
+        for (size_t i = 1; i < args.length; ++i)
+        {
+            check(i + 1 < args.length, "P31 missing CLI value");
+            auto key = args[i];
+            const val = to!size_t(args[++i]);
+            switch (key)
+            {
+                case "--count": taskCount = val; break;
+                case "--workers": workers = val; break;
+                case "--ingress": ingress = val; break;
+                case "--retained": retained = val; break;
+                case "--warmup": warmup = val; break;
+                case "--rounds": rounds = val; break;
+                default: throw new Exception("P31 unknown argument: " ~ key);
+            }
+        }
+        check(taskCount > 0 && taskCount <= 100_000 &&
+            taskCount % 4 == 0 && workers > 0 &&
+            ingress > 0 && retained > 0 && rounds >= 3 &&
+            rounds <= 12 && warmup <= 3,
+            "P31 invalid fixed-dimension workload");
+        writeln("phase,round,work,producers,mode,count,workers,ingress,"
+            ~ "retained,accepted,completed,executed,checksum,attempts,"
+            ~ "producer_alloc_bytes,create_start_ns,submit_ns,"
+            ~ "join_release_ns,total_ns");
+
+        // Latin square for the three ownership arms.
+        const P31Mode[3][3] orders = [
+            [P31Mode.m0, P31Mode.deferred, P31Mode.managed],
+            [P31Mode.deferred, P31Mode.managed, P31Mode.m0],
+            [P31Mode.managed, P31Mode.m0, P31Mode.deferred]
+        ];
+        const P31Work[3] workKinds = [
+            P31Work.sharedTwoAtomics,
+            P31Work.shardedTwoAtomics,
+            P31Work.minimal
+        ];
+        const size_t[3] producerCounts = [1, 2, 4];
+        foreach (round; 0 .. warmup + rounds)
+        {
+            auto phase = round < warmup ? "warmup" : "measure";
+            // Vary profile order as well as ownership arm position.
+            foreach (pIdx; 0 .. producerCounts.length)
+            {
+                auto nProd = producerCounts[
+                    (pIdx + round) % producerCounts.length];
+                foreach (wIdx; 0 .. workKinds.length)
+                {
+                    auto kind = workKinds[
+                        (wIdx + round) % workKinds.length];
+                    foreach (mode; orders[round % orders.length])
+                        p31Measure(phase, round, mode, kind, taskCount,
+                            workers, nProd, ingress, retained);
+                }
+            }
+        }
+        writeln("P31_FIXED_DIMENSIONS_BENCHMARK_PASS");
     }
 }
 else version (P29ExitUnknown)
