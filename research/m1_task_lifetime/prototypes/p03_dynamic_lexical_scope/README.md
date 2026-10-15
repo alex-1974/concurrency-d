@@ -51,7 +51,43 @@ bash tools/research/m1_dynamic_scope_prototype.sh dmd
 bash tools/research/m1_dynamic_scope_prototype.sh ldc2
 ```
 
-The runner compiles the repository's actual M0 task-ref module, not a duplicate mock, and enables `-preview=dip1000`. The LDC variant also runs `-O3` without `-release`, preserving the assert-based invariants.
+The runner compiles the repository's actual M0 task-ref module, not a duplicate mock, and enables `-preview=dip1000`. Both compilers additionally execute `-release`; LDC also executes `-O3` without `-release`. Essential admissions and runtime correctness conditions now use always-evaluated `ensure` rather than removable `assert`.
+
+## 2026-10-15 release-mode harness qualification
+
+The original P03 research harness used `assert(portal.trySpawn(...))`
+for **essential task admission** and ordinary `assert` for nearly all
+post-join oracles. Under `-release`, D removes those calls, so the original
+fixture was **not a valid whole-release correctness test**: it could omit
+published tasks, stall on the test-only blocked-worker rendezvous and skip
+outcome verification. This is a **test-harness bug**, not evidence of a defect
+in the M0 scheduler or a newly discovered compiler error.
+
+The research-only P03 source now uses an always-evaluated `ensure(bool)`
+helper for admission and all runtime checks. Its three static
+`static assert` compile barriers remain unchanged. The blocked-worker
+backpressure scenario releases its test semaphore in `finally` even if a
+requirement throws before normal release; destructor ordering writes a
+nonthrowing atomic violation flag, checked **after** destruction, rather than
+throwing from a destructor. The P03 native runner now **compiles and executes**
+normal, `-release` and (for LDC) `-O3` correctness configurations, under
+bounded subprocess timeouts. The real original `TaskRef` transport remains
+unchanged. No public API, new ownership guarantee or scheduling policy is
+implied.
+
+**Exact research-only code gate:** [CI #38712094608](https://github.com/alex-1974/concurrency-d/actions/runs/38712094608)
+at commit `d928726418e2d16f0f6ea450818a46b3cda05131`:
+DMD 2.111.0 / LDC 1.41.0 P03 Debug and `-release` stages passed;
+LDC additionally ran `-O3` with assertions enabled. The long-running full
+P01–P18 workflow should be checked separately before declaring the entire
+branch green. The after-the-fact runner timeout/documentation change itself
+also needs its own exact-head CI gate.
+
+**Boundary unchanged:** `runScoped` and task submission remain `@system`;
+short-lived nested block borrows are not compiler-proved, arbitrary callback
+data races are not addressed, and native `Thread.start`/join failure does
+not have a proved recoverable lifetime semantics. Retain ADR-0001 **PROPOSED**,
+Issue #17 **OPEN**, PR #38 **Draft**, and `source/` unchanged.
 
 ## Design limits / GO-NO-GO
 

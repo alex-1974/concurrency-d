@@ -12,7 +12,7 @@ command -v "$DC" >/dev/null 2>&1 || { echo "missing compiler: $DC" >&2; exit 2; 
   "-of=$TMP/m1-p03-dynamic-scope" \
   "$ROOT/source/concurrency/internal/task_record.d" \
   "$ROOT/research/m1_task_lifetime/prototypes/p03_dynamic_lexical_scope/concurrency/research/m1_dynamic_scope.d"
-"$TMP/m1-p03-dynamic-scope"
+timeout --signal=TERM --kill-after=5s 45s "$TMP/m1-p03-dynamic-scope"
 
 # P03 release-mode correctness must remain live: all admissions and oracle
 # checks used to be assert() statements, which D -release elides.
@@ -20,7 +20,7 @@ command -v "$DC" >/dev/null 2>&1 || { echo "missing compiler: $DC" >&2; exit 2; 
   "-of=$TMP/m1-p03-dynamic-scope-release" \
   "$ROOT/source/concurrency/internal/task_record.d" \
   "$ROOT/research/m1_task_lifetime/prototypes/p03_dynamic_lexical_scope/concurrency/research/m1_dynamic_scope.d"
-"$TMP/m1-p03-dynamic-scope-release"
+timeout --signal=TERM --kill-after=5s 45s "$TMP/m1-p03-dynamic-scope-release"
 
 if [[ "$(basename -- "$DC")" == ldc2* ]]; then
     # Keep assert checks enabled: this is optimized correctness, not a benchmark.
