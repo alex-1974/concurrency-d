@@ -62,8 +62,8 @@ else
     sample.cadenceYields = waves * ((tasksPerWave - 1) / P18ProducerCadence);
     const all = tasksPerWave * waves;""")
     d = one(d,
-        "sample.retries, \",\" , sample.parkCount, \",\" , sample.checksum);",
-        "sample.retries, \",\" , sample.parkCount, \",\" , sample.checksum, \",\" , sample.cadenceYields);")
+        "sample.retries, \",\", sample.parkCount, \",\", sample.checksum);",
+        "sample.retries, \",\", sample.parkCount, \",\", sample.checksum, \",\", sample.cadenceYields);")
     d = one(d,
         '"retries,park_count,checksum");',
         '"retries,park_count,checksum,cadence_yields");')
