@@ -62,3 +62,11 @@ configuration "p24-root-registry-optimized" {
     mainSourceFile "consumer/p24_root_registry.d"
     dflags "-O3"
 }
+
+configuration "p25-owner-modes" {
+    mainSourceFile "consumer/p25_ownership_modes.d"
+}
+configuration "p25-owner-modes-optimized" {
+    mainSourceFile "consumer/p25_ownership_modes.d"
+    dflags "-O3"
+}
