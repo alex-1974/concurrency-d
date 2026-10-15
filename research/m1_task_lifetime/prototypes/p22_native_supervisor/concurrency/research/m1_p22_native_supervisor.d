@@ -108,6 +108,7 @@ private final class RootedGroup
     private Receipt receipt;
     private size_t nativeCount;
     private size_t joinClaims;
+    private size_t waitingClosers;
     private bool injectPreJoin;
 
     this(bool fakePreJoinFault = false)
@@ -143,13 +144,11 @@ private final class RootedGroup
             }
             catch (Throwable)
             {
-                synchronized (mutex)
-                {
-                    fault = Fault.nativeUnknown;
-                    phase = Phase.uncertain;
-                    changed.notifyAll();
-                }
-                return false;
+                // A real druntime start failure could have happened
+                // AFTER the OS launched this native worker. The
+                // isolated research harness has no independent OS
+                // quiescence proof for that path: do not unwind.
+                abort();
             }
             ++nativeCount;
 
@@ -220,6 +219,7 @@ private final class RootedGroup
                     ++joinClaims;
                     break;
                 case Phase.draining:
+                    ++waitingClosers; // under mutex: independent waiter arrived
                     while (phase == Phase.draining)
                         changed.wait();
                     return phase == Phase.joinedStopped
@@ -291,6 +291,12 @@ private final class RootedGroup
     {
         synchronized (mutex)
             return joinClaims;
+    }
+
+    size_t observedWaiters()
+    {
+        synchronized (mutex)
+            return waitingClosers;
     }
 
     size_t startedCount() { return nativeCount; }
@@ -410,6 +416,17 @@ private void testConcurrentNormalJoin()
     require(supervisor.tryDiscard(), "supervisor did not release joined owner");
 }
 
+private void awaitTwoCloseWaiters(RootedGroup group)
+{
+    const deadline = MonoTime.currTime + dur!"seconds"(10);
+    while (group.observedWaiters() < 2)
+    {
+        require(MonoTime.currTime < deadline,
+            "two concurrent shutdown observers did not enter draining");
+        Thread.yield();
+    }
+}
+
 private void testInjectedPrejoinAndAbandonedController()
 {
     auto group = new RootedGroup(true);
@@ -435,6 +452,7 @@ private void testInjectedPrejoinAndAbandonedController()
         "close did not enter draining before fault");
     require(group.heldRoots() == 2, "early roots cleared during draining");
     require(!supervisor.tryDiscard(), "prejoin owner discarded early");
+    awaitTwoCloseWaiters(group); // prove both join the first closer's barrier
     faultGate.releaseOrAbort(1);
 
     foreach (thread; closers)
