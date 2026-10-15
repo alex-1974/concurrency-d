@@ -24,13 +24,13 @@ for mode in debug release; do
         "-of=$TMP/p22-$mode" "$SOURCE"
     timeout --signal=TERM --kill-after=3s 35s "$TMP/p22-$mode" \
         >"$TMP/$mode.log"
-    grep -Fx 'P22_NATIVE_SUPERVISOR_PASS normal=1 prejoin=1 postlaunch=1' \
+    grep -Fx 'P22_NATIVE_SUPERVISOR_PASS normal=12 prejoin=12 postlaunch=8' \
         "$TMP/$mode.log"
 done
 if [[ "$(basename -- "$DC")" == ldc2* ]]; then
     "$DC" -O3 -preview=dip1000 "-of=$TMP/p22-O3" "$SOURCE"
     timeout --signal=TERM --kill-after=3s 35s "$TMP/p22-O3" \
         >"$TMP/O3.log"
-    grep -Fx 'P22_NATIVE_SUPERVISOR_PASS normal=1 prejoin=1 postlaunch=1' \
+    grep -Fx 'P22_NATIVE_SUPERVISOR_PASS normal=12 prejoin=12 postlaunch=8' \
         "$TMP/O3.log"
 fi

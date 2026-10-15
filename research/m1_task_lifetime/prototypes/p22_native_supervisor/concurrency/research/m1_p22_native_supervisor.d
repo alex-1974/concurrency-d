@@ -537,8 +537,15 @@ private void testPostLaunchStartUncertainty()
 
 void main()
 {
-    testConcurrentNormalJoin();
-    testInjectedPrejoinAndAbandonedController();
-    testPostLaunchStartUncertainty();
-    writeln("P22_NATIVE_SUPERVISOR_PASS normal=1 prejoin=1 postlaunch=1");
+    // Repeated independent native start/join cycles; the synthetic
+    // pre-join barrier forces two observers to WAIT concurrently.
+    foreach (_; 0 .. 12)
+    {
+        testConcurrentNormalJoin();
+        testInjectedPrejoinAndAbandonedController();
+    }
+    foreach (_; 0 .. 8)
+        testPostLaunchStartUncertainty();
+
+    writeln("P22_NATIVE_SUPERVISOR_PASS normal=12 prejoin=12 postlaunch=8");
 }
