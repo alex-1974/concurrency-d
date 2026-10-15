@@ -20,7 +20,7 @@ def main():
             raise ValueError("P34 source anchor drift: " + old[:70])
         text = text.replace(old, new, 1)
     destination.parent.mkdir(parents=True, exist_ok=True)
-    destination.write_text("// GENERATED P34 RESEARCH ONLY\\n" + text)
+    destination.write_text("// GENERATED P34 RESEARCH ONLY\n" + text)
     print("P34_SOURCE_PIN_PASS")
 
 
