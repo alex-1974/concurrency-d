@@ -130,7 +130,9 @@ def self_test():
     # timestamps rather than quietly analyzing incoherent phases.
     near = valid.replace(",350\n", ",600\n", 1)
     validate(io.StringIO(near), 3)
-    far = valid.replace(",350\\n", ",5350\n", 1)
+    far = valid.replace(",350\n", ",5350\n", 1)
+    if far == valid:
+        raise ValueError("P30 timing-negative fixture was not mutated")
     try:
         validate(io.StringIO(far), 3)
     except ValueError:
