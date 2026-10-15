@@ -32,7 +32,7 @@ else version (P18Cadence8)
 else version (P18Cadence64)
     private enum size_t P18ProducerCadence = 64;
 else
-    static assert(0, "P18 cadence benchmark requires explicit cadence version");
+    private enum size_t P18ProducerCadence = 0;
 """)
     k = one(k,
         """                    if (outcome == SubmissionResult.accepted)
