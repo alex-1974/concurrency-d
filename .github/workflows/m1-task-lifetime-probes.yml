@@ -49,6 +49,8 @@ on:
       - "tools/research/m1_p34_make_wrapper.py"
       - "tools/research/m1_p34_probe.sh"
       - "tools/research/m1_p34_compare.py"
+      - "tools/research/m1_p34_xps.sh"
+      - "tools/research/m1_p34_three_arm.py"
       - "tools/research/m1_p20_make_owned_fault.py"
       - "tools/research/m1_owned_gc_real_pool.sh"
       - "tools/research/m1_matched_pool_benchmark.sh"
@@ -137,6 +139,8 @@ on:
       - "tools/research/m1_p34_make_wrapper.py"
       - "tools/research/m1_p34_probe.sh"
       - "tools/research/m1_p34_compare.py"
+      - "tools/research/m1_p34_xps.sh"
+      - "tools/research/m1_p34_three_arm.py"
       - "tools/research/m1_p20_make_owned_fault.py"
       - "tools/research/m1_owned_gc_real_pool.sh"
       - "tools/research/m1_matched_pool_benchmark.sh"
@@ -309,6 +313,12 @@ jobs:
         run: |
           bash -n tools/research/m1_p33_xps.sh
           python3 -m py_compile tools/research/m1_p33_compare.py
+
+      - name: P34 native three-arm capture preflight
+        shell: bash
+        run: |
+          bash -n tools/research/m1_p34_xps.sh
+          python3 -m py_compile tools/research/m1_p34_three_arm.py
 
       - name: P34 pinned owner null and timed wrapper correctness
         shell: bash
