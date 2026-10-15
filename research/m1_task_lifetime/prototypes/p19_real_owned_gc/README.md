@@ -108,6 +108,18 @@ An earlier compile-only attempt (CI #38716326218) exposed D's
 `opCall` aggregate-construction ambiguity; explicit struct field
 initialization fixed only the test fixture.
 
+## P20 native-state follow-up
+
+[P20](../p20_owned_native_unknown/README.md) introduces a **synthetic
+pre-native-join** fault on a source-pinned research copy of the **real**
+M0 `OwnedTaskExecutor`. It observes `isStopped()==true` while the
+accepted worker remains blocked and its owned record retained, then
+requires a separate supervisor-rooted *actual successful join* before
+cleanup. This does **not** reproduce an actual failed native join or
+promote P19's normal lifecycle evidence into a general fault-tolerant
+`@safe` executor. The false-state finding motivates a distinct
+`shutdownUncertain` versus verified `joinedStopped` design gate.
+
 ## Decision and limits
 
 **KEEP (research):** concrete evidence for ordinary accepted GC-backed
