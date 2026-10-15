@@ -138,6 +138,21 @@ HEAD separately before declaring the entire branch green.
 Do not derive throughput or overhead measurements from shared-runner
 CI timing.
 
+## P27 process-exit follow-up
+
+[P27](../p27_registry_transitions/README.md) qualifies
+`register → start → publish → close → release` overlap on the
+**real unchanged M0 worker pool**, the competing-start/closer barrier,
+and a separate certified never-started root cancellation. Its first
+native teardown probe exposed a crucial **negative result**:
+with a still-active druntime Thread on pinned DMD/LDC Linux, ordinary
+program return did not reach the module destructor before the
+timeout. The revised gate therefore tests an **explicit
+application-shutdown** fail-stop while `main()` is still executing,
+and retains the runtime-only timeout as a diagnostic counterexample.
+This does not qualify native join-error retry or any arbitrary
+`@safe` scoped borrow.
+
 ## Assessment and remaining limits
 
 **Keep as evidence, do not promote one universal owner.** The move
