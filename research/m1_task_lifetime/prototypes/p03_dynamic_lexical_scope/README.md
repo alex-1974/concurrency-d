@@ -115,6 +115,8 @@ normal, `-release` and LDC `-O3` test modes. A missing marker or timeout
 fails the gate. The checker is research-only. **Do not interpret its PASS
 as justification for changing P03's `@system` annotation.**
 
+**Executed qualification:** [CI #38713663752](https://github.com/alex-1974/concurrency-d/actions/runs/38713663752) completed successfully at commit `1cd40c66b18489fa1ae1b4d196cd9f0b66a5b76a`. Both DMD 2.111.0 and LDC 1.41.0 passed the nested-block ordering marker in normal and release execution; LDC also passed optimized `-O3`. The P01–P18 workflow completed successfully. This supports only the bounded ordering observation, not a new public `@safe` lifetime guarantee.
+
 ## Design limits / GO-NO-GO
 
 **KEEP (research):** lexical dynamic TaskRef publication with one producer, bounded pinned task records, fixed worker count, exception-safe join and no detach. This demonstrably extends P02's one-shot batch capability without changing the one-word transport.
