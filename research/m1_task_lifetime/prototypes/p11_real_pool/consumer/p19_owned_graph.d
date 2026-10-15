@@ -154,7 +154,9 @@ private void testQueuedGcGraphAfterDroppedHandles()
     auto receipt = new Receipt();
 
     // The blocker is admitted and is the only executing task.
-    auto blocker = executor.submit(Blocker(gate));
+    Blocker blockedWork;
+    blockedWork.gate = gate;
+    auto blocker = executor.submit(blockedWork);
     require(blocker !is null, "blocker admission rejected");
     blocker = null;
 
@@ -217,7 +219,8 @@ private struct ScalarTask
 private void testResultAfterRecordReaping()
 {
     auto executor = new OwnedTaskExecutor(1, 4, 2);
-    auto task = ScalarTask(17);
+    ScalarTask task;
+    task.value = 17;
     auto handle = executor.submit(task);
     require(handle !is null, "scalar admission rejected");
 
