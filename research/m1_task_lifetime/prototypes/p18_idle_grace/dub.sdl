@@ -78,6 +78,15 @@ configuration "cadence64-grace" {
     mainSourceFile "generated/cadence/consumer/main.d"
     versions "P18Cadence64" "P18Grace"
 }
+// Native event-free PARK transition correctness probes, source-pinned
+// clones only. Never include in benchmark or production configurations.
+configuration "park-boundary-control" {
+    mainSourceFile "generated/boundary/main.d"
+}
+configuration "park-boundary-grace" {
+    mainSourceFile "generated/boundary/main.d"
+    versions "P18BoundaryGrace"
+}
 configuration "race-control" {
     mainSourceFile "generated/race/main.d"
 }
