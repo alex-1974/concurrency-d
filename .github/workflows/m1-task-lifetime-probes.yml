@@ -25,6 +25,7 @@ on:
       - "tools/research/m1_p24_root_registry.sh"
       - "tools/research/m1_p25_owner_modes.sh"
       - "tools/research/m1_p26_token_registry.sh"
+      - "tools/research/m1_p27_registry_transitions.sh"
       - "tools/research/m1_p20_make_owned_fault.py"
       - "tools/research/m1_owned_gc_real_pool.sh"
       - "tools/research/m1_matched_pool_benchmark.sh"
@@ -89,6 +90,7 @@ on:
       - "tools/research/m1_p24_root_registry.sh"
       - "tools/research/m1_p25_owner_modes.sh"
       - "tools/research/m1_p26_token_registry.sh"
+      - "tools/research/m1_p27_registry_transitions.sh"
       - "tools/research/m1_p20_make_owned_fault.py"
       - "tools/research/m1_owned_gc_real_pool.sh"
       - "tools/research/m1_matched_pool_benchmark.sh"
@@ -229,6 +231,10 @@ jobs:
       - name: P26 token moves, exceptional unwind, registry release races
         shell: bash
         run: bash tools/research/m1_p26_token_registry.sh "$DC"
+
+      - name: P27 real M0 register-start-submit-close-release race and process exit
+        shell: bash
+        run: bash tools/research/m1_p27_registry_transitions.sh "$DC"
 
       - name: P12 paired matched M0 work-stealing benchmark (CI diagnostic only)
         shell: bash
