@@ -11,10 +11,10 @@ python3 "$ROOT/tools/research/m1_p23_make_owned.py" "$ROOT/source/concurrency/in
 for build in debug release; do
     output="$(timeout 160s dub run --root="$BASE" --compiler="$DC" --build="$build" --config=p23-lifecycle)"
     printf '%s\n' "$output"
-    grep -Fq 'P23_REAL_M0_LIFECYCLE_PASS normal=6 prejoin=6 poststart=6' <<< "$output"
+    grep -Fq 'P23_REAL_M0_LIFECYCLE_PASS normal=6 prejoin=6 poststart=6 producer=6' <<< "$output"
 done
 if [[ "$(basename -- "$DC")" == ldc2* ]]; then
     output="$(timeout 160s dub run --root="$BASE" --compiler="$DC" --build=debug --config=p23-lifecycle-optimized)"
     printf '%s\n' "$output"
-    grep -Fq 'P23_REAL_M0_LIFECYCLE_PASS normal=6 prejoin=6 poststart=6' <<< "$output"
+    grep -Fq 'P23_REAL_M0_LIFECYCLE_PASS normal=6 prejoin=6 poststart=6 producer=6' <<< "$output"
 fi
