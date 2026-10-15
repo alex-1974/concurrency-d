@@ -86,3 +86,11 @@ configuration "p28-bounded-optimized" {
     mainSourceFile "consumer/p28_bounded_orphans.d"
     dflags "-O3"
 }
+
+configuration "p29-generational" {
+    mainSourceFile "consumer/p29_generational_owner.d"
+}
+configuration "p29-generational-optimized" {
+    mainSourceFile "consumer/p29_generational_owner.d"
+    dflags "-O3"
+}
