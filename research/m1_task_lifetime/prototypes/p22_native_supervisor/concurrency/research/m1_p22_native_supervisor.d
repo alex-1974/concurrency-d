@@ -354,6 +354,15 @@ private void checkResults(Receipt receipt, size_t count)
     }
 }
 
+// A separate invocation frame per closer: capturing a loop-local slot
+// directly can alias a reused iteration activation in D.
+private Thread makeCloser(RootedGroup group, Shutdown[] outcomes, size_t index)
+{
+    return new Thread({
+        outcomes[index] = group.closeAndJoin();
+    });
+}
+
 private void testConcurrentNormalJoin()
 {
     auto group = new RootedGroup();
@@ -370,10 +379,7 @@ private void testConcurrentNormalJoin()
     Thread[3] closers;
     foreach (i; 0 .. closers.length)
     {
-        const slot = i;
-        closers[i] = new Thread({
-            statuses[slot] = group.closeAndJoin();
-        });
+        closers[i] = makeCloser(group, statuses[], i);
         closers[i].start();
     }
 
@@ -420,10 +426,7 @@ private void testInjectedPrejoinAndAbandonedController()
     Thread[3] closers;
     foreach (i; 0 .. closers.length)
     {
-        const slot = i;
-        closers[i] = new Thread({
-            statuses[slot] = group.closeAndJoin();
-        });
+        closers[i] = makeCloser(group, statuses[], i);
         closers[i].start();
     }
     awaitEntered(faultGate, 1);
