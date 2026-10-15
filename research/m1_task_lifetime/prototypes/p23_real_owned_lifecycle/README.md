@@ -135,6 +135,20 @@ runs pinned DMD 2.111.0 and LDC 1.41.0 through the new and
 existing P01–P22 gates. **Confirm the exact run conclusion before
 claiming overall PASS**.
 
+## P24 durable-root follow-up
+
+[P24](../p24_durable_root/README.md) tests the next ownership layer
+**without replacing the real M0 scheduler**. A process-reachable,
+two-slot registry calls `GC.addRoot` on the source-pinned P23
+`OwnedTaskExecutor` *before native worker startup*, holds separate
+task/root obligations after producer/controller abandonment, rejects
+release during unproven shutdown, and pairs every removal with an
+actual successful native join. It also isolates two simultaneous
+executors so release of one joined owner cannot clear the other
+blocked executor's root. This does **not** establish a general public
+lifecycle manager, arbitrary `@safe` captures or native failure
+recovery; the P23 fail-stop policy remains.
+
 ## Decision gates
 
 **KEEP as research:** deferred native start with independent
