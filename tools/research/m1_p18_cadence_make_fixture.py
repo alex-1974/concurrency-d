@@ -25,7 +25,9 @@ def generate(kernel, driver, race, destination):
         """module concurrency.research.m1_p18_cadence_kernel;
 
 // Only a generated research benchmark: compile-time separated workloads.
-version (P18Cadence8)
+version (P18CadenceNone)
+    private enum size_t P18ProducerCadence = 0;
+else version (P18Cadence8)
     private enum size_t P18ProducerCadence = 8;
 else version (P18Cadence64)
     private enum size_t P18ProducerCadence = 64;
@@ -40,15 +42,29 @@ else
                         // Intentional producer-only pacing AFTER a successful
                         // admission, never after the final TaskRef in a wave.
                         // The original full-inbox retry policy is unchanged.
-                        if (j + 1 < tasksPerWave &&
-                            ((j + 1) % P18ProducerCadence) == 0)
-                            Thread.yield();
+                        static if (P18ProducerCadence != 0)
+                        {
+                            if (j + 1 < tasksPerWave &&
+                                ((j + 1) % P18ProducerCadence) == 0)
+                                Thread.yield();
+                        }
                         break;
                     }""")
     d = one(d, "module concurrency.research.p18_consumer;",
         "module concurrency.research.p18_cadence_consumer;")
     d = one(d, "import concurrency.research.m1_p18_kernel :",
         "import concurrency.research.m1_p18_cadence_kernel :")
+    # Narrow all cadence arms to the SAME six cases (one worker, 128/512/
+    # 1024 iterations, ingress 8/2048); preserve other P13 profiles.
+    d = one(d,
+        'options.profile != "sched8" && options.profile != "sched2048"',
+        'options.profile != "sched8" && options.profile != "sched2048" && options.profile != "cadencefocus"')
+    d = one(d,
+        'profile == "singleingress" ? [1] :',
+        'profile == "singleingress" || profile == "cadencefocus" ? [1] :')
+    d = one(d,
+        'profile == "singleingress" ? [8, 64, 256, 2048] :',
+        'profile == "singleingress" ? [8, 64, 256, 2048] : profile == "cadencefocus" ? [8, 2048] :')
     d = one(d, "P18 bounded idle grace RESEARCH only;",
         "P18 deliberately paced producer research (8/64 successes);")
 
@@ -59,7 +75,11 @@ else
     k = one(k,
         "    sample.ingress = ingress;\n    const all = tasksPerWave * waves;",
         """    sample.ingress = ingress;
-    sample.cadenceYields = waves * ((tasksPerWave - 1) / P18ProducerCadence);
+    static if (P18ProducerCadence == 0)
+        sample.cadenceYields = 0;
+    else
+        sample.cadenceYields =
+            waves * ((tasksPerWave - 1) / P18ProducerCadence);
     const all = tasksPerWave * waves;""")
     d = one(d,
         "sample.retries, \",\", sample.parkCount, \",\", sample.checksum);",
