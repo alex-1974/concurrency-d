@@ -12,7 +12,16 @@ from tempfile import TemporaryDirectory
 
 from m1_p18_make_grace_pool import ORIGINAL_M0_BLOB, generate as make_grace, once
 
+# Never put an essential publish/notification side effect solely inside
+# D assert(): whole-release LDC can compile assertions away.
 PROBE = r"""
+private void requireParkBoundary(bool condition,
+                                  string detail = "park boundary invariant")
+{
+    if (!condition)
+        throw new Exception("P18 park boundary: " ~ detail);
+}
+
 // Research-only module-local access to the PRIVATE original TaskInbox.
 // No change to generation, mutex, Condition, worker search or close logic.
 // Any unreturned waiter is killed by the CI wrapper's external timeout.
@@ -179,11 +188,16 @@ def generate(original, destination):
         "module concurrency.research.m1_p18_grace_pool;",
         "module concurrency.research.m1_p18_boundary_grace_pool;")
     prefix = "// GENERATED SOURCE-PINNED RESEARCH TEST; NOT PRODUCTION.\n"
+    # Ensure ALL 16 research assertions are converted to always-executed
+    # checks; failing to do this invalidates -release semantics.
+    if PROBE.count("assert(") != 16:
+        raise RuntimeError("native park boundary assertion site drift")
+    probe = PROBE.replace("assert(", "requireParkBoundary(")
     outputs = (
         (destination / "concurrency/research/m1_p18_boundary_control_pool.d",
-         prefix + m0 + PROBE),
+         prefix + m0 + probe),
         (destination / "concurrency/research/m1_p18_boundary_grace_pool.d",
-         prefix + grace_source + PROBE),
+         prefix + grace_source + probe),
         (destination / "boundary/main.d", MAIN),
     )
     for path, contents in outputs:
