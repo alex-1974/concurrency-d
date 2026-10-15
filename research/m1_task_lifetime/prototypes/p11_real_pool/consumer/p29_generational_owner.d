@@ -809,11 +809,27 @@ version (P30Benchmark)
         // Rotation avoids always granting the first arm the warmest
         // instruction cache or last arm the hottest processor. The
         // analyzer compares corresponding round/profile triples.
+        // Balanced cyclic Latin square: each arm occurs exactly once at
+        // position 1, 2 and 3 over each block of three paired triplets.
+        // The archived 2026-10-15 XPS baseline used UNBALANCED orders;
+        // retain that dataset unchanged and compare follow-up separately.
         const PerfMode[3][3] orders = [
             [PerfMode.original, PerfMode.deferred, PerfMode.managed],
-            [PerfMode.managed, PerfMode.deferred, PerfMode.original],
-            [PerfMode.deferred, PerfMode.original, PerfMode.managed]
+            [PerfMode.deferred, PerfMode.managed, PerfMode.original],
+            [PerfMode.managed, PerfMode.original, PerfMode.deferred]
         ];
+        foreach (target; [PerfMode.original, PerfMode.deferred,
+                          PerfMode.managed])
+        {
+            size_t[3] positions;
+            foreach (order; orders)
+                foreach (position, arm; order)
+                    if (arm == target)
+                        ++positions[position];
+            foreach (countAtPosition; positions)
+                check(countAtPosition == 1,
+                    "P30 performance arm orders are not position balanced");
+        }
         foreach (round; 0 .. warmup + rounds)
         {
             const phase = round < warmup ? "warmup" : "measure";
