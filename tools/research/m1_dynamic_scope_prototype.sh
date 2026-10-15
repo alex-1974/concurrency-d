@@ -28,5 +28,5 @@ if [[ "$(basename -- "$DC")" == ldc2* ]]; then
       "-of=$TMP/m1-p03-dynamic-scope-O3" \
       "$ROOT/source/concurrency/internal/task_record.d" \
       "$ROOT/research/m1_task_lifetime/prototypes/p03_dynamic_lexical_scope/concurrency/research/m1_dynamic_scope.d"
-    "$TMP/m1-p03-dynamic-scope-O3"
+    timeout --signal=TERM --kill-after=5s 45s "$TMP/m1-p03-dynamic-scope-O3"
 fi
