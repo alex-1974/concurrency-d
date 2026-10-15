@@ -38,6 +38,7 @@ on:
       - "tools/research/m1_p32_classify.py"
       - "tools/research/m1_p32_probe.sh"
       - "tools/research/m1_p32_compare.py"
+      - "tools/research/m1_p33_source_audit.py"
       - "tools/research/m1_p20_make_owned_fault.py"
       - "tools/research/m1_owned_gc_real_pool.sh"
       - "tools/research/m1_matched_pool_benchmark.sh"
@@ -115,6 +116,7 @@ on:
       - "tools/research/m1_p32_classify.py"
       - "tools/research/m1_p32_probe.sh"
       - "tools/research/m1_p32_compare.py"
+      - "tools/research/m1_p33_source_audit.py"
       - "tools/research/m1_p20_make_owned_fault.py"
       - "tools/research/m1_owned_gc_real_pool.sh"
       - "tools/research/m1_matched_pool_benchmark.sh"
@@ -281,6 +283,10 @@ jobs:
         run: |
           python3 tools/research/m1_p32_source_audit.py --self-test
           python3 tools/research/m1_p32_classify.py --self-test
+
+      - name: P33 exact P31 research source boundary audit
+        shell: bash
+        run: python3 tools/research/m1_p33_source_audit.py
 
       - name: P32-B matched producer M0 control vs pinned timed inbox
         shell: bash
