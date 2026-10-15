@@ -32,3 +32,19 @@ The actual P31 execution is implemented under `version(P31Benchmark)` in `resear
 If P33 demonstrates substantial *wrapper* time but little user-visible retry, the next step is an external profiler of allocations, GC and OS scheduling before attributing the time to P29 manager locking. If P33 finds bottlenecks in manager transitions, proposed changes must preserve explicit process roots and generation/ABA protections. Only a semantics-matched uninstrumented candidate-versus-baseline native result can justify a production optimization.
 
 **Current next implementation:** generated exact-P31 consumer and versioned DUB configuration, plus barrier correctness tests and paired null-clock controls. P33 is **not yet qualified**. Draft PR #38 and ADR-0001 stay unpromoted.
+
+## Executable P33 and paired native capture
+
+The generated P33 phase consumer now lives only as a temporary generated file at `p11_real_pool/consumer/p33_generational_owner.d`. It derives from the exact immutable P31 Git blob using `tools/research/m1_p33_make_phase.py`; the `p33-phases` and `p33-phases-optimized` DUB configurations are research-only. Every producer reaches an explicit semaphore start gate before entering the original per-task `p31Attempt` loop. The control remains the original unmodified P31 executable (same owner modes, TaskRecord work and retention); `tools/research/m1_p33_compare.py` enforces identical task count, work oracle and completion count across both.
+
+Reproduction:
+
+```bash
+bash tools/research/m1_p33_probe.sh dmd
+bash tools/research/m1_p33_probe.sh ldc2
+bash tools/research/m1_p33_xps.sh
+```
+
+The native script alternates whole-process unchanged-P31 and start-gated-P33 order across three sessions, each containing three warm-up and nine measured rounds on LDC release `-O3`. It stores raw logs, CSV, validation, metadata, an archive and SHA-256 receipt outside the repository. **P33 native XPS results have not yet been supplied.** The new CI gate must pass before the runtime comparison is qualified.
+
+This stage isolates the effect of a synchronization intervention, **not** pure thread-launch cost: the gated variant adds semaphore operations, thread-local clock reads and waiting; it still measures producer joins after barrier release. It does **not** yet separately timestamp each owned TaskRecord allocation or directly time the P29 manager lock. Those assertions require a subsequent narrower experiment and perturbation controls.
