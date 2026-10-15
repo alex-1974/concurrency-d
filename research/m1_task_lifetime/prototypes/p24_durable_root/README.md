@@ -139,6 +139,19 @@ P24_DURABLE_ROOT_PASS normal=6 uncertain=6 independent=4 roots=20 removed=20
 (DMD 2.111.0 and LDC 1.41.0). Confirm all jobs and final exact-head
 workflow conclusion before marking this full branch qualified.
 
+## P25 owner-mode comparison
+
+[P25](../p25_owner_modes/README.md) compares this process-registry
+ownership mode with a **noncopyable lexical LifetimeToken** under the
+same source-pinned real M0 `OwnedTaskExecutor` and identical
+accepted-task outcomes. The lexical token releases its registered
+GC root only after actual joined shutdown and **fails the process**
+if its scope exits without proved join; the registry permits the
+controller scope to disappear while work is still owned. Compile
+negative and separate `SIGABRT` gates distinguish the lifetime
+contracts. Both modes have matched correctness evidence, **not**
+measured performance equivalence or a general public `@safe` proof.
+
 ## Engineering disposition — conditional KEEP, production NO-GO
 
 P24 supports a **registered-root ownership family** with an explicit
