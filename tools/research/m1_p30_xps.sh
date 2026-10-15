@@ -101,7 +101,7 @@ freq = Path("/sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq")
 obj["frequency_khz_at_finish"] = (
     freq.read_text().strip() if freq.exists() else "unavailable"
 )
-path.write_text(json.dumps(obj, indent=2, sort_keys=True) + "\\n")
+path.write_text(json.dumps(obj, indent=2, sort_keys=True) + "\n")
 PY
 
 # One portable upload artifact, with SHA-256 alongside it. Do not
