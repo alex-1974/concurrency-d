@@ -164,6 +164,23 @@ negative builds directly to preserve real SIGABRT return codes.
 Verify the complete DMD/LDC run conclusion and final documentation
 HEAD before declaring P28 green.
 
+## P29 generation-tagged owner follow-up
+
+[P29](../p29_generational_owner/README.md) qualifies a correction to
+the P28 **bare-slot-index identity**: each reusable slot has a
+monotonically increasing generation that is verified under the
+same manager Mutex for every lifecycle and submission operation.
+Stale pre-reuse handles are tested against a new, live actual-M0
+executor under four simultaneous native attacker threads. In
+addition, an unproven native-liveness slot remains occupied while
+a separate certified never-started slot is recycled.
+
+The two-element handle is **not** an unforgeable security token or
+a general `@safe` ownership capability. The P29 registry also adds
+lock/unlock operations around managed task submission, so its
+throughput and contention overhead require real optimized XPS
+measurement before any production decision.
+
 ## Decision status
 
 **KEEP as research evidence:** bounded independent native ownership
