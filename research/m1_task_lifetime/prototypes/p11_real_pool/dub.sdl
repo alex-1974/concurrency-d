@@ -70,3 +70,11 @@ configuration "p25-owner-modes-optimized" {
     mainSourceFile "consumer/p25_ownership_modes.d"
     dflags "-O3"
 }
+
+configuration "p27-transitions" {
+    mainSourceFile "consumer/p27_registry_transitions.d"
+}
+configuration "p27-transitions-optimized" {
+    mainSourceFile "consumer/p27_registry_transitions.d"
+    dflags "-O3"
+}
