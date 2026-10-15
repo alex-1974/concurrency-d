@@ -18,6 +18,7 @@ import core.sync.semaphore : Semaphore;
 import core.thread : Thread;
 import core.time : MonoTime, dur;
 import std.stdio : writeln;
+import std.algorithm.mutation : move;
 
 private void require(bool yes, string why)
 {
@@ -123,6 +124,14 @@ private final class ProcessRegistry
     {
         synchronized (mutex)
             return owner !is null;
+    }
+
+    // P26: a borrowed LOCAL reference is acquired under the same
+    // mutex as root removal. Null is an expected race outcome.
+    OwnedTaskExecutor tryBorrow()
+    {
+        synchronized (mutex)
+            return owner;
     }
 }
 
@@ -332,6 +341,141 @@ private void exercise(Mode mode, bool synthetic)
     // The token destructor is now permitted to return normally.
 }
 
+// P26: each thread captures a separate function activation, not a
+// foreach iteration frame. These inspect only the fully joined owner.
+private Thread p26Reader(ProcessRegistry reg, shared uint* seen)
+{
+    return new Thread({
+        foreach (_; 0 .. 1000)
+        {
+            auto local = reg.tryBorrow();
+            if (local !is null)
+            {
+                if (!local.isStopped() || local.retainedCount() != 0)
+                    abort();
+                atomicFetchAdd!(MemoryOrder.rel)(*seen, 1u);
+            }
+            Thread.yield();
+        }
+    });
+}
+
+private Thread p26Releaser(ProcessRegistry reg, shared uint* won)
+{
+    return new Thread({
+        if (reg.tryRelease())
+            atomicFetchAdd!(MemoryOrder.rel)(*won, 1u);
+    });
+}
+
+private void p26Join(Thread t)
+{
+    try
+    {
+        auto failure = t.join(false);
+        if (failure !is null)
+            abort();
+    }
+    catch (Throwable)
+        abort();
+}
+
+private void p26ConcurrentRegistry()
+{
+    foreach (_; 0 .. 12)
+    {
+        auto reg = new ProcessRegistry();
+        auto owner = new OwnedTaskExecutor(1, 4, 4);
+        reg.adopt(owner);
+        owner = null;
+        reg.start();
+        reg.borrow().closeAndJoin(); // proof before root unregistration
+        require(reg.borrow().isStopped(), "P26 prior join absent");
+
+        shared uint observed, successes;
+        Thread[4] readers;
+        Thread[4] releasers;
+        foreach (i; 0 .. readers.length)
+        {
+            readers[i] = p26Reader(reg, &observed);
+            try readers[i].start();
+            catch (Throwable) abort();
+        }
+        foreach (i; 0 .. releasers.length)
+        {
+            releasers[i] = p26Releaser(reg, &successes);
+            try releasers[i].start();
+            catch (Throwable) abort();
+        }
+        foreach (t; readers)
+            p26Join(t);
+        foreach (t; releasers)
+            p26Join(t);
+        require(atomicLoad!(MemoryOrder.acq)(successes) == 1u,
+            "P26 registry must unregister exactly once");
+        require(!reg.holds() && reg.tryBorrow() is null &&
+            !reg.tryRelease(), "P26 registry stale/double release");
+        GC.collect();
+    }
+}
+
+private void p26MoveOwnership()
+{
+    LifetimeToken initial;
+    auto owner = new OwnedTaskExecutor(1, 4, 4);
+    initial.adopt(owner);
+    owner = null;
+    initial.start();
+    // Deliberate D move primitive rather than accidental copy.
+    auto relocated = move(initial);
+    require(relocated.borrow() !is null, "P26 moved token lost owner");
+    relocated.borrow().closeAndJoin();
+    require(relocated.tryRelease(), "P26 moved token root not removed");
+    require(!relocated.tryRelease(), "P26 duplicate root removal");
+    // Both destructors must now complete without fail-stop.
+}
+
+private void p26ExceptionWithJoinedCleanup()
+{
+    LifetimeToken token;
+    auto owner = new OwnedTaskExecutor(1, 4, 4);
+    token.adopt(owner);
+    owner = null;
+    token.start();
+    try
+        throw new Exception("P26_expected_unwind");
+    finally
+    {
+        try token.borrow().closeAndJoin();
+        catch (Throwable) abort();
+        require(token.tryRelease(), "P26 finally failed native join cleanup");
+    }
+}
+
+private void p26Positive()
+{
+    foreach (_; 0 .. 12)
+        p26MoveOwnership();
+    foreach (_; 0 .. 12)
+    {
+        bool caught;
+        try p26ExceptionWithJoinedCleanup();
+        catch (Exception error)
+            caught = error.msg == "P26_expected_unwind";
+        require(caught, "P26 exception propagation changed by token");
+    }
+    p26ConcurrentRegistry();
+    writeln("P26_OWNERSHIP_SAFETY_PASS moved=12 unwind=12 races=12");
+}
+
+version (P26ReturnCopy)
+{
+    private LifetimeToken p26BadReturn(ref LifetimeToken original)
+    {
+        return original; // requires prohibited copy, NOT move from lvalue
+    }
+}
+
 version (P25NegativeCopy)
 {
     void compileNegativeCopy()
@@ -341,7 +485,30 @@ version (P25NegativeCopy)
     }
 }
 
-version (P25DropFault)
+version (P26UnwindFault)
+{
+    void main()
+    {
+        try
+        {
+            LifetimeToken token;
+            auto owner = new OwnedTaskExecutor(1, 2, 2);
+            token.adopt(owner);
+            token.start();
+            owner = null;
+            import core.stdc.stdio : fprintf, fflush, stderr;
+            fprintf(stderr, "P26_INJECTED_UNWIND\n");
+            fflush(stderr);
+            throw new Exception("P26_injected_scope_throw");
+        }
+        catch (Exception)
+        {
+            // Unreachable if the active token destructor fail-stops.
+            writeln("P26_UNEXPECTED_RECOVERABLE_SCOPE");
+        }
+    }
+}
+else version (P25DropFault)
 {
     void main()
     {
@@ -368,6 +535,8 @@ else
             exercise(Mode.registry, true);
         }
         require(!registry().holds(), "registry was not emptied");
+        version (P26Positive)
+            p26Positive();
         writeln("P25_OWNER_MODES_PASS token=12 registry=12 normal=12 uncertain=12");
     }
 }
