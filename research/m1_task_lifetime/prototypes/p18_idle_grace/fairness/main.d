@@ -108,6 +108,16 @@ private void joinOrAbort(Thread thread) @system
         abort(); // No proof of native quiescence after a failed join.
 }
 
+private void notifyOrAbort(Semaphore gate) @system
+{
+    // D forbids a catch clause nested inside a finally block. Keep
+    // recoverable cleanup and the native-error fail-stop in this helper.
+    try
+        gate.notify();
+    catch (Throwable)
+        abort();
+}
+
 private void closeOrAbort(SubmissionWorkerPool pool) @system
 {
     try
@@ -252,12 +262,7 @@ private void scenario(
         // including if an observation deadline or ordinary check fails.
         atomicStore!(MemoryOrder.rel)(rendezvous[1], 1u);
         if (blocked)
-        {
-            try
-                gate.notify();
-            catch (Throwable)
-                abort();
-        }
+            notifyOrAbort(gate);
         foreach (id; 0 .. launched)
             joinOrAbort(producerThreads[id]);
         closeOrAbort(pool);
