@@ -122,6 +122,33 @@ P11 does not record throughput/latency distributions, allocation profiles or nor
 
 An appropriate next research slice would run a **shared long-lived M0 worker pool** with matching closure/ownership obligations for both paths and isolate task admission/dispatch costs, or explicitly benchmark only the per-record header-thunk microkernel with its narrower semantics. Include native optimized LDC codegen, OS/CPU pinning and repeated sample distributions before drawing a C++ parity or high-performance conclusion.
 
+## Release-mode ownership/result oracle hardening — 2026-10-15
+
+The P11 real-M0 copied-input consumer and the separate independently owned
+`OwnedTaskExecutor` consumer already test the two distinct lifetime families
+with identical scalar results. An audit identified a release-only harness
+defect: `assert(handles[i].get() == typed.values[i])` **elides the entire
+handle-result observation** under D `-release`. Other result/count/steal
+oracles were also `assert`-based, and a steal-phase time limit relied on
+assertions enabled by debug builds.
+
+Research-only changes make the consumer checks **always executed**, including
+all 256 `TaskHandle.get()` observations. The real-steal gate always checks
+admissions, worker rendezvous deadlines, task results and post-join counters;
+an invalid test record kind now unconditionally fails the test process.
+The typed P11 pool checks accepted/completed/returned invariants even with
+D assertions removed. The P11 runner executes an additional **full DUB
+release** `positive` consumer with a required final marker, for **both
+DMD and LDC**, alongside the existing debug, compile-negative and optimized
+assertions-on research tests. A timeout bounds every native process.
+
+The new gate is correctness-only. No semantic change to `TaskRef`, M0
+`SubmissionWorkerPool`, GC-owned task nodes or producer admission; no
+cross-family throughput claim. P11 remains deliberately `@system`, and
+its native failure/borrowed lifetime promises are **not upgraded**.
+The executed source-commit and CI result must be checked before marking
+this added whole-release gate qualified.
+
 ## Safety verdict
 
 **KEEP P11** as a reproducible, compiler-qualified integration of P09/P10 typed records with the *real* M0 scheduler and concrete steal path. The P11 API is intentionally `@system` and supported by three negative consumers; no public-facing type/API is frozen.

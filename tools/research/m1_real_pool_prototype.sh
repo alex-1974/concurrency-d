@@ -48,6 +48,26 @@ for scenario in negative-safe negative-borrow negative-delegate; do
     rm -f -- "$LOG"
 done
 
+# Exercise actual copy-vs-owned-result parity in WHOLE release mode.
+# The original consumer hid TaskHandle.get() inside assert(), which would
+# silently remove the observation. Keep all admission and join checks live.
+LOG="$(mktemp)"
+if ! timeout --signal=TERM --kill-after=5s 160s \
+    dub run --root="$BASE" --compiler="$DC" --build=release \
+        --config=positive >"$LOG" 2>&1; then
+    cat "$LOG" >&2
+    rm -f -- "$LOG"
+    exit 1
+fi
+if ! grep -q '^P11 real M0 work stealing: PASS' "$LOG"; then
+    cat "$LOG" >&2
+    rm -f -- "$LOG"
+    echo "FAIL: P11 release output marker missing" >&2
+    exit 1
+fi
+cat "$LOG"
+rm -f -- "$LOG"
+
 if [[ "$(basename -- "$DC")" == ldc2* ]]; then
     # The opt-in research configuration injects -O3 into a debug build:
     # compiler assertions remain enabled, unlike ordinary release mode.

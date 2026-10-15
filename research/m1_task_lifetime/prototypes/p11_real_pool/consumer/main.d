@@ -11,6 +11,12 @@ import concurrency.internal.owned_task :
 import concurrency.research.m1_steal_probe : qualifyRealSteal;
 import std.stdio : writeln;
 
+private void requireP11(bool valid)
+{
+    if (!valid)
+        throw new Exception("P11 consumer invariant failed");
+}
+
 private struct Point2
 {
     int x;
@@ -70,13 +76,13 @@ private void testBoundedTyped()
     foreach (workers; [1, 2, 4])
     {
         auto result = evaluateWithRealPool(full[], &calculate, workers, 4);
-        assert(result.count == full.length);
-        assert(result.accepted == full.length);
-        assert(result.completed == full.length);
-        assert(result.returned == full.length);
+        requireP11(result.count == full.length);
+        requireP11(result.accepted == full.length);
+        requireP11(result.completed == full.length);
+        requireP11(result.returned == full.length);
 
         foreach (i, raw; full)
-            assert(result.values[i] == calculate(raw));
+            requireP11(result.values[i] == calculate(raw));
     }
 
     // Repeated calls prove stack record arrays from prior invocations are
@@ -84,10 +90,10 @@ private void testBoundedTyped()
     foreach (_; 0 .. 16)
     {
         auto result = evaluateWithRealPool(full[0 .. 16], &calculate, 4, 2);
-        assert(result.accepted == 16);
-        assert(result.completed == 16);
-        assert(result.returned == 16);
-        assert(result.values[15] == calculate(full[15]));
+        requireP11(result.accepted == 16);
+        requireP11(result.completed == 16);
+        requireP11(result.returned == 16);
+        requireP11(result.values[15] == calculate(full[15]));
     }
 
     Point2[4] points = [
@@ -95,11 +101,11 @@ private void testBoundedTyped()
         Point2(-3, 8), Point2(7, -9)
     ];
     auto mapped = evaluateWithRealPool(points[], &mapPoint, 2, 2);
-    assert(mapped.values[0].value == 23);
-    assert(mapped.values[1].value == 45);
-    assert(mapped.values[2].value == -22);
-    assert(mapped.values[3].value == 61);
-    assert(mapped.values[2].token == 8);
+    requireP11(mapped.values[0].value == 23);
+    requireP11(mapped.values[1].value == 45);
+    requireP11(mapped.values[2].value == -22);
+    requireP11(mapped.values[3].value == 61);
+    requireP11(mapped.values[2].token == 8);
 
     Tile[2] tiles;
     tiles[0] = Tile(
@@ -107,13 +113,13 @@ private void testBoundedTyped()
     tiles[1] = Tile(
         [Point2(-1, -2), Point2(3, 4)], [5, 6, 7]);
     auto nested = evaluateWithRealPool(tiles[], &sumTile, 2, 1);
-    assert(nested.values[0] == 106);
-    assert(nested.values[1] == 22);
+    requireP11(nested.values[0] == 106);
+    requireP11(nested.values[1] == 22);
     tiles[0].vertices[0].x = 999;
-    assert(nested.values[0] == 106);
+    requireP11(nested.values[0] == 106);
 
     int[] empty;
-    assert(evaluateWithRealPool(empty, &calculate).count == 0);
+    requireP11(evaluateWithRealPool(empty, &calculate).count == 0);
 
     int[RealPoolCapacity + 1] oversized;
     bool overRejected;
@@ -121,14 +127,14 @@ private void testBoundedTyped()
         evaluateWithRealPool(oversized[], &calculate);
     catch (Exception error)
         overRejected = error.msg == "P11 too many values";
-    assert(overRejected);
+    requireP11(overRejected);
 
     bool zeroWorkersRejected;
     try
         evaluateWithRealPool(full[0 .. 1], &calculate, 0, 4);
     catch (Exception error)
         zeroWorkersRejected = error.msg == "P11 invalid pool shape";
-    assert(zeroWorkersRejected);
+    requireP11(zeroWorkersRejected);
 
     int function(int) @safe pure nothrow @nogc absent;
     bool nullRejected;
@@ -136,7 +142,7 @@ private void testBoundedTyped()
         evaluateWithRealPool(full[0 .. 1], absent);
     catch (Exception error)
         nullRejected = error.msg == "P11 null operation";
-    assert(nullRejected);
+    requireP11(nullRejected);
 }
 
 private void testActualOwnedExecutorParity()
@@ -160,13 +166,13 @@ private void testActualOwnedExecutorParity()
 
     foreach (i; 0 .. handles.length)
     {
-        assert(handles[i].get() == typed.values[i]);
+        requireP11(handles[i].get() == typed.values[i]);
         handles[i] = null;
     }
 
     executor.closeAndJoin();
-    assert(executor.acceptedCount() == input.length);
-    assert(executor.completedCount() == input.length);
+    requireP11(executor.acceptedCount() == input.length);
+    requireP11(executor.completedCount() == input.length);
 }
 
 void main()

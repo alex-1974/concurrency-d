@@ -15,6 +15,13 @@ import core.stdc.stdlib : abort;
 import core.thread : Thread;
 import core.time : MonoTime, dur;
 
+// Always-evaluated correctness checks, including release-mode watchdog.
+private void requireSteal(bool valid)
+{
+    if (!valid)
+        throw new Exception("P11 real-steal invariant failed");
+}
+
 private enum uint PrepA = 0;
 private enum uint PrepB = 1;
 private enum uint Head = 2;
@@ -33,7 +40,7 @@ private struct ProbeRecord
     TaskHeader header;
     uint kind;
 }
-static assert(ProbeRecord.header.offsetof == 0);
+static requireSteal(ProbeRecord.header.offsetof == 0);
 
 private void executeProbe(shared(TaskHeader)* header) @trusted nothrow @nogc
 {
@@ -57,7 +64,7 @@ private void executeProbe(shared(TaskHeader)* header) @trusted nothrow @nogc
             atomicFetchAdd!(MemoryOrder.rel)(otherExecuted, 1u);
             return;
         default:
-            assert(0, "P11 unknown steal probe record kind");
+            abort(); // Wrong kind must also fail in D -release.
     }
 }
 
@@ -66,7 +73,7 @@ private void untilAtLeast(shared(uint)* flag, uint expected) @system
     const deadline = MonoTime.currTime + dur!"seconds"(10);
     while (atomicLoad!(MemoryOrder.acq)(*flag) < expected)
     {
-        assert(MonoTime.currTime < deadline,
+        requireSteal(MonoTime.currTime < deadline,
             "P11 deterministic steal phase timed out");
         Thread.yield();
     }
@@ -77,7 +84,7 @@ private void publish(SubmissionWorkerPool pool, ref ProbeRecord record)
 {
     const accepted = pool.trySubmit(
         TaskRef(cast(shared(TaskHeader)*) &record.header));
-    assert(accepted == SubmissionResult.accepted);
+    requireSteal(accepted == SubmissionResult.accepted);
 }
 
 private void joinOrAbort(SubmissionWorkerPool pool) @system
@@ -147,23 +154,23 @@ void qualifyRealSteal() @system
     // exactly one worker is released; inbox capacity is >= eight.
     foreach (i; 2 .. records.length)
         publish(pool, records[i]);
-    assert(pool.acceptedCount() == 10);
+    requireSteal(pool.acceptedCount() == 10);
 
     atomicStore!(MemoryOrder.rel)(releaseA, 1u);
     untilAtLeast(&enteredHead, 1u);
-    assert(atomicLoad!(MemoryOrder.acq)(otherExecuted) == 0u);
+    requireSteal(atomicLoad!(MemoryOrder.acq)(otherExecuted) == 0u);
 
     // PrepB was still occupied when Head entered. The only remaining
     // jobs are in PrepA worker's local owner deque, not in the inbox.
     atomicStore!(MemoryOrder.rel)(releaseB, 1u);
     untilAtLeast(&otherExecuted, 7u);
-    assert(atomicLoad!(MemoryOrder.acq)(releaseHead) == 0u);
+    requireSteal(atomicLoad!(MemoryOrder.acq)(releaseHead) == 0u);
 
     releaseEverything();
     joinOrAbort(pool);
     joined = true;
 
-    assert(pool.acceptedCount() == 10);
-    assert(pool.completedCount() == 10);
-    assert(atomicLoad!(MemoryOrder.acq)(otherExecuted) == 7u);
+    requireSteal(pool.acceptedCount() == 10);
+    requireSteal(pool.completedCount() == 10);
+    requireSteal(atomicLoad!(MemoryOrder.acq)(otherExecuted) == 7u);
 }

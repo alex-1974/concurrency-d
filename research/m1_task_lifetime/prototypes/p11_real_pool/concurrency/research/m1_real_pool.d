@@ -164,7 +164,8 @@ PoolResults!R evaluateWithRealPool(P, R)(
                 if (admitted == SubmissionResult.closed)
                     throw new Exception("P11 pool unexpectedly closed");
 
-                assert(admitted == SubmissionResult.full);
+                if (admitted != SubmissionResult.full)
+                    throw new Exception("P11 unexpected admission result");
                 ++results.backpressureRetries;
                 Thread.yield();
             }
@@ -175,13 +176,15 @@ PoolResults!R evaluateWithRealPool(P, R)(
 
     results.accepted = pool.acceptedCount();
     results.completed = pool.completedCount();
-    assert(results.accepted == input.length);
-    assert(results.completed == input.length);
+    if (results.accepted != input.length ||
+        results.completed != input.length)
+        throw new Exception("P11 execution obligations mismatch");
 
     foreach (i; 0 .. input.length)
     {
-        assert(atomicLoad!(MemoryOrder.acq)(
-            records[i].prefix.returned) == 1u);
+        if (atomicLoad!(MemoryOrder.acq)(
+                records[i].prefix.returned) != 1u)
+            throw new Exception("P11 record not returned");
         ++results.returned;
         results.values[i] = records[i].output;
     }
