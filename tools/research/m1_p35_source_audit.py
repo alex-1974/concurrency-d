@@ -46,6 +46,11 @@ def main():
         raise ValueError("P35 owner critical section changed")
     if owner.count("if (_retained.length >= _maxRetained)") != 2:
         raise ValueError("P35 retention second capacity gate missing")
+    first=owner.index("if (_retained.length >= _maxRetained)")
+    second=owner.index("if (_retained.length >= _maxRetained)", first+1)
+    if not (first < owner.index("reapCompletedUnderLock();") < second <
+            owner.index("if (!_pool.hasIngressCapacity())")):
+        raise ValueError("P35 second capacity guard moved relative to reclaim")
     offsets=[owner.index(x) for x in checks]
     if offsets!=sorted(offsets):
         raise ValueError("P35 owner operation order changed")
