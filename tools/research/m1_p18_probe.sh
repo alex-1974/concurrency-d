@@ -45,7 +45,20 @@ for cadence in cadence0 cadence8 cadence64; do
         test "$(grep -c '^measure,' "$TMP/$cadence-$arm.csv")" = 6
     done
 done
+python3 "$ROOT/tools/research/m1_p18_cadence_smoke.py" "$TMP" --count 128 --waves 2
 
+# Require the cadence generator to fail before writing output if the original
+# P13 driver changes in any byte (even a comment).
+cp "$P13/consumer/main.d" "$TMP/cadence-drifted-driver.d"
+printf '\n// deliberately drifted driver for a fail-closed test\n' >>"$TMP/cadence-drifted-driver.d"
+if python3 "$ROOT/tools/research/m1_p18_cadence_make_fixture.py" \
+    "$P13/concurrency/research/m1_scaling_kernel.d" \
+    "$TMP/cadence-drifted-driver.d" "$P162/race/main.d" \
+    "$TMP/forbidden-cadence" >"$TMP/cadence-source-negative.log" 2>&1; then
+    echo "P18 ERROR: cadence generator accepted modified P13 driver" >&2
+    exit 1
+fi
+test ! -e "$TMP/forbidden-cadence"
 
 # Separately generated, source-locked event-only copies. They are never
 # compared for runtime speed with the existing uninstrumented M0/P18 pair.
@@ -369,6 +382,22 @@ if [[ "$(basename -- "$DC")" == ldc2* ]]; then
             "$TMP/release-$profile-grace.csv" \
             --profile "$profile" --count 32 --waves 2 --rounds 1
     done
+    # Three deliberately different producer admission workloads must all
+    # compile under LDC whole-release with identical M0/P18 TaskRef results.
+    for cadence in cadence0 cadence8 cadence64; do
+        for arm in control grace; do
+            timeout --signal=TERM --kill-after=5s 175s \
+                dub run --root="$BASE" --compiler="$DC" --build=release \
+                --config="$cadence-$arm" -- --profile cadencefocus \
+                --count 128 --waves 2 --warmup 1 --rounds 1 \
+                --seed 332925051 >"$TMP/release-$cadence-$arm.log"
+            grep -E '^(phase,round,|warmup,|measure,)' \
+                "$TMP/release-$cadence-$arm.log" \
+                >"$TMP/release-$cadence-$arm.csv"
+        done
+    done
+    python3 "$ROOT/tools/research/m1_p18_cadence_smoke.py" "$TMP" \
+        --prefix release- --count 128 --waves 2
     # Phase-boundary snapshots also compile and conserve work in LDC release.
     # Phase-timed binaries are NOT direct historical throughput baselines.
     for mode in phase-control phase-grace; do
