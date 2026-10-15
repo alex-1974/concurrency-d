@@ -40,7 +40,7 @@ private struct ProbeRecord
     TaskHeader header;
     uint kind;
 }
-static requireSteal(ProbeRecord.header.offsetof == 0);
+static assert(ProbeRecord.header.offsetof == 0);
 
 private void executeProbe(shared(TaskHeader)* header) @trusted nothrow @nogc
 {
