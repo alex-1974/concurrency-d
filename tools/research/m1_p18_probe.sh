@@ -31,6 +31,7 @@ python3 "$ROOT/tools/research/m1_p18_cadence_make_fixture.py" \
     "$P13/concurrency/research/m1_scaling_kernel.d" \
     "$P13/consumer/main.d" "$P162/race/main.d" "$BASE/generated"
 python3 "$ROOT/tools/research/m1_p18_cadence_compare.py" --self-test
+bash -n "$ROOT/tools/research/m1_p18_cadence_xps.sh"
 for cadence in cadence0 cadence8 cadence64; do
     for arm in control grace; do
         timeout --signal=TERM --kill-after=5s 175s \
