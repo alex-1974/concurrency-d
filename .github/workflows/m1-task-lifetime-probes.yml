@@ -22,6 +22,7 @@ on:
       - "tools/research/m1_p22_native_supervisor.sh"
       - "tools/research/m1_p23_make_owned.py"
       - "tools/research/m1_p23_real_m0_lifecycle.sh"
+      - "tools/research/m1_p24_root_registry.sh"
       - "tools/research/m1_p20_make_owned_fault.py"
       - "tools/research/m1_owned_gc_real_pool.sh"
       - "tools/research/m1_matched_pool_benchmark.sh"
@@ -83,6 +84,7 @@ on:
       - "tools/research/m1_p22_native_supervisor.sh"
       - "tools/research/m1_p23_make_owned.py"
       - "tools/research/m1_p23_real_m0_lifecycle.sh"
+      - "tools/research/m1_p24_root_registry.sh"
       - "tools/research/m1_p20_make_owned_fault.py"
       - "tools/research/m1_owned_gc_real_pool.sh"
       - "tools/research/m1_matched_pool_benchmark.sh"
@@ -211,6 +213,10 @@ jobs:
       - name: P23 source-pinned real M0 deferred startup and uncertain shutdown
         shell: bash
         run: bash tools/research/m1_p23_real_m0_lifecycle.sh "$DC"
+
+      - name: P24 explicit GC-root process registry on real M0 (research)
+        shell: bash
+        run: bash tools/research/m1_p24_root_registry.sh "$DC"
 
       - name: P12 paired matched M0 work-stealing benchmark (CI diagnostic only)
         shell: bash
