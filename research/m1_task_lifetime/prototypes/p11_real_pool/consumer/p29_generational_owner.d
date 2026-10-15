@@ -1,0 +1,563 @@
+/++
+ P29 bounded generational management of real M0 OwnedTaskExecutor.
+ Research only. Slot index alone is never a public owner identity.
+ Explicit handoff; no GC-finalizer detection or general @safe API.
++/
+module concurrency.research.p29_generational_owner;
+
+import concurrency.research.m1_p23_owned : OwnedTaskExecutor;
+import core.atomic : MemoryOrder, atomicFetchAdd, atomicLoad;
+import core.memory : GC;
+import core.stdc.stdio : fprintf, fflush, stderr;
+import core.stdc.stdlib : abort;
+import core.sync.mutex : Mutex;
+import core.sync.semaphore : Semaphore;
+import core.thread : Thread;
+import core.time : MonoTime, dur;
+import std.stdio : writeln;
+
+private void check(bool correct, string reason)
+{
+    if (!correct)
+        throw new Exception("P29: " ~ reason);
+}
+
+private enum Phase : ubyte
+{
+    vacant, reserved, starting, active, orphaned, draining, uncertain, joined
+}
+
+private struct OwnerHandle
+{
+    size_t slot;
+    ulong generation;
+}
+
+private struct Entry
+{
+    OwnedTaskExecutor executor;
+    ulong generation;
+    Phase phase;
+    bool abandoned;
+    size_t operations;
+}
+
+private final class GenerationalManager
+{
+    private enum size_t Capacity = 2;
+    private Mutex mutex;
+    private Entry[Capacity] entries;
+    private size_t installed;
+    private size_t removed;
+    private size_t denied;
+    private size_t joinClaims;
+
+    this() { mutex = new Mutex(); }
+
+    private bool matches(OwnerHandle h)
+    {
+        return h.generation != 0 && h.slot < Capacity &&
+            entries[h.slot].generation == h.generation &&
+            entries[h.slot].phase != Phase.vacant;
+    }
+
+    bool enroll(OwnedTaskExecutor candidate, out OwnerHandle h) @system
+    {
+        check(candidate !is null && candidate.researchConstructed(),
+            "enroll requires unstarted owner");
+        h = OwnerHandle.init;
+        synchronized (mutex)
+        {
+            foreach (i; 0 .. Capacity)
+            {
+                auto e = &entries[i];
+                if (e.phase != Phase.vacant)
+                    continue;
+                // Generation must never wrap and resurrect stale handles.
+                if (e.generation == ulong.max)
+                    abort();
+                GC.addRoot(cast(void*) candidate);
+                ++e.generation;
+                e.executor = candidate;
+                e.phase = Phase.reserved;
+                e.abandoned = false;
+                e.operations = 0;
+                ++installed;
+                h = OwnerHandle(i, e.generation);
+                return true;
+            }
+            ++denied;
+        }
+        return false;
+    }
+
+    bool start(OwnerHandle h) @system
+    {
+        OwnedTaskExecutor owner;
+        synchronized (mutex)
+        {
+            if (!matches(h) || entries[h.slot].phase != Phase.reserved)
+                return false;
+            auto e = &entries[h.slot];
+            e.phase = Phase.starting;
+            owner = e.executor;
+        }
+        try owner.researchStart();
+        catch (Throwable) abort(); // real postlaunch ambiguity: fail-stop
+        synchronized (mutex)
+        {
+            check(matches(h) && entries[h.slot].phase == Phase.starting,
+                "native start changed generation or owner state");
+            entries[h.slot].phase =
+                owner.researchUncertain() ? Phase.uncertain : Phase.active;
+        }
+        return true;
+    }
+
+    // Original M0 admission is the only task-queue operation. The
+    // temporary registry operation count does NOT instrument worker
+    // dispatch, deque pop, steal, park or completion hot paths.
+    bool publish(OwnerHandle h, Job work)
+    {
+        OwnedTaskExecutor owner;
+        synchronized (mutex)
+        {
+            if (!matches(h) || entries[h.slot].phase != Phase.active)
+                return false;
+            ++entries[h.slot].operations;
+            owner = entries[h.slot].executor;
+        }
+
+        bool accepted;
+        try
+        {
+            auto result = owner.trySubmit(work);
+            accepted = result !is null;
+            result = null;
+        }
+        catch (Exception)
+        {
+            // M0 close may linearize earlier than the submission.
+        }
+        catch (Throwable)
+            abort();
+
+        synchronized (mutex)
+        {
+            if (!matches(h) || entries[h.slot].operations == 0)
+                abort();
+            --entries[h.slot].operations;
+        }
+        return accepted;
+    }
+
+    bool orphan(OwnerHandle h)
+    {
+        synchronized (mutex)
+        {
+            if (!matches(h))
+                return false;
+            auto e = &entries[h.slot];
+            if (e.abandoned || (e.phase != Phase.active &&
+                                e.phase != Phase.uncertain))
+                return false;
+            e.abandoned = true;
+            if (e.phase == Phase.active)
+                e.phase = Phase.orphaned;
+            return true;
+        }
+    }
+
+    bool joinOrphan(OwnerHandle h) @system
+    {
+        OwnedTaskExecutor owner;
+        synchronized (mutex)
+        {
+            if (!matches(h))
+                return false;
+            auto e = &entries[h.slot];
+            if (!e.abandoned || e.phase != Phase.orphaned)
+                return false;
+            e.phase = Phase.draining;
+            owner = e.executor;
+            ++joinClaims;
+        }
+        try owner.closeAndJoin(); // real original native worker join
+        catch (Throwable) abort(); // native uncertainty is not quiescence
+        synchronized (mutex)
+        {
+            check(matches(h) && entries[h.slot].phase == Phase.draining &&
+                owner.isStopped(), "joined without native evidence");
+            entries[h.slot].phase = Phase.joined;
+        }
+        return true;
+    }
+
+    // P23 test hook: synthetic failure follows a KNOWN successful
+    // Thread.start, before the FIRST native join. Never retry a real
+    // failed native join or treat unknown OS status as recoverable.
+    bool finishKnownSynthetic(OwnerHandle h) @system
+    {
+        OwnedTaskExecutor owner;
+        synchronized (mutex)
+        {
+            if (!matches(h) || !entries[h.slot].abandoned ||
+                entries[h.slot].phase != Phase.uncertain)
+                return false;
+            entries[h.slot].phase = Phase.draining;
+            ++joinClaims;
+            owner = entries[h.slot].executor;
+        }
+        try owner.researchJoinKnownSynthetic();
+        catch (Throwable) abort();
+        synchronized (mutex)
+        {
+            check(matches(h) && owner.isStopped(),
+                "synthetic proof did not join actual workers");
+            entries[h.slot].phase = Phase.joined;
+        }
+        return true;
+    }
+
+    bool reclaim(OwnerHandle h) @system
+    {
+        synchronized (mutex)
+        {
+            if (!matches(h))
+                return false;
+            auto e = &entries[h.slot];
+            if (e.phase != Phase.joined || e.operations != 0)
+                return false;
+            auto owner = e.executor;
+            check(owner !is null && owner.isStopped() &&
+                owner.acceptedCount() == owner.completedCount() &&
+                owner.retainedCount() == 0,
+                "native join and settled TaskRefs required");
+            GC.removeRoot(cast(void*) owner);
+            e.executor = null;
+            e.phase = Phase.vacant;
+            e.abandoned = false;
+            ++removed;
+            return true;
+        }
+    }
+
+    bool cancelNeverStarted(OwnerHandle h) @system
+    {
+        synchronized (mutex)
+        {
+            if (!matches(h) || entries[h.slot].phase != Phase.reserved)
+                return false;
+            auto e = &entries[h.slot];
+            check(e.executor.researchConstructed(), "not an unstarted owner");
+            GC.removeRoot(cast(void*) e.executor);
+            e.executor = null;
+            e.phase = Phase.vacant;
+            e.abandoned = false;
+            ++removed;
+            return true;
+        }
+    }
+
+    Phase status(OwnerHandle h)
+    {
+        synchronized (mutex)
+        {
+            if (!matches(h))
+                return Phase.vacant;
+            return entries[h.slot].phase;
+        }
+    }
+
+    size_t occupied()
+    {
+        synchronized (mutex)
+        {
+            size_t total;
+            foreach (e; entries)
+                if (e.phase != Phase.vacant)
+                    ++total;
+            return total;
+        }
+    }
+
+    bool outstanding()
+    {
+        return occupied() != 0;
+    }
+
+    size_t rootAdds() { synchronized (mutex) return installed; }
+    size_t rootRemovals() { synchronized (mutex) return removed; }
+    size_t refusals() { synchronized (mutex) return denied; }
+    size_t nativeJoinClaims() { synchronized (mutex) return joinClaims; }
+}
+
+// Reference remains independent from ordinary controller or submitter.
+private __gshared GenerationalManager applicationOwner;
+
+private void verifyApplicationExit()
+{
+    if (applicationOwner !is null && applicationOwner.outstanding())
+    {
+        fprintf(stderr, "P29_UNFINISHED_OWNER_FAILSTOP\n");
+        fflush(stderr);
+        abort();
+    }
+}
+
+private final class Gate
+{
+    Semaphore semaphore;
+    shared uint entrants;
+    this() { semaphore = new Semaphore(0); }
+    void park()
+    {
+        atomicFetchAdd!(MemoryOrder.rel)(entrants, 1u);
+        semaphore.wait();
+    }
+    void signalOrAbort()
+    {
+        try semaphore.notify();
+        catch (Throwable) abort();
+    }
+}
+
+private final class Graph
+{
+    int value;
+    Graph next;
+    this(int number, Graph other = null) { value = number; next = other; }
+}
+
+private final class Receipt
+{
+    shared uint executed;
+    shared uint checksum;
+}
+
+private struct Job
+{
+    Gate gate;
+    Graph graph;
+    Receipt result;
+    int opCall()
+    {
+        gate.park();
+        const answer = cast(uint)(graph.value + graph.next.value * 3);
+        atomicFetchAdd!(MemoryOrder.rel)(result.checksum, answer);
+        atomicFetchAdd!(MemoryOrder.rel)(result.executed, 1u);
+        return cast(int)answer;
+    }
+}
+
+private void awaitWorker(Gate gate)
+{
+    const deadline = MonoTime.currTime + dur!"seconds"(10);
+    while (atomicLoad!(MemoryOrder.acq)(gate.entrants) == 0u)
+    {
+        check(MonoTime.currTime < deadline, "native M0 worker did not park");
+        Thread.yield();
+    }
+}
+
+private void outcome(Receipt r, uint expected)
+{
+    check(atomicLoad!(MemoryOrder.acq)(r.executed) == 1u &&
+        atomicLoad!(MemoryOrder.acq)(r.checksum) == expected,
+        "owned task graph result or exactly-once property broken");
+}
+
+private void launchOrAbort(Thread t)
+{
+    try t.start();
+    catch (Throwable) abort();
+}
+
+private void joinOrAbort(Thread t)
+{
+    try
+    {
+        auto error = t.join(false);
+        if (error !is null)
+            abort();
+    }
+    catch (Throwable)
+        abort();
+}
+
+private Thread staleAttacker(GenerationalManager manager,
+    OwnerHandle stale, Job bad, shared uint* violations)
+{
+    return new Thread({
+        foreach (_; 0 .. 100)
+        {
+            if (manager.start(stale) ||
+                manager.publish(stale, bad) ||
+                manager.orphan(stale) ||
+                manager.cancelNeverStarted(stale) ||
+                manager.reclaim(stale) ||
+                manager.joinOrphan(stale) ||
+                manager.finishKnownSynthetic(stale))
+                atomicFetchAdd!(MemoryOrder.rel)(*violations, 1u);
+            Thread.yield();
+        }
+    });
+}
+
+private Thread orphanCloser(GenerationalManager manager, OwnerHandle h,
+    shared uint* completed)
+{
+    return new Thread({
+        if (!manager.joinOrphan(h))
+            abort();
+        atomicFetchAdd!(MemoryOrder.rel)(*completed, 1u);
+    });
+}
+
+private void testAbaAndConcurrentStale()
+{
+    auto manager = new GenerationalManager();
+    applicationOwner = manager;
+    auto old = new OwnedTaskExecutor(1, 3, 4);
+    OwnerHandle before, after;
+    check(manager.enroll(old, before) && before.generation != 0 &&
+        manager.cancelNeverStarted(before), "initial root not released");
+    old = null;
+
+    auto current = new OwnedTaskExecutor(1, 3, 4);
+    check(manager.enroll(current, after) &&
+        after.slot == before.slot &&
+        after.generation != before.generation,
+        "slot was reused without unique generation");
+    current = null;
+    check(manager.start(after), "fresh generation failed real start");
+
+    auto gate = new Gate();
+    auto receipt = new Receipt();
+    Job accepted;
+    accepted.gate = gate;
+    accepted.graph = new Graph(5, new Graph(7));
+    accepted.result = receipt;
+    check(manager.publish(after, accepted), "fresh generation admission");
+    awaitWorker(gate);
+
+    // Identical task shape for stale submissions; not one can reach
+    // the new executor after the slot was reused.
+    shared uint violations;
+    Thread[4] attacks;
+    foreach (i; 0 .. attacks.length)
+    {
+        attacks[i] = staleAttacker(manager, before, accepted, &violations);
+        launchOrAbort(attacks[i]);
+    }
+    foreach (t; attacks)
+        joinOrAbort(t);
+    check(atomicLoad!(MemoryOrder.acq)(violations) == 0u &&
+        manager.status(before) == Phase.vacant &&
+        manager.status(after) == Phase.active,
+        "stale handle operated on different owner generation");
+
+    check(manager.orphan(after), "real active owner could not orphan");
+    shared uint joined;
+    auto closer = orphanCloser(manager, after, &joined);
+    launchOrAbort(closer);
+    check(!manager.reclaim(after) && manager.occupied() == 1,
+        "active worker released root");
+    foreach (_; 0 .. 4)
+    {
+        GC.collect();
+        check(manager.occupied() == 1, "worker GC graph lost");
+    }
+    gate.signalOrAbort();
+    joinOrAbort(closer);
+    outcome(receipt, 26u);
+    check(atomicLoad!(MemoryOrder.acq)(joined) == 1u &&
+        manager.status(after) == Phase.joined &&
+        manager.reclaim(after) && !manager.reclaim(after),
+        "joined owner root not reclaimed exactly once");
+    check(manager.rootAdds() == 2 && manager.rootRemovals() == 2,
+        "ABA root pairing incorrect");
+    verifyApplicationExit();
+    applicationOwner = null;
+}
+
+private void testQuotaAndUnknownGeneration()
+{
+    auto manager = new GenerationalManager();
+    applicationOwner = manager;
+    auto uncertain = new OwnedTaskExecutor(1, 2, 4);
+    uncertain.researchInjectAfterStart();
+    OwnerHandle u, other, refused, future;
+    check(manager.enroll(uncertain, u), "unknown owner not adopted");
+    uncertain = null;
+    check(manager.start(u) && manager.status(u) == Phase.uncertain &&
+        manager.orphan(u), "after-start synthetic uncertainty lost");
+
+    auto second = new OwnedTaskExecutor(1, 2, 4);
+    check(manager.enroll(second, other), "second capacity slot missing");
+    second = null;
+    auto third = new OwnedTaskExecutor(1, 2, 4);
+    check(!manager.enroll(third, refused) &&
+        refused.generation == 0 && manager.refusals() == 1 &&
+        manager.occupied() == 2, "fixed capacity exhausted incorrectly");
+    foreach (_; 0 .. 4)
+    {
+        GC.collect();
+        check(!manager.cancelNeverStarted(u) && !manager.reclaim(u) &&
+            !manager.joinOrphan(u) &&
+            manager.status(u) == Phase.uncertain &&
+            manager.occupied() == 2,
+            "unknown native liveness was silently evicted");
+    }
+
+    // Free ONLY a proven never-started different slot. Re-occupy it.
+    check(manager.cancelNeverStarted(other) &&
+        manager.enroll(third, future) &&
+        future.slot == other.slot &&
+        future.generation != other.generation &&
+        !manager.start(other) && !manager.orphan(other) &&
+        !manager.cancelNeverStarted(other) &&
+        manager.cancelNeverStarted(future),
+        "quota reuse accepted stale generation");
+    check(manager.occupied() == 1 && manager.status(u) == Phase.uncertain,
+        "live uncertain generation disappeared during unrelated reuse");
+
+    // Allowed only for known synthetic post-SUCCESSFUL native start.
+    // No native join was attempted before this call.
+    check(manager.finishKnownSynthetic(u) &&
+        manager.status(u) == Phase.joined && manager.reclaim(u),
+        "synthetic real native join did not release unknown slot");
+    check(manager.occupied() == 0 &&
+        manager.rootAdds() == 3 && manager.rootRemovals() == 3 &&
+        manager.refusals() == 1, "uncertain ledger imbalance");
+    verifyApplicationExit();
+    applicationOwner = null;
+}
+
+version (P29ExitUnknown)
+{
+    void main()
+    {
+        applicationOwner = new GenerationalManager();
+        auto x = new OwnedTaskExecutor(1, 2, 4);
+        x.researchInjectAfterStart();
+        OwnerHandle h;
+        check(applicationOwner.enroll(x, h), "failed to adopt");
+        x = null;
+        check(applicationOwner.start(h) && applicationOwner.orphan(h),
+            "unknown setup failed");
+        verifyApplicationExit(); // mandatory fail-stop BEFORE druntime
+    }
+}
+else
+{
+    void main()
+    {
+        foreach (_; 0 .. 8)
+        {
+            testAbaAndConcurrentStale();
+            testQuotaAndUnknownGeneration();
+        }
+        writeln("P29_GENERATIONAL_OWNER_PASS aba=8 contention=8 unknown_quota=8");
+    }
+}
