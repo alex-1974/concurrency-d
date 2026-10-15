@@ -427,14 +427,27 @@ if [[ "$(basename -- "$DC")" == ldc2* ]]; then
     done
     python3 "$ROOT/tools/research/m1_p18_cadence_smoke.py" "$TMP" \
         --prefix release- --count 128 --waves 2
-    # Native exact-source park boundary semantics also qualify under
-    # whole-release LDC (non-speed, no hot-path instrumentation).
+    # Separate LDC release COMPILE from native EXECUTION. A slow LDC
+    # optimization is not evidence of a lost Condition wakeup. Only the
+    # prebuilt executable gets a strictly bounded native test timeout.
     for boundary in park-boundary-control park-boundary-grace; do
-        timeout --signal=TERM --kill-after=5s 80s \
-            dub run --root="$BASE" --compiler="$DC" --build=release \
-            --config="$boundary" >"$TMP/release-$boundary.log"
+        echo "P18 release park-boundary compile: $boundary"
+        dub build --root="$BASE" --compiler="$DC" --build=release \
+            --config="$boundary" \
+            >"$TMP/release-$boundary-build.log" 2>&1 || {
+            cat "$TMP/release-$boundary-build.log" >&2
+            exit 1
+        }
+        echo "P18 release park-boundary execute: $boundary"
+        timeout --signal=TERM --kill-after=5s 45s \
+            "$BASE/m1-p18-idle-grace" \
+            >"$TMP/release-$boundary-execute.log" 2>&1 || {
+            cat "$TMP/release-$boundary-execute.log" >&2
+            echo "P18 native boundary execution failed $boundary" >&2
+            exit 1
+        }
         grep -q '^P18_PARK_BOUNDARY_PASS scenarios=96' \
-            "$TMP/release-$boundary.log"
+            "$TMP/release-$boundary-execute.log"
     done
     # Phase-boundary snapshots also compile and conserve work in LDC release.
     # Phase-timed binaries are NOT direct historical throughput baselines.
