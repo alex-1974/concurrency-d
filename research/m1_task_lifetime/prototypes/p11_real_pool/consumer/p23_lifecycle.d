@@ -119,6 +119,12 @@ private Thread closer(OwnedTaskExecutor owner,
     });
 }
 
+private void signalOrAbort(Semaphore sem)
+{
+    try sem.notify();
+    catch (Throwable) abort();
+}
+
 private void joinAllOrAbort(Thread[3] threads)
 {
     foreach (t; threads)
@@ -239,8 +245,7 @@ private void testSyntheticPreJoin()
     }
     finally
     {
-        try beforeJoin.notify();
-        catch (Throwable) abort();
+        signalOrAbort(beforeJoin);
         joinAllOrAbort(closers);
     }
 
