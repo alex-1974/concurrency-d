@@ -38,3 +38,11 @@ configuration "owned-graph-optimized" {
 configuration "owned-negative-safe" {
     mainSourceFile "consumer/p19_negative_safe.d"
 }
+
+configuration "owned-fault" {
+    mainSourceFile "consumer/p20_fault_consumer.d"
+}
+configuration "owned-fault-optimized" {
+    mainSourceFile "consumer/p20_fault_consumer.d"
+    dflags "-O3"
+}
