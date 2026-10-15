@@ -118,6 +118,18 @@ entire P01–P20 matrix conclusion separately; old generator attempts with
 escaped literals and a broad source replacement were research-runner
 defects corrected before this source commit.
 
+## P21 executable contract follow-up
+
+The [P21 shutdown/ownership protocol](../p21_shutdown_contract/README.md)
+turns the P20 `stopped`/quiescence contradiction into an explicit finite
+**two-worker, two-task state model**: external native join/never-started
+proof, terminal settlement of unexecuted accepted work, independent
+supervisor retention across caller abandonment, rejection of premature
+root release, and bounded exhaustive checks of both permitted and
+forbidden event transitions. These are **research constraints**, not a
+claim that a D state-machine model proves the actual M0's native error
+handling. Production `source/` remains unchanged.
+
 ## Engineering state contract — proposed, not merged
 
 The P20 result supports separating a **shutdown request**, a **terminal
