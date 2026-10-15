@@ -15,6 +15,12 @@ import core.sync.semaphore : Semaphore;
 import core.thread : Thread;
 import core.time : MonoTime, dur;
 import std.stdio : writeln;
+version (P30Benchmark)
+{
+    import concurrency.internal.owned_task :
+        OriginalExecutor = OwnedTaskExecutor;
+    import std.conv : to;
+}
 
 private void check(bool correct, string reason)
 {
@@ -117,7 +123,7 @@ private final class GenerationalManager
     // Original M0 admission is the only task-queue operation. The
     // temporary registry operation count does NOT instrument worker
     // dispatch, deque pop, steal, park or completion hot paths.
-    bool publish(OwnerHandle h, Job work)
+    bool publish(F)(OwnerHandle h, F work)
     {
         OwnedTaskExecutor owner;
         synchronized (mutex)
@@ -534,7 +540,287 @@ private void testQuotaAndUnknownGeneration()
     applicationOwner = null;
 }
 
-version (P29ExitUnknown)
+version (P30Benchmark)
+{
+    private enum PerfMode : ubyte { original, deferred, managed }
+
+    private final class PerfReceipt
+    {
+        shared uint executed;
+        shared ulong checksum;
+    }
+
+    private struct PerfJob
+    {
+        PerfReceipt receipt;
+        uint value;
+
+        int opCall()
+        {
+            atomicFetchAdd!(MemoryOrder.rel)(receipt.executed, 1u);
+            atomicFetchAdd!(MemoryOrder.rel)(receipt.checksum,
+                cast(ulong)value);
+            return cast(int)value;
+        }
+    }
+
+    private final class ProducerStats
+    {
+        size_t attempts;
+        size_t allocations;
+        size_t accepted;
+    }
+
+    private Thread performanceProducer(
+        PerfMode mode, OriginalExecutor original,
+        OwnedTaskExecutor deferred, GenerationalManager manager,
+        OwnerHandle h, PerfJob job, size_t requested,
+        ProducerStats stats)
+    {
+        // Each worker delegate owns its own captured call-frame.
+        return new Thread({
+            const before = GC.allocatedInCurrentThread();
+            const deadline = MonoTime.currTime + dur!"seconds"(40);
+            foreach (_; 0 .. requested)
+            {
+                bool submitted;
+                while (!submitted)
+                {
+                    if (MonoTime.currTime > deadline)
+                        throw new Exception("P30 producer submission timeout");
+                    ++stats.attempts;
+                    final switch (mode)
+                    {
+                        case PerfMode.original:
+                            auto result = original.trySubmit(job);
+                            submitted = result !is null;
+                            result = null;
+                            break;
+                        case PerfMode.deferred:
+                            auto result = deferred.trySubmit(job);
+                            submitted = result !is null;
+                            result = null;
+                            break;
+                        case PerfMode.managed:
+                            submitted = manager.publish(h, job);
+                            break;
+                    }
+                    if (!submitted)
+                        Thread.yield();
+                }
+                ++stats.accepted;
+            }
+            const after = GC.allocatedInCurrentThread();
+            stats.allocations = after >= before ? after - before : 0;
+        });
+    }
+
+    private struct PerfSample
+    {
+        string phase;
+        size_t round;
+        string mode;
+        size_t tasks;
+        size_t workers;
+        size_t producers;
+        size_t ingress;
+        size_t retained;
+        size_t accepted;
+        size_t completed;
+        ulong checksum;
+        size_t attempts;
+        size_t producerBytes;
+        long createStartNs;
+        long submitNs;
+        long joinReleaseNs;
+        long totalNs;
+    }
+
+    private PerfSample performanceArm(
+        string phase, size_t round, PerfMode mode,
+        size_t tasks, size_t workers, size_t producers,
+        size_t ingress, size_t retained)
+    {
+        check(producers > 0 && tasks % producers == 0,
+            "P30 count must divide producers");
+        const perProducer = tasks / producers;
+        auto receipt = new PerfReceipt();
+        PerfJob job;
+        job.receipt = receipt;
+        job.value = 60u;
+
+        OriginalExecutor original;
+        OwnedTaskExecutor deferred;
+        GenerationalManager manager;
+        OwnerHandle h;
+
+        // Preparation (including shared Job/Receipt) is outside the
+        // timed phases in ALL three modes.
+        GC.collect();
+        const t0 = MonoTime.currTime;
+        final switch (mode)
+        {
+            case PerfMode.original:
+                original = new OriginalExecutor(workers, ingress, retained);
+                break;
+            case PerfMode.deferred:
+                deferred = new OwnedTaskExecutor(workers, ingress, retained);
+                deferred.researchStart();
+                break;
+            case PerfMode.managed:
+                manager = new GenerationalManager();
+                deferred = new OwnedTaskExecutor(workers, ingress, retained);
+                check(manager.enroll(deferred, h), "P30 enroll failed");
+                check(manager.start(h), "P30 manager native start failed");
+                break;
+        }
+        const t1 = MonoTime.currTime;
+
+        auto threads = new Thread[producers];
+        auto stats = new ProducerStats[producers];
+        foreach (i; 0 .. producers)
+        {
+            stats[i] = new ProducerStats();
+            threads[i] = performanceProducer(mode, original, deferred,
+                manager, h, job, perProducer, stats[i]);
+        }
+        foreach (t; threads)
+            launchOrAbort(t);
+        foreach (t; threads)
+            joinOrAbort(t);
+        const t2 = MonoTime.currTime;
+
+        final switch (mode)
+        {
+            case PerfMode.original:
+                original.closeAndJoin();
+                break;
+            case PerfMode.deferred:
+                deferred.closeAndJoin();
+                break;
+            case PerfMode.managed:
+                check(manager.orphan(h), "P30 manager orphan rejected");
+                check(manager.joinOrphan(h), "P30 manager native join failed");
+                check(manager.reclaim(h), "P30 manager root release failed");
+                check(manager.rootAdds() == 1 && manager.rootRemovals() == 1,
+                    "P30 explicit roots not paired");
+                break;
+        }
+        const t3 = MonoTime.currTime;
+
+        size_t accepted, completed;
+        final switch (mode)
+        {
+            case PerfMode.original:
+                accepted = original.acceptedCount();
+                completed = original.completedCount();
+                break;
+            case PerfMode.deferred:
+            case PerfMode.managed:
+                accepted = deferred.acceptedCount();
+                completed = deferred.completedCount();
+                break;
+        }
+        size_t attempts, producerBytes, acknowledgements;
+        foreach (stat; stats)
+        {
+            attempts += stat.attempts;
+            producerBytes += stat.allocations;
+            acknowledgements += stat.accepted;
+        }
+        const executed = atomicLoad!(MemoryOrder.acq)(receipt.executed);
+        const checksum = atomicLoad!(MemoryOrder.acq)(receipt.checksum);
+        check(accepted == tasks && completed == tasks &&
+            acknowledgements == tasks && executed == tasks &&
+            checksum == cast(ulong)tasks * 60u && attempts >= tasks,
+            "P30 unpaired accepted/completed/execution/checksum");
+        check(t1 >= t0 && t2 >= t1 && t3 >= t2, "P30 monotonic time");
+
+        PerfSample sample;
+        sample.phase = phase;
+        sample.round = round;
+        final switch (mode)
+        {
+            case PerfMode.original: sample.mode = "m0"; break;
+            case PerfMode.deferred: sample.mode = "deferred"; break;
+            case PerfMode.managed: sample.mode = "managed"; break;
+        }
+        sample.tasks = tasks;
+        sample.workers = workers;
+        sample.producers = producers;
+        sample.ingress = ingress;
+        sample.retained = retained;
+        sample.accepted = accepted;
+        sample.completed = completed;
+        sample.checksum = checksum;
+        sample.attempts = attempts;
+        sample.producerBytes = producerBytes;
+        sample.createStartNs = (t1 - t0).total!"nsecs";
+        sample.submitNs = (t2 - t1).total!"nsecs";
+        sample.joinReleaseNs = (t3 - t2).total!"nsecs";
+        sample.totalNs = (t3 - t0).total!"nsecs";
+        return sample;
+    }
+
+    private void outputSample(PerfSample s)
+    {
+        writeln(s.phase, ",", s.round, ",", s.mode, ",",
+            s.tasks, ",", s.workers, ",", s.producers, ",",
+            s.ingress, ",", s.retained, ",", s.accepted, ",",
+            s.completed, ",", s.checksum, ",", s.attempts, ",",
+            s.producerBytes, ",", s.createStartNs, ",",
+            s.submitNs, ",", s.joinReleaseNs, ",", s.totalNs);
+    }
+
+    void main(string[] args)
+    {
+        size_t tasks = 512, workers = 2, producers = 2;
+        size_t ingress = 64, retained = 512, warmup = 1, rounds = 3;
+        for (size_t i = 1; i < args.length; ++i)
+        {
+            check(i + 1 < args.length, "P30 missing flag argument");
+            auto flag = args[i];
+            auto value = to!size_t(args[++i]);
+            switch (flag)
+            {
+                case "--count": tasks = value; break;
+                case "--workers": workers = value; break;
+                case "--producers": producers = value; break;
+                case "--ingress": ingress = value; break;
+                case "--retained": retained = value; break;
+                case "--warmup": warmup = value; break;
+                case "--rounds": rounds = value; break;
+                default: throw new Exception("P30 unknown option: " ~ flag);
+            }
+        }
+        check(tasks > 0 && workers > 0 && producers > 0 &&
+            ingress > 0 && retained > 0 &&
+            tasks % producers == 0 && rounds >= 3 && warmup <= 10 &&
+            rounds <= 20 && tasks <= 100_000,
+            "P30 invalid dimensions");
+        writeln("phase,round,mode,count,workers,producers,ingress,retained,"
+            ~ "accepted,completed,checksum,attempts,producer_alloc_bytes,"
+            ~ "create_start_ns,submit_ns,join_release_ns,total_ns");
+
+        // Rotation avoids always granting the first arm the warmest
+        // instruction cache or last arm the hottest processor. The
+        // analyzer compares corresponding round/profile triples.
+        const PerfMode[3][3] orders = [
+            [PerfMode.original, PerfMode.deferred, PerfMode.managed],
+            [PerfMode.managed, PerfMode.deferred, PerfMode.original],
+            [PerfMode.deferred, PerfMode.original, PerfMode.managed]
+        ];
+        foreach (round; 0 .. warmup + rounds)
+        {
+            const phase = round < warmup ? "warmup" : "measure";
+            foreach (mode; orders[round % orders.length])
+                outputSample(performanceArm(phase, round, mode,
+                    tasks, workers, producers, ingress, retained));
+        }
+        writeln("P30_M0_OWNERSHIP_BENCHMARK_PASS");
+    }
+}
+else version (P29ExitUnknown)
 {
     void main()
     {
