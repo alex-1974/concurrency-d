@@ -94,3 +94,7 @@ configuration "p29-generational-optimized" {
     mainSourceFile "consumer/p29_generational_owner.d"
     dflags "-O3"
 }
+
+configuration "p33-phases" {
+    mainSourceFile "consumer/p33_generational_owner.d"
+}
