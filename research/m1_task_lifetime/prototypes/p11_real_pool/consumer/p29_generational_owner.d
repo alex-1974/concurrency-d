@@ -916,7 +916,8 @@ else version (P31Benchmark)
         P31Stats stats)
     {
         return new Thread({
-            auto counted = P31CountedJob(counter);
+            P31CountedJob counted;
+            counted.result = counter;
             P31MinimalJob minimal;
             const startBytes = GC.allocatedInCurrentThread();
             const deadline = MonoTime.currTime + dur!"seconds"(40);
