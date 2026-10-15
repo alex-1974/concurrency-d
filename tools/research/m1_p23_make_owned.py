@@ -233,6 +233,17 @@ def main():
             _pool.closeAndJoin();
         }
         catch (Throwable error)""", "prejoin seam")
+    s = change(s, """        catch (Throwable error)
+        {
+            failure = error;
+        }""", """        catch (Throwable error)
+        {
+            // A real native join failure leaves worker liveness unknown.
+            // Only a known synthetic pre-join fault may return here.
+            if (!_injectPreJoin)
+                abort();
+            failure = error;
+        }""", "native-failure fail-stop")
     s = change(s, """            _shutdownFailure = failure;
             _lifecycle = Lifecycle.stopped;
             _lifecycleChanged.notifyAll();""", """            _shutdownFailure = failure;
