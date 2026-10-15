@@ -60,8 +60,11 @@ else
         'options.profile != "sched8" && options.profile != "sched2048"',
         'options.profile != "sched8" && options.profile != "sched2048" && options.profile != "cadencefocus"')
     d = one(d,
-        'profile == "singleingress" ? [1] :',
-        'profile == "singleingress" || profile == "cadencefocus" ? [1] :')
+        'profile == "singleingress" || profile == "sched8" || profile == "sched2048" ? [1] :',
+        'profile == "singleingress" || profile == "sched8" || profile == "sched2048" || profile == "cadencefocus" ? [1] :')
+    d = one(d,
+        'profile == "focus512" || profile == "singleingress" ? [128, 512, 1024] :',
+        'profile == "focus512" || profile == "singleingress" || profile == "cadencefocus" ? [128, 512, 1024] :')
     d = one(d,
         'profile == "singleingress" ? [8, 64, 256, 2048] :',
         'profile == "singleingress" ? [8, 64, 256, 2048] : profile == "cadencefocus" ? [8, 2048] :')
