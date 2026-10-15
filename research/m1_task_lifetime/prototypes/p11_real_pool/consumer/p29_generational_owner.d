@@ -592,15 +592,19 @@ version (P30Benchmark)
                     final switch (mode)
                     {
                         case PerfMode.original:
+                        {
                             auto result = original.trySubmit(job);
                             submitted = result !is null;
                             result = null;
                             break;
+                        }
                         case PerfMode.deferred:
+                        {
                             auto result = deferred.trySubmit(job);
                             submitted = result !is null;
                             result = null;
                             break;
+                        }
                         case PerfMode.managed:
                             submitted = manager.publish(h, job);
                             break;
