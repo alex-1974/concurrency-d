@@ -26,7 +26,7 @@ EVENTS = ("publish", "foreign_take", "finish", "announce", "local_claim", "close
 
 def source_gate(file):
     raw = file.read_bytes()
-    digest = hashlib.sha1(f"blob {len(raw)}\\0".encode() + raw).hexdigest()
+    digest = hashlib.sha1(f"blob {len(raw)}\0".encode() + raw).hexdigest()
     if digest != BLOB:
         raise ValueError(f"M0 source drift: {digest}")
     if raw.decode("utf-8").count(GUARD) != 1:
