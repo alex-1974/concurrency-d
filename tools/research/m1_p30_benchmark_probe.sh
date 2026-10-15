@@ -34,7 +34,9 @@ for build in debug release; do
     grep -E '^(phase,round,mode|warmup,|measure,)' \
         "$TEMP/$build.raw" > "$TEMP/$build.csv"
     python3 "$ROOT/tools/research/m1_p30_analyze.py" \
-        --input "$TEMP/$build.csv" --min-rounds 3
+        --input "$TEMP/$build.csv" --min-rounds 3 || {
+            cat "$TEMP/$build.csv" >&2; exit 1;
+        }
 done
 if [[ "$(basename -- "$DC")" == ldc2* ]]; then
     # LDC -O3 with assertion oracles still enabled.
@@ -52,6 +54,8 @@ if [[ "$(basename -- "$DC")" == ldc2* ]]; then
     grep -E '^(phase,round,mode|warmup,|measure,)' \
         "$TEMP/O3.raw" > "$TEMP/O3.csv"
     python3 "$ROOT/tools/research/m1_p30_analyze.py" \
-        --input "$TEMP/O3.csv" --min-rounds 3
+        --input "$TEMP/O3.csv" --min-rounds 3 || {
+            cat "$TEMP/O3.csv" >&2; exit 1;
+        }
 fi
 echo "P30_COMPILER_CORRECTNESS_PASS (CI timings DIAGNOSTIC ONLY)"
