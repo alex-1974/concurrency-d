@@ -2,6 +2,7 @@
 """P34 null/timed same-work correctness. The timed probe is invasive."""
 import argparse
 import csv
+import io
 from pathlib import Path
 
 BASE = ("phase","round","work","producers","mode","count","workers","ingress",
@@ -10,8 +11,7 @@ BASE = ("phase","round","work","producers","mode","count","workers","ingress",
         "total_ns")
 FIELDS = BASE + ("probe_calls","probe_ns")
 
-def read(path):
-    with path.open(newline="") as handle:
+def parse(handle):
         reader=csv.DictReader(handle)
         if tuple(reader.fieldnames or ()) != FIELDS:
             raise ValueError("P34 CSV schema mismatch")
@@ -36,12 +36,35 @@ def read(path):
             result[key]=row
         return result
 
+def read(path):
+    with path.open(newline="") as handle:
+        return parse(handle)
+
+def self_test():
+    header=",".join(FIELDS)
+    data={k:"0" for k in FIELDS}
+    data.update(phase="measure",round="3",work="minimal",producers="2",
+                mode="managed",count="8",accepted="8",completed="8",
+                attempts="8",probe_calls="8",probe_ns="0")
+    row=",".join(data[k] for k in FIELDS)
+    parsed=parse(io.StringIO(header+"\\n"+row+"\\n"))
+    if ("measure",3,"minimal",2,"managed") not in parsed:
+        raise ValueError("P34 numeric profile key normalization failed")
+    print("P34_PROFILE_KEY_SELFTEST_PASS")
+
 def main():
     parser=argparse.ArgumentParser()
-    parser.add_argument("control",type=Path)
-    parser.add_argument("timed",type=Path)
+    parser.add_argument("--self-test",action="store_true")
+    parser.add_argument("control",type=Path,nargs="?")
+    parser.add_argument("timed",type=Path,nargs="?")
     parser.add_argument("--min-rounds",type=int,default=3)
     a=parser.parse_args()
+    if a.self_test:
+        self_test()
+        if a.control is None and a.timed is None:
+            return
+    if a.control is None or a.timed is None:
+        parser.error("control and timed CSV paths are required")
     left,right=read(a.control),read(a.timed)
     if left.keys()!=right.keys():
         raise ValueError("P34 missing paired row")
