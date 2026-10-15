@@ -128,9 +128,9 @@ def self_test():
         raise ValueError("P30 invalid checksum was accepted")
     # Allow a bounded conversion difference, but reject mismatched
     # timestamps rather than quietly analyzing incoherent phases.
-    near = valid.replace(",350\\n", ",600\\n", 1)
+    near = valid.replace(",350\n", ",600\n", 1)
     validate(io.StringIO(near), 3)
-    far = valid.replace(",350\\n", ",5350\\n", 1)
+    far = valid.replace(",350\\n", ",5350\n", 1)
     try:
         validate(io.StringIO(far), 3)
     except ValueError:
