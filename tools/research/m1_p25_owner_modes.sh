@@ -40,9 +40,16 @@ grep -Eq 'copy|postblit|this\(this\)|disabled' "$TMP/negative.log" || {
     cat "$TMP/negative.log" >&2; echo "P25 wrong negative failure" >&2; exit 1;
 }
 
-# The real native worker must not survive a lexical owner unwinding.
+# Build via DUB but execute the resulting binary DIRECTLY.
+# DUB wraps a child SIGABRT as its own exit code 2, masking exit 134.
+dub build --root="$BASE" --compiler="$DC" --build=debug \
+    --config=p25-owner-modes --d-version=P25DropFault --force \
+    >"$TMP/drop-build.log" 2>&1 || {
+        cat "$TMP/drop-build.log" >&2; exit 1;
+    }
 set +e
-timeout --signal=TERM --kill-after=4s 60s dub run --root="$BASE" --compiler="$DC" --build=debug --config=p25-owner-modes --d-version=P25DropFault >"$TMP/drop.log" 2>&1
+( timeout --signal=TERM --kill-after=4s 60s \
+    "$BASE/m1-p11-real-pool" >"$TMP/drop.log" 2>&1 ) 2>/dev/null
 drop_status=$?
 set -e
 if [[ "$drop_status" != 134 ]] || ! grep -Fq 'P25_TOKEN_DROP_FAILSTOP' "$TMP/drop.log"; then
