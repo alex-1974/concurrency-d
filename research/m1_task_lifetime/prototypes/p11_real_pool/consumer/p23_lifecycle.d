@@ -310,6 +310,92 @@ private void testAfterPoolLaunch()
     require(supervisor.tryDiscard(), "post-start root leaked after join");
 }
 
+private int smallTask()
+{
+    return 23;
+}
+
+private Thread makeProducer(OwnedTaskExecutor executor, shared uint* admitted)
+{
+    // Independent thread activation avoids a reused outer foreach frame.
+    return new Thread({
+        foreach (_; 0 .. 64)
+        {
+            try
+            {
+                auto h = executor.trySubmit(&smallTask);
+                if (h !is null)
+                    atomicFetchAdd!(MemoryOrder.rel)(*admitted, 1u);
+                else
+                    Thread.yield();
+            }
+            catch (Exception)
+            {
+                // Only operations accepted before the close linearization
+                // contribute a completion obligation.
+                break;
+            }
+        }
+    });
+}
+
+private void testProducerRace()
+{
+    auto owner = new OwnedTaskExecutor(2, 8, 256);
+    auto supervisor = new Supervisor(owner);
+    require(owner.researchConstructed(), "producer owner started early");
+    supervisor.start();
+
+    shared uint admitted;
+    Thread[4] producers;
+    foreach (i; 0 .. producers.length)
+    {
+        producers[i] = makeProducer(owner, &admitted);
+        try producers[i].start();
+        catch (Throwable) abort(); // ambiguous native producer start
+    }
+
+    const deadline = MonoTime.currTime + dur!"seconds"(10);
+    while (owner.acceptedCount() == 0)
+    {
+        require(MonoTime.currTime < deadline, "no producers admitted");
+        Thread.yield();
+    }
+
+    // Close while producer methods may still be trying to publish.
+    try owner.closeAndJoin();
+    catch (Throwable) abort();
+    foreach (p; producers)
+    {
+        try
+        {
+            auto problem = p.join(false);
+            if (problem !is null)
+                abort();
+        }
+        catch (Throwable)
+            abort();
+    }
+
+    require(owner.isStopped(), "producer close did not prove native join");
+    require(owner.researchJoinClaims() == 1, "multiple producer join claims");
+    require(owner.acceptedCount() ==
+        atomicLoad!(MemoryOrder.acq)(admitted),
+        "producer acknowledgements differ from accepted obligations");
+    require(owner.completedCount() == owner.acceptedCount(),
+        "producer racing close lost a TaskRef completion");
+    require(owner.retainedCount() == 0,
+        "postjoin producer roots not reclaimed");
+
+    bool rejected;
+    try owner.trySubmit(&smallTask);
+    catch (Exception) rejected = true;
+    require(rejected, "closed executor accepted late producer");
+
+    owner = null;
+    require(supervisor.tryDiscard(), "producer-root not released");
+}
+
 void main()
 {
     foreach (_; 0 .. 6)
@@ -317,6 +403,7 @@ void main()
         testNormal();
         testSyntheticPreJoin();
         testAfterPoolLaunch();
+        testProducerRace();
     }
-    writeln("P23_REAL_M0_LIFECYCLE_PASS normal=6 prejoin=6 poststart=6");
+    writeln("P23_REAL_M0_LIFECYCLE_PASS normal=6 prejoin=6 poststart=6 producer=6");
 }
