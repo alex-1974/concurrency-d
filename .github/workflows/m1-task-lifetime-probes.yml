@@ -28,6 +28,9 @@ on:
       - "tools/research/m1_p27_registry_transitions.sh"
       - "tools/research/m1_p28_bounded_orphans.sh"
       - "tools/research/m1_p29_generational_owner.sh"
+      - "tools/research/m1_p30_benchmark_probe.sh"
+      - "tools/research/m1_p30_analyze.py"
+      - "tools/research/m1_p30_xps.sh"
       - "tools/research/m1_p20_make_owned_fault.py"
       - "tools/research/m1_owned_gc_real_pool.sh"
       - "tools/research/m1_matched_pool_benchmark.sh"
@@ -95,6 +98,9 @@ on:
       - "tools/research/m1_p27_registry_transitions.sh"
       - "tools/research/m1_p28_bounded_orphans.sh"
       - "tools/research/m1_p29_generational_owner.sh"
+      - "tools/research/m1_p30_benchmark_probe.sh"
+      - "tools/research/m1_p30_analyze.py"
+      - "tools/research/m1_p30_xps.sh"
       - "tools/research/m1_p20_make_owned_fault.py"
       - "tools/research/m1_owned_gc_real_pool.sh"
       - "tools/research/m1_matched_pool_benchmark.sh"
@@ -247,6 +253,10 @@ jobs:
       - name: P29 generational owner ABA and quota management (real M0)
         shell: bash
         run: bash tools/research/m1_p29_generational_owner.sh "$DC"
+
+      - name: P30 original M0 versus deferred and P29 managed same-work correctness
+        shell: bash
+        run: bash tools/research/m1_p30_benchmark_probe.sh "$DC"
 
       - name: P12 paired matched M0 work-stealing benchmark (CI diagnostic only)
         shell: bash
