@@ -263,7 +263,7 @@ private final class WorkGate
     Semaphore sem;
     shared uint entered;
     this() { sem = new Semaphore(0); }
-    void await()
+    void park()
     {
         atomicFetchAdd!(MemoryOrder.rel)(entered, 1u);
         sem.wait();
@@ -295,7 +295,7 @@ private struct Job
     Receipt receipt;
     int opCall()
     {
-        gate.await();
+        gate.park();
         const v = cast(uint)(graph.value + graph.child.value * 3);
         atomicFetchAdd!(MemoryOrder.rel)(receipt.checksum, v);
         atomicFetchAdd!(MemoryOrder.rel)(receipt.runs, 1u);
@@ -515,6 +515,6 @@ else
             testCapacityAndOrphanDrain();
             testUncertainConsumesCapacity();
         }
-        writeln("P28_BOUNDED_OWNER_PASS orphan_drains=6 unknown_retained=6 root_pairs=36 quota_denials=12");
+        writeln("P28_BOUNDED_OWNER_PASS orphan_drains=6 unknown_retained=6 root_pairs=30 quota_denials=12");
     }
 }
