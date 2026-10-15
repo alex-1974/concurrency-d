@@ -189,6 +189,23 @@ throughput penalty. The larger concern is the poor multi-producer
 profile throughput in all three implementations; that mechanism
 needs isolation under fixed task/worker dimensions.
 
+## Balanced repeat received — 2026-10-15
+
+A second **SHA-256 verified** XPS measurement was supplied on
+[`eacbe9a1`](https://github.com/alex-1974/concurrency-d/commit/eacbe9a1f63d51a873ce1e40ae86e7198cac7557)
+using the corrected arm order. The [balanced-repeat analysis](evidence/xps-2026-10-15-balanced-results.md)
+preserves its archive checksum, matched-worker/task preflight and
+paired nine-round comparison against the
+[original order-imbalanced baseline](evidence/xps-2026-10-15-results.md).
+
+In balanced measurements, paired P29/P23 submission ratios for
+1/2/4 producers are **1.022/1.017/1.012**. Per-round signs are
+6/9, 5/9 and 5/9 slower, with ranges crossing 1. These findings
+do **not** isolate a stable per-submission manager-lock penalty or
+justify weakening P29 ownership correctness. The 4-producer
+profile also doubles workers and task count, so P31 must hold
+those dimensions fixed before diagnosing scaling.
+
 ## Decision status
 
 **KEEP as a benchmark harness, not yet a performance verdict.**
