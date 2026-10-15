@@ -161,6 +161,25 @@ or unrelated research PR #35 is edited.
 Check the actual run outcome and final documentation HEAD
 before marking P29 fully qualified.
 
+## P30 matched benchmark follow-up
+
+[P30](../p30_ownership_benchmark/README.md) now compares the
+**same P29 `GenerationalManager` implementation** against direct
+source-pinned P23 and the original, unchanged M0
+`OwnedTaskExecutor`. P29's `publish` operation was generalized
+from a single concrete `Job` parameter to `publish(F)(...)`,
+without changing its per-submission mutex/generation/active-call
+protocol. The benchmark exercises actual typed TaskRef execution,
+real bounded admission, parallel producers and native joins.
+
+P30's CI verifies *equal work and timing sample structure only*.
+The optimized XPS script records phase-separated timing and
+producer-thread allocation metrics; no XPS performance verdict
+exists until those artifacts are executed and reviewed. The
+unmanaged original M0 arm has a **weaker native-failure/owner
+lifetime contract**, so faster timings alone cannot justify
+replacing the managed production candidate.
+
 ## Important limitations / next steps
 
 - **Generation is identity, not authority or borrow safety**:
