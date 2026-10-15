@@ -34,6 +34,8 @@ on:
       - "tools/research/m1_p31_fixed_scaling.sh"
       - "tools/research/m1_p31_analyze.py"
       - "tools/research/m1_p31_xps.sh"
+      - "tools/research/m1_p32_source_audit.py"
+      - "tools/research/m1_p32_classify.py"
       - "tools/research/m1_p20_make_owned_fault.py"
       - "tools/research/m1_owned_gc_real_pool.sh"
       - "tools/research/m1_matched_pool_benchmark.sh"
@@ -107,6 +109,8 @@ on:
       - "tools/research/m1_p31_fixed_scaling.sh"
       - "tools/research/m1_p31_analyze.py"
       - "tools/research/m1_p31_xps.sh"
+      - "tools/research/m1_p32_source_audit.py"
+      - "tools/research/m1_p32_classify.py"
       - "tools/research/m1_p20_make_owned_fault.py"
       - "tools/research/m1_owned_gc_real_pool.sh"
       - "tools/research/m1_matched_pool_benchmark.sh"
@@ -267,6 +271,12 @@ jobs:
       - name: P31 producer scaling with fixed M0 work, atomic work variants
         shell: bash
         run: bash tools/research/m1_p31_fixed_scaling.sh "$DC"
+
+      - name: P32-A pinned M0 source and P31 retry analyzer preflight
+        shell: bash
+        run: |
+          python3 tools/research/m1_p32_source_audit.py --self-test
+          python3 tools/research/m1_p32_classify.py --self-test
 
       - name: P12 paired matched M0 work-stealing benchmark (CI diagnostic only)
         shell: bash
