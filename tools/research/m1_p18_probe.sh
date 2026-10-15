@@ -19,6 +19,12 @@ python3 "$ROOT/tools/research/m1_p18_make_fixture.py" \
     "$P13/concurrency/research/m1_scaling_kernel.d" \
     "$P13/consumer/main.d" \
     "$P162/race/main.d" "$BASE/generated"
+# Exhaustively enumerate bounded worker/external-event interleavings with
+# the original generation+Condition predicate text pinned to M0. The
+# deliberately broken no-generation mutant MUST have counterexamples.
+python3 "$ROOT/tools/research/m1_p18_park_boundary_model.py" \
+    --source "$ROOT/source/concurrency/internal/submission_pool.d" \
+    --self-test
 # Deterministic native publication/search/park/notify correctness
 # boundaries for both unchanged original M0 and bounded P18 research clone.
 # These are not benchmarks and must not change source scheduler semantics.
