@@ -170,6 +170,18 @@ owner reachability after **all** owners disappear, nor an acceptable
 high-availability error contract. Ordinary `@system` captures remain
 `@system`; P22 does not imply general `@safe TaskScope`.
 
+## P23 real M0 lifecycle follow-up
+
+[P23's source-pinned original-owned-executor experiment](../p23_real_owned_lifecycle/README.md)
+now tests the deferred-start and separately held owner **against the
+unchanged real M0** `SubmissionWorkerPool`, `TaskRef`, `OwnedNode`,
+backpressure and worker completion accounting rather than P22's separate
+two-worker skeleton. It adds three concurrent closers, known synthetic
+pre-join and post-successful-start cases, nested GC capture retention,
+and a four-producer shutdown race. Real native start/join failures
+remain **fail-stop**; the research supervisor is not yet a durable
+process-level owner, nor does it imply a general `@safe` API.
+
 **Next bounded integration gate:** explore a separately named research
 wrapper/adaptation around the real M0 `OwnedTaskExecutor` with
 per-worker native lifecycle proof and an independent **prelaunch**
