@@ -1,6 +1,6 @@
 # M1 P32 — M0 producer-admission mechanism isolation
 
-Date: 2026-10-15. **Research protocol / source audit only; no P32 native measurements or causal result yet.**
+Date: 2026-10-15. **P32-A evidence recorded; P32-B matched research consumer and paired correctness gate committed, CI still pending. No P32 native XPS measurement or causal verdict.**
 
 Context: [P31's native XPS evidence](../p31_fixed_producer_scaling/evidence/xps-2026-10-15-results.md) observes substantial 1→2→4 producer submission-phase throughput loss at fixed 8,192 tasks, four workers, ingress 128, retention 1,024, including minimal task work. It does not time an individual admission or identify the cause. Issue #17 and Draft PR #38 remain open; ADR-0001 stays PROPOSED.
 
@@ -33,4 +33,4 @@ The source auditor `tools/research/m1_p32_source_audit.py` checks these immutabl
 - Fail-stop on uncertain native starts/joins; never declare worker quiescence based solely on a shutdown request.
 - Any candidate changes to admission locking require separate proof that task records/GC roots remain live until native worker join, no lost wakeups and no ABA acceptance.
 
-**Status:** P32 protocol established, P32 source checker added. Instrumented benchmark, XPS capture and mechanism verdict are **outstanding**.
+**P32-B implementation checkpoint (2026-10-15):** `consumer/main.d` and `dub.sdl` compare the actual pinned production `SubmissionWorkerPool` with the pre-existing P15 source-pinned timestamp overlay, using identical one-word TaskRef records, 1/2/4 producer counts, fixed workers/tasks/ingress, and native join-before-record-release. `tools/research/m1_p32_probe.sh` generates the P15 copy temporarily and runs debug/release DMD/LDC correctness comparisons; `tools/research/m1_p32_compare.py` checks record counts, task completion and lock-call conservation. The instrumentation deliberately changes time under the lock; resulting wait/hold observations are perturbed diagnostics, not uninstrumented timing ground truth. The original pool has weaker ownership/failure semantics than P29. The immediate CI run is [#38793687750](https://github.com/alex-1974/concurrency-d/actions/runs/38793687750), pending at the time of writing. **No CI PASS or native XPS measurement is claimed yet.** Full P32-C paired native sampling, separate producer-thread startup control and causal verdict remain outstanding.
