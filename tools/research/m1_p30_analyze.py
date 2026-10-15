@@ -42,8 +42,14 @@ def validate(lines, min_rounds):
             raise ValueError("P30 fewer attempts than accepted tasks")
         if any(row[key] <= 0 for key in TIMES):
             raise ValueError("P30 zero/nonpositive monotonic interval")
-        if abs(sum(row[t] for t in TIMES[:3]) - row["total_ns"]) > 5:
-            raise ValueError("P30 phase totals are inconsistent")
+        discrepancy = abs(sum(row[t] for t in TIMES[:3]) - row["total_ns"])
+        # MonoTime/Duration conversions can round independent intervals
+        # to target time units separately. 1 microsecond is a rounding
+        # tolerance, NOT a tolerance for differing task semantics.
+        if discrepancy > 1_000:
+            raise ValueError(
+                f"P30 phase totals inconsistent by {discrepancy} ns: {row}"
+            )
         key = (row["phase"], row["round"])
         pair = pairs.setdefault(key, {})
         if row["mode"] in pair:
@@ -120,6 +126,17 @@ def self_test():
         pass
     else:
         raise ValueError("P30 invalid checksum was accepted")
+    # Allow a bounded conversion difference, but reject mismatched
+    # timestamps rather than quietly analyzing incoherent phases.
+    near = valid.replace(",350\\n", ",600\\n", 1)
+    validate(io.StringIO(near), 3)
+    far = valid.replace(",350\\n", ",5350\\n", 1)
+    try:
+        validate(io.StringIO(far), 3)
+    except ValueError:
+        pass
+    else:
+        raise ValueError("P30 inconsistent timing passed self-test")
     print("P30_ANALYZER_SELFTEST_PASS")
 
 
