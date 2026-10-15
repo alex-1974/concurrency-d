@@ -275,6 +275,19 @@ private final class ManagedOwner
 // Anchored independently of producers and controller temporaries.
 private __gshared ManagedOwner processOwner;
 
+// Explicit application shutdown boundary: the D runtime may wait for
+// live druntime Threads BEFORE dispatching shared static module
+// destructors. Therefore this check must run while main can still act.
+private void processExitOrAbort()
+{
+    if (processOwner !is null && processOwner.outstanding())
+    {
+        fprintf(stderr, "P27_APPLICATION_EXIT_FAILSTOP\\n");
+        fflush(stderr);
+        abort();
+    }
+}
+
 // A process-boundary sentinel; intentionally NO native join here.
 // It MUST NOT silently allow druntime module teardown with live TaskRefs.
 shared static ~this()
@@ -473,8 +486,9 @@ version (P27ExitActive)
         processOwner.adopt(controller);
         controller = null;
         processOwner.start();
-        // No application-level close. The shared module destructor must
-        // fail-stop instead of abandoning an active native worker owner.
+        // Explicit app-controlled shutdown check runs BEFORE D runtime
+        // tries to wait for the still-running native worker threads.
+        processExitOrAbort();
     }
 }
 else version (P27ExitUnstarted)
@@ -487,6 +501,20 @@ else version (P27ExitUnstarted)
         controller = null;
         // A registered but never-started executor still requires explicit
         // cancellation before the module lifetime ends.
+    }
+}
+else version (P27RuntimeOnly)
+{
+    void main()
+    {
+        auto controller = new OwnedTaskExecutor(1, 2, 2);
+        processOwner = new ManagedOwner();
+        processOwner.adopt(controller);
+        controller = null;
+        processOwner.start();
+        // Deliberately omit explicit process-exit check. With the pinned
+        // DMD/LDC runtimes, normal main exit waits for native workers
+        // before shared static ~this() can run. Bounded diagnostic only.
     }
 }
 else
@@ -502,6 +530,7 @@ else
         }
         require(processOwner is null,
             "final module exit still holds an owner reference");
+        processExitOrAbort(); // normal safe process boundary
         writeln("P27_LIFECYCLE_RACES_PASS producer_close=12 start_close=12 never_started=12");
     }
 }
