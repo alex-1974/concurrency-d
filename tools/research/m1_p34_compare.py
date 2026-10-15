@@ -17,7 +17,8 @@ def read(path):
             raise ValueError("P34 CSV schema mismatch")
         result={}
         for row in reader:
-            key=tuple(row[k] for k in BASE[:5])
+            key=(row["phase"],int(row["round"]),row["work"],
+                 int(row["producers"]),row["mode"])
             if key in result:
                 raise ValueError("P34 duplicate arm")
             for field in FIELDS:
