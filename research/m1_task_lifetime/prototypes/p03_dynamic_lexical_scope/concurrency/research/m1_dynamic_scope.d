@@ -20,6 +20,14 @@ import core.thread : Thread;
 import core.memory : GC;
 import std.stdio : writeln;
 
+// Always-evaluated correctness guard. D -release removes assert bodies,
+// including essential trySpawn submissions and oracle checks. Research only.
+private void ensure(bool condition) @safe
+{
+    if (!condition)
+        throw new Exception("P03 runtime invariant failed");
+}
+
 private enum size_t QueueCapacity = 8;
 private enum size_t TaskBudget = 24;
 private enum size_t WorkerCount = 2;
@@ -38,7 +46,7 @@ private struct PinnedRecord
 
     void prepare(Work job) @system
     {
-        assert(job !is null);
+        ensure(job !is null);
         callback = job;
         failure = null;
         header.execute = &execute;
@@ -146,7 +154,7 @@ private final class Engine
     {
         synchronized (mutex)
         {
-            assert(target <= accepted);
+            ensure(target <= accepted);
             while (returned < target)
                 returnedChanged.wait();
         }
@@ -156,7 +164,7 @@ private final class Engine
     {
         synchronized (mutex)
         {
-            assert(!joined);
+            ensure(!joined);
             closed = true;
             available.notifyAll();
         }
@@ -166,8 +174,8 @@ private final class Engine
 
         synchronized (mutex)
         {
-            assert(queued == 0);
-            assert(accepted == returned);
+            ensure(queued == 0);
+            ensure(accepted == returned);
             joined = true;
         }
     }
@@ -282,10 +290,10 @@ private struct Portal
         result.admitted = engine.acceptedCount();
         result.quiescent = engine.returnedCount();
         result.rejected = rejected;
-        assert(result.admitted == slots);
+        ensure(result.admitted == slots);
         foreach (i; 0 .. slots)
         {
-            assert(records[i].hasReturned());
+            ensure(records[i].hasReturned());
             if (records[i].failure !is null)
                 ++result.childExceptions;
         }
@@ -318,7 +326,7 @@ private alias Build = void delegate(Portal*) @system;
 +/
 private Outcome runScoped(scope Build build) @system
 {
-    assert(build !is null);
+    ensure(build !is null);
     Portal portal;
     auto engine = new Engine();
     portal.connect(engine);
@@ -388,20 +396,26 @@ private void testDynamicBackpressure() @system
     shared uint completed;
     auto result = runScoped((Portal* portal) @system
     {
-        assert(portal.trySpawn(() @safe { gate.block(); }));
-        assert(portal.trySpawn(() @safe { gate.block(); }));
-        gate.waitFor(2); // two workers executing, none can drain inbox
+        // Even a failed expectation must release both blocked workers
+        // before runScoped's finally attempts native worker join.
+        try
+        {
+            ensure(portal.trySpawn(() @safe { gate.block(); }));
+            ensure(portal.trySpawn(() @safe { gate.block(); }));
+            gate.waitFor(2); // two workers executing, none can drain inbox
 
-        foreach (i; 0 .. QueueCapacity)
-            assert(portal.trySpawn(atomicInc(&completed)));
-        assert(!portal.trySpawn(atomicInc(&completed))); // inbox full
-        assert(portal.acceptedCount() == 10);
-        gate.release(); // release blocked workers before lexical return
+            foreach (i; 0 .. QueueCapacity)
+                ensure(portal.trySpawn(atomicInc(&completed)));
+            ensure(!portal.trySpawn(atomicInc(&completed))); // inbox full
+            ensure(portal.acceptedCount() == 10);
+        }
+        finally
+            gate.release();
     });
 
-    assert(result.admitted == 10 && result.quiescent == 10);
-    assert(result.rejected == 1 && result.childExceptions == 0);
-    assert(atomicLoad!(MemoryOrder.acq)(completed) == QueueCapacity);
+    ensure(result.admitted == 10 && result.quiescent == 10);
+    ensure(result.rejected == 1 && result.childExceptions == 0);
+    ensure(atomicLoad!(MemoryOrder.acq)(completed) == QueueCapacity);
 }
 
 private void testIncrementalAdmissionAndBudget() @system
@@ -412,18 +426,18 @@ private void testIncrementalAdmissionAndBudget() @system
         foreach (batch; 0 .. TaskBudget / QueueCapacity)
         {
             foreach (i; 0 .. QueueCapacity)
-                assert(portal.trySpawn(atomicInc(&completed)));
+                ensure(portal.trySpawn(atomicInc(&completed)));
             portal.waitUntilReturned((batch + 1) * QueueCapacity);
         }
         // Queue is empty, but the 24 pinned records are all committed.
         // No address may be recycled during this lexical scope.
-        assert(!portal.trySpawn(atomicInc(&completed)));
+        ensure(!portal.trySpawn(atomicInc(&completed)));
     });
 
-    assert(result.admitted == TaskBudget);
-    assert(result.quiescent == TaskBudget);
-    assert(result.rejected == 1);
-    assert(atomicLoad!(MemoryOrder.acq)(completed) == TaskBudget);
+    ensure(result.admitted == TaskBudget);
+    ensure(result.quiescent == TaskBudget);
+    ensure(result.rejected == 1);
+    ensure(atomicLoad!(MemoryOrder.acq)(completed) == TaskBudget);
 }
 
 private void testThrowingBuilderJoins() @system
@@ -434,17 +448,17 @@ private void testThrowingBuilderJoins() @system
     {
         runScoped((Portal* portal) @system
         {
-            assert(portal.trySpawn(atomicInc(&completed)));
-            assert(portal.trySpawn(atomicInc(&completed)));
+            ensure(portal.trySpawn(atomicInc(&completed)));
+            ensure(portal.trySpawn(atomicInc(&completed)));
             throw new Exception("builder abort");
         });
     }
     catch (Exception error)
         sawBuilderError = error.msg == "builder abort";
 
-    assert(sawBuilderError);
+    ensure(sawBuilderError);
     // runScoped finally has already joined accepted jobs before rethrow.
-    assert(atomicLoad!(MemoryOrder.acq)(completed) == 2u);
+    ensure(atomicLoad!(MemoryOrder.acq)(completed) == 2u);
 }
 
 private void testChildExceptionIsolation() @system
@@ -452,12 +466,12 @@ private void testChildExceptionIsolation() @system
     shared uint completed;
     auto result = runScoped((Portal* portal) @system
     {
-        assert(portal.trySpawn(() @safe { throw new Exception("child"); }));
-        assert(portal.trySpawn(atomicInc(&completed)));
+        ensure(portal.trySpawn(() @safe { throw new Exception("child"); }));
+        ensure(portal.trySpawn(atomicInc(&completed)));
     });
-    assert(result.admitted == 2 && result.quiescent == 2);
-    assert(result.childExceptions == 1);
-    assert(atomicLoad!(MemoryOrder.acq)(completed) == 1u);
+    ensure(result.admitted == 2 && result.quiescent == 2);
+    ensure(result.childExceptions == 1);
+    ensure(atomicLoad!(MemoryOrder.acq)(completed) == 1u);
 }
 
 private void collectGcForTest() @trusted
@@ -476,6 +490,7 @@ private void testGcCaptureAndDestructorOrder() @system
     auto witness = new GcWitness(41);
     shared uint completed;
     shared uint destroyed;
+    shared uint badOrdering;
 
     {
         struct Guard
@@ -483,30 +498,34 @@ private void testGcCaptureAndDestructorOrder() @system
             @disable this(this);
             shared(uint)* finished;
             shared(uint)* destructorCount;
+            shared(uint)* badOrdering;
             ~this() @system
             {
-                assert(atomicLoad!(MemoryOrder.acq)(*finished) == 1u);
+                if (atomicLoad!(MemoryOrder.acq)(*finished) != 1u)
+                    atomicStore!(MemoryOrder.rel)(*badOrdering, 1u);
                 atomicOp!"+="(*destructorCount, 1u);
             }
         }
         Guard guard;
         guard.finished = &completed;
         guard.destructorCount = &destroyed;
+        guard.badOrdering = &badOrdering;
 
         auto outcome = runScoped((Portal* portal) @system
         {
-            assert(portal.trySpawn(() @safe
+            ensure(portal.trySpawn(() @safe
             {
                 collectGcForTest();
-                assert(witness.value == 41);
+                ensure(witness.value == 41);
                 atomicStore!(MemoryOrder.rel)(completed, 1u);
             }));
         });
-        assert(outcome.admitted == 1 && outcome.quiescent == 1);
-        assert(outcome.childExceptions == 0);
-        assert(atomicLoad!(MemoryOrder.acq)(destroyed) == 0u);
+        ensure(outcome.admitted == 1 && outcome.quiescent == 1);
+        ensure(outcome.childExceptions == 0);
+        ensure(atomicLoad!(MemoryOrder.acq)(destroyed) == 0u);
     }
-    assert(atomicLoad!(MemoryOrder.acq)(destroyed) == 1u);
+    ensure(atomicLoad!(MemoryOrder.acq)(destroyed) == 1u);
+    ensure(atomicLoad!(MemoryOrder.acq)(badOrdering) == 0u);
 }
 
 void main()
