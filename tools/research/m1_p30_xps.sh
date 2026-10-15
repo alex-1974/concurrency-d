@@ -88,6 +88,27 @@ bench single-producer 8192 2 1 64 1024
 bench two-producer 8192 2 2 64 1024
 bench four-producer 16384 4 4 128 1024
 
-echo "P30_XPS_ARTIFACTS_READY $OUT"
-echo "Capture metadata, all *.csv and *-summary.json for review."
-echo "Check thermal throttling, competing processes and repeats before claims."
+# Record end-of-run governor/frequency for basic run provenance.
+python3 - "$OUT/metadata.json" <<'PY'
+import datetime
+import json
+import sys
+from pathlib import Path
+path = Path(sys.argv[1])
+obj = json.loads(path.read_text())
+obj["utc_finished"] = datetime.datetime.now(datetime.timezone.utc).isoformat()
+freq = Path("/sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq")
+obj["frequency_khz_at_finish"] = (
+    freq.read_text().strip() if freq.exists() else "unavailable"
+)
+path.write_text(json.dumps(obj, indent=2, sort_keys=True) + "\\n")
+PY
+
+# One portable upload artifact, with SHA-256 alongside it. Do not
+# write generated measurements into the Git research branch.
+ARCHIVE="$OUT.tar.gz"
+tar -C "$OUT" -czf "$ARCHIVE" .
+sha256sum "$ARCHIVE" > "$ARCHIVE.sha256"
+echo "P30_XPS_ARTIFACTS_READY $ARCHIVE"
+echo "P30_XPS_SHA256 $ARCHIVE.sha256"
+echo "Review raw CSV, metadata, thermal state and sample variance before claims."
