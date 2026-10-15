@@ -1112,11 +1112,6 @@ else version (P31Benchmark)
     {
         size_t taskCount = 512, workers = 4, ingress = 64,
             retained = 256, warmup = 1, rounds = 3;
-        foreach (i, arg; args[1 .. $])
-        {
-            // Parser below uses the original args array; i is
-            // intentionally not used to avoid compiler mode drift.
-        }
         for (size_t i = 1; i < args.length; ++i)
         {
             check(i + 1 < args.length, "P31 missing CLI value");
