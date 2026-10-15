@@ -206,6 +206,12 @@ justify weakening P29 ownership correctness. The 4-producer
 profile also doubles workers and task count, so P31 must hold
 those dimensions fixed before diagnosing scaling.
 
+## P31 controlled producer follow-up
+
+[P31](../p31_fixed_producer_scaling/README.md) addresses the confounded producer profiles in the two P30 XPS captures. It retains the exact original M0 scheduler and P29 owner manager while fixing total TaskRefs, workers, ingress and retention across **1/2/4 producers**. It compares a task with two shared atomics against a task with two producer-sharded atomics and a minimal-return task, each under the original M0, direct P23 and managed P29 ownership paths.
+
+This protocol does not assume the P30 profile slowdown was caused by the P29 manager Mutex or by shared task counters. P31's work variants are mechanism diagnostics; only owner modes *within the same work variant* have equivalent task semantics. An actual optimized XPS run is required before any numerical conclusion.
+
 ## Decision status
 
 **KEEP as a benchmark harness, not yet a performance verdict.**
