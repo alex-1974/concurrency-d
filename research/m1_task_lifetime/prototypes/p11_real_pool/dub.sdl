@@ -78,3 +78,11 @@ configuration "p27-transitions-optimized" {
     mainSourceFile "consumer/p27_registry_transitions.d"
     dflags "-O3"
 }
+
+configuration "p28-bounded" {
+    mainSourceFile "consumer/p28_bounded_orphans.d"
+}
+configuration "p28-bounded-optimized" {
+    mainSourceFile "consumer/p28_bounded_orphans.d"
+    dflags "-O3"
+}
