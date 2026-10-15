@@ -89,6 +89,32 @@ data races are not addressed, and native `Thread.start`/join failure does
 not have a proved recoverable lifetime semantics. Retain ADR-0001 **PROPOSED**,
 Issue #17 **OPEN**, PR #38 **Draft**, and `source/` unchanged.
 
+## Nested-block ordering witness (2026-10-15; new evidence gate)
+
+The new `testNestedBlockOrdering` exercises the **actual P03 engine**
+with one admitted task. A worker enters a test gate while a nested lexical
+`InnerGuard` is still alive. The builder then leaves that inner block;
+the guard's destructor stores a release atomic marker. **Before the
+outer `runScoped` builder returns or its final join starts**, it observes
+that the nested block has ended. Only then does the builder release the
+worker, which sees the acquired marker and completes. The outer join still
+properly accounts for the admitted TaskRef.
+
+This is a **bounded scheduling/lifetime-order witness**, not an attempt to
+access a destroyed object. The worker reads only atomics whose referents
+outlive the joined task; **no expired pointer is passed or dereferenced**.
+Its purpose is to invalidate the inference that an *outer* scope join alone
+also keeps all *inner* lexical-block resources alive. It does not establish
+the compiler's treatment of particular captured raw-pointer/delegate forms,
+nor does it prove a data race or memory-safety violation.
+
+The source uses always-evaluated `ensure` checks, a `finally` gate
+release and a nonthrowing destructor. The native runner requires the exact
+`P03_NESTED_SCOPE_ORDER_PASS` marker, not merely process exit status, in
+normal, `-release` and LDC `-O3` test modes. A missing marker or timeout
+fails the gate. The checker is research-only. **Do not interpret its PASS
+as justification for changing P03's `@system` annotation.**
+
 ## Design limits / GO-NO-GO
 
 **KEEP (research):** lexical dynamic TaskRef publication with one producer, bounded pinned task records, fixed worker count, exception-safe join and no detach. This demonstrably extends P02's one-shot batch capability without changing the one-word transport.
