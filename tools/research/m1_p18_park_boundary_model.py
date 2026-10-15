@@ -41,6 +41,7 @@ class State:
     accepted: int = 0
     completed: int = 0
     announced_local: int = 0
+    claimed_not_announced: int = 0
     closed: bool = False
 
 
@@ -53,7 +54,8 @@ def event(st, name):
     if name == "foreign_take":
         if st.inbox == 0:
             return None
-        return replace(st, inbox=st.inbox-1)
+        return replace(st, inbox=st.inbox-1,
+                       claimed_not_announced=st.claimed_not_announced+1)
     if name == "finish":
         # A task cannot finish before removal from the inbox.
         if st.accepted - st.completed - st.inbox <= 0:
@@ -63,7 +65,12 @@ def event(st, name):
         return replace(st, completed=completed,
                        generation=st.generation+int(should_broadcast))
     if name == "announce":
+        # Announced owner-deque work requires a previously claimed inbox
+        # TaskRef: a bare notify with no owned task is NOT a valid worker step.
+        if st.claimed_not_announced == 0:
+            return None
         return replace(st,generation=st.generation+1,
+                       claimed_not_announced=st.claimed_not_announced-1,
                        announced_local=st.announced_local+1)
     if name == "local_claim":
         if st.announced_local == 0:
@@ -106,6 +113,7 @@ def explore(second_search=False, mutant=False, max_external=3):
                 # instead of taking the park transition in THIS bounded model.
                 if st.inbox != 0 or st.announced_local != 0:
                     terminated+=1
+                    return
                 else:
                     dfs(stage+1,used,st,observed,trace+("empty-scan",))
             else:
@@ -117,6 +125,10 @@ def explore(second_search=False, mutant=False, max_external=3):
                         sleeps_with_stale_ticket+=1
                         if witness is None:
                             witness=trace+("BUG:park-on-stale-state",)
+                # The guard decision is terminal in this bounded model:
+                # external events AFTER sleep are NOT equivalent to events
+                # between search and the atomic locked guard.
+                return
         if used < max_external:
             for name in EVENTS:
                 new=event(st,name)
