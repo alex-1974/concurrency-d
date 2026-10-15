@@ -889,7 +889,7 @@ else version (P31Benchmark)
 
     private bool p31Attempt(F)(
         P31Mode mode, OriginalExecutor baseline,
-        OwnedTaskExecutor real, GenerationalManager manager,
+        OwnedTaskExecutor owned, GenerationalManager manager,
         OwnerHandle h, F job)
     {
         final switch (mode)
@@ -901,7 +901,7 @@ else version (P31Benchmark)
             }
             case P31Mode.deferred:
             {
-                auto result = real.trySubmit(job);
+                auto result = owned.trySubmit(job);
                 return result !is null;
             }
             case P31Mode.managed:
@@ -911,7 +911,7 @@ else version (P31Benchmark)
 
     private Thread p31Producer(
         P31Mode mode, P31Work work, OriginalExecutor baseline,
-        OwnedTaskExecutor real, GenerationalManager manager,
+        OwnedTaskExecutor owned, GenerationalManager manager,
         OwnerHandle h, P31Counter counter, size_t count,
         P31Stats stats)
     {
@@ -929,10 +929,10 @@ else version (P31Benchmark)
                         "P31 producer admission timeout");
                     ++stats.attempts;
                     if (work == P31Work.minimal)
-                        accepted = p31Attempt(mode, baseline, real,
+                        accepted = p31Attempt(mode, baseline, owned,
                             manager, h, minimal);
                     else
-                        accepted = p31Attempt(mode, baseline, real,
+                        accepted = p31Attempt(mode, baseline, owned,
                             manager, h, counted);
                     if (!accepted)
                         Thread.yield();
@@ -984,7 +984,7 @@ else version (P31Benchmark)
         // retention, and same task type for each matched work-kind triple.
         GC.collect();
         OriginalExecutor baseline;
-        OwnedTaskExecutor real;
+        OwnedTaskExecutor owned;
         GenerationalManager manager;
         OwnerHandle h;
 
@@ -995,14 +995,14 @@ else version (P31Benchmark)
                 baseline = new OriginalExecutor(workers, ingress, retained);
                 break;
             case P31Mode.deferred:
-                real = new OwnedTaskExecutor(workers, ingress, retained);
-                real.researchStart();
+                owned = new OwnedTaskExecutor(workers, ingress, retained);
+                owned.researchStart();
                 break;
             case P31Mode.managed:
                 manager = new GenerationalManager();
-                real = new OwnedTaskExecutor(workers, ingress, retained);
-                check(manager.enroll(real, h) && manager.start(h),
-                    "P31 manager prelaunch/real-start failed");
+                owned = new OwnedTaskExecutor(workers, ingress, retained);
+                check(manager.enroll(owned, h) && manager.start(h),
+                    "P31 manager prelaunch/owned-start failed");
                 break;
         }
         const created = MonoTime.currTime;
@@ -1014,7 +1014,7 @@ else version (P31Benchmark)
             stats[i] = new P31Stats();
             auto counter = work == P31Work.sharedTwoAtomics
                 ? sharedCounter : counters[i];
-            threads[i] = p31Producer(mode, work, baseline, real,
+            threads[i] = p31Producer(mode, work, baseline, owned,
                 manager, h, counter, taskCount / producers, stats[i]);
         }
         foreach (t; threads)
@@ -1029,7 +1029,7 @@ else version (P31Benchmark)
                 baseline.closeAndJoin();
                 break;
             case P31Mode.deferred:
-                real.closeAndJoin();
+                owned.closeAndJoin();
                 break;
             case P31Mode.managed:
                 check(manager.orphan(h) && manager.joinOrphan(h) &&
@@ -1049,8 +1049,8 @@ else version (P31Benchmark)
         }
         else
         {
-            accepted = real.acceptedCount();
-            completed = real.completedCount();
+            accepted = owned.acceptedCount();
+            completed = owned.completedCount();
         }
         size_t attempts, acknowledged, producerBytes;
         foreach (stat; stats)
