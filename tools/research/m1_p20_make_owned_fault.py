@@ -82,8 +82,8 @@ def main() -> None:
     )
     src = swap_once(
         src,
-        "        try\\n        {\\n            _pool.closeAndJoin();\\n"
-        "        }\\n        catch (Throwable error)",
+        "        try\n        {\n            _pool.closeAndJoin();\n"
+        "        }\n        catch (Throwable error)",
         """        try
         {
             if (_researchInjectBeforeJoin)
