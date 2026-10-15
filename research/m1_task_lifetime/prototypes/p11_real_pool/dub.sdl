@@ -46,3 +46,11 @@ configuration "owned-fault-optimized" {
     mainSourceFile "consumer/p20_fault_consumer.d"
     dflags "-O3"
 }
+
+configuration "p23-lifecycle" {
+    mainSourceFile "consumer/p23_lifecycle.d"
+}
+configuration "p23-lifecycle-optimized" {
+    mainSourceFile "consumer/p23_lifecycle.d"
+    dflags "-O3"
+}
