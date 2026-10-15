@@ -31,14 +31,9 @@ if [[ "$(basename -- "$DC")" == ldc2* ]]; then
     }
 fi
 
-# A copy of a move-only scoped ownership token MUST be compile rejected.
-NEG_FLAG="-version=P25NegativeCopy"
-DROP_FLAG="-version=P25DropFault"
-if [[ "$(basename -- "$DC")" == ldc2* ]]; then
-    NEG_FLAG="-d-version=P25NegativeCopy"
-    DROP_FLAG="-d-version=P25DropFault"
-fi
-if timeout 60s dub build --root="$BASE" --compiler="$DC" --build=debug --config=p25-owner-modes --build-mode=allAtOnce --compiler-args="$NEG_FLAG" >"$TMP/negative.log" 2>&1; then
+# DUB's documented --d-version sets the research negative branch.
+# It translates the correct compiler option for each pinned compiler.
+if timeout 60s dub build --root="$BASE" --compiler="$DC" --build=debug --config=p25-owner-modes --d-version=P25NegativeCopy >"$TMP/negative.log" 2>&1; then
     echo "P25 ERROR token unexpectedly copyable" >&2; exit 1
 fi
 grep -Eq 'copy|postblit|this\(this\)|disabled' "$TMP/negative.log" || {
@@ -47,7 +42,7 @@ grep -Eq 'copy|postblit|this\(this\)|disabled' "$TMP/negative.log" || {
 
 # The real native worker must not survive a lexical owner unwinding.
 set +e
-timeout --signal=TERM --kill-after=4s 60s dub run --root="$BASE" --compiler="$DC" --build=debug --config=p25-owner-modes --compiler-args="$DROP_FLAG" >"$TMP/drop.log" 2>&1
+timeout --signal=TERM --kill-after=4s 60s dub run --root="$BASE" --compiler="$DC" --build=debug --config=p25-owner-modes --d-version=P25DropFault >"$TMP/drop.log" 2>&1
 drop_status=$?
 set -e
 if [[ "$drop_status" != 134 ]] || ! grep -Fq 'P25_TOKEN_DROP_FAILSTOP' "$TMP/drop.log"; then
