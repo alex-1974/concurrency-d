@@ -17,6 +17,7 @@ on:
       - "tools/research/m1_inline_transfer_and_uncertain.sh"
       - "tools/research/m1_typed_transport_prototype.sh"
       - "tools/research/m1_real_pool_prototype.sh"
+      - "tools/research/m1_owned_gc_real_pool.sh"
       - "tools/research/m1_matched_pool_benchmark.sh"
       - "tools/research/m1_worker_scaling_probe.sh"
       - "tools/research/m1_worker_scaling_analyze.py"
@@ -71,6 +72,7 @@ on:
       - "tools/research/m1_inline_transfer_and_uncertain.sh"
       - "tools/research/m1_typed_transport_prototype.sh"
       - "tools/research/m1_real_pool_prototype.sh"
+      - "tools/research/m1_owned_gc_real_pool.sh"
       - "tools/research/m1_matched_pool_benchmark.sh"
       - "tools/research/m1_worker_scaling_probe.sh"
       - "tools/research/m1_worker_scaling_analyze.py"
@@ -177,6 +179,10 @@ jobs:
       - name: P11 actual M0 work stealing typed task DUB consumer (research only)
         shell: bash
         run: bash tools/research/m1_real_pool_prototype.sh "$DC"
+
+      - name: P19 real M0 owned GC graphs and handle independence
+        shell: bash
+        run: bash tools/research/m1_owned_gc_real_pool.sh "$DC"
 
       - name: P12 paired matched M0 work-stealing benchmark (CI diagnostic only)
         shell: bash

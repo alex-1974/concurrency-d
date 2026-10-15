@@ -27,3 +27,14 @@ configuration "optimized" {
     // Debug build retains assertions; this configuration adds LDC -O3.
     dflags "-O3"
 }
+
+configuration "owned-graph" {
+    mainSourceFile "consumer/p19_owned_graph.d"
+}
+configuration "owned-graph-optimized" {
+    mainSourceFile "consumer/p19_owned_graph.d"
+    dflags "-O3"
+}
+configuration "owned-negative-safe" {
+    mainSourceFile "consumer/p19_negative_safe.d"
+}
