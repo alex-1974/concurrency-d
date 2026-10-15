@@ -81,10 +81,16 @@ def main() -> None:
         "test-only recovery hook",
     )
     src = swap_once(
-        src, "            _pool.closeAndJoin();",
-        """            if (_researchInjectBeforeJoin)
+        src,
+        "        try\\n        {\\n            _pool.closeAndJoin();\\n"
+        "        }\\n        catch (Throwable error)",
+        """        try
+        {
+            if (_researchInjectBeforeJoin)
                 throw new Exception("P20 synthetic pre-join fault");
-            _pool.closeAndJoin();""",
+            _pool.closeAndJoin();
+        }
+        catch (Throwable error)""",
         "original close path injection",
     )
     dest = target_path
