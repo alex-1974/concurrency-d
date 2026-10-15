@@ -1,0 +1,58 @@
+#!/usr/bin/env bash
+# P25: matched real M0 owned-task correctness: lexical token vs registry.
+set -euo pipefail
+ulimit -c 0
+DC="${1:-dmd}"
+ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)"
+BASE="$ROOT/research/m1_task_lifetime/prototypes/p11_real_pool"
+GEN="$BASE/concurrency/research/m1_p23_owned.d"
+TMP="$(mktemp -d)"
+cleanup() { rm -f -- "$GEN"; rm -rf -- "$TMP"; }
+trap cleanup EXIT
+[[ ! -e "$GEN" ]] || { echo "P25 generated copy already exists" >&2; exit 1; }
+test "$(git -C "$ROOT" hash-object source/concurrency/internal/submission_pool.d)" = b7d8fafcb3179f00cba7e89e28c6d6b9b676353a
+python3 "$ROOT/tools/research/m1_p23_make_owned.py" "$ROOT/source/concurrency/internal/owned_task.d" "$GEN"
+
+for build in debug release; do
+    timeout --signal=TERM --kill-after=4s 160s dub run --root="$BASE" --compiler="$DC" --build="$build" --config=p25-owner-modes > "$TMP/$build.log" 2>&1 || {
+        cat "$TMP/$build.log" >&2; exit 1;
+    }
+    grep -Fx 'P25_OWNER_MODES_PASS token=12 registry=12 normal=12 uncertain=12' "$TMP/$build.log" || {
+        cat "$TMP/$build.log" >&2; exit 1;
+    }
+done
+
+if [[ "$(basename -- "$DC")" == ldc2* ]]; then
+    timeout --signal=TERM --kill-after=4s 160s dub run --root="$BASE" --compiler="$DC" --build=debug --config=p25-owner-modes-optimized > "$TMP/O3.log" 2>&1 || {
+        cat "$TMP/O3.log" >&2; exit 1;
+    }
+    grep -Fx 'P25_OWNER_MODES_PASS token=12 registry=12 normal=12 uncertain=12' "$TMP/O3.log" || {
+        cat "$TMP/O3.log" >&2; exit 1;
+    }
+fi
+
+# A copy of a move-only scoped ownership token MUST be compile rejected.
+NEG_FLAG="-version=P25NegativeCopy"
+DROP_FLAG="-version=P25DropFault"
+if [[ "$(basename -- "$DC")" == ldc2* ]]; then
+    NEG_FLAG="-d-version=P25NegativeCopy"
+    DROP_FLAG="-d-version=P25DropFault"
+fi
+if timeout 60s dub build --root="$BASE" --compiler="$DC" --build=debug --config=p25-owner-modes --build-mode=allAtOnce --compiler-args="$NEG_FLAG" >"$TMP/negative.log" 2>&1; then
+    echo "P25 ERROR token unexpectedly copyable" >&2; exit 1
+fi
+grep -Eq 'copy|postblit|this\(this\)|disabled' "$TMP/negative.log" || {
+    cat "$TMP/negative.log" >&2; echo "P25 wrong negative failure" >&2; exit 1;
+}
+
+# The real native worker must not survive a lexical owner unwinding.
+set +e
+timeout --signal=TERM --kill-after=4s 60s dub run --root="$BASE" --compiler="$DC" --build=debug --config=p25-owner-modes --compiler-args="$DROP_FLAG" >"$TMP/drop.log" 2>&1
+drop_status=$?
+set -e
+if [[ "$drop_status" != 134 ]] || ! grep -Fq 'P25_TOKEN_DROP_FAILSTOP' "$TMP/drop.log"; then
+    cat "$TMP/drop.log" >&2
+    echo "P25 incorrect drop-fault result: $drop_status" >&2
+    exit 1
+fi
+echo "P25_SCOPE_FAILSTOP_PASS disabled_copy=1 exit=134"
