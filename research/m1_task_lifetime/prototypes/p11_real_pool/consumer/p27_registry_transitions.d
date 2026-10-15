@@ -282,7 +282,7 @@ private void processExitOrAbort()
 {
     if (processOwner !is null && processOwner.outstanding())
     {
-        fprintf(stderr, "P27_APPLICATION_EXIT_FAILSTOP\\n");
+        fprintf(stderr, "P27_APPLICATION_EXIT_FAILSTOP\n");
         fflush(stderr);
         abort();
     }
