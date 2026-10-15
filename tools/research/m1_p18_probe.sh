@@ -19,6 +19,29 @@ python3 "$ROOT/tools/research/m1_p18_make_fixture.py" \
     "$P13/concurrency/research/m1_scaling_kernel.d" \
     "$P13/consumer/main.d" \
     "$P162/race/main.d" "$BASE/generated"
+# Deterministic native publication/search/park/notify correctness
+# boundaries for both unchanged original M0 and bounded P18 research clone.
+# These are not benchmarks and must not change source scheduler semantics.
+python3 "$ROOT/tools/research/m1_p18_park_boundary_make_fixture.py" \
+    "$ROOT/source/concurrency/internal/submission_pool.d" "$BASE/generated"
+for boundary in park-boundary-control park-boundary-grace; do
+    timeout --signal=TERM --kill-after=5s 80s \
+        dub run --root="$BASE" --compiler="$DC" --build=debug \
+        --config="$boundary" >"$TMP/$boundary.log"
+    grep -q '^P18_PARK_BOUNDARY_PASS scenarios=96' "$TMP/$boundary.log"
+done
+
+# Source change must invalidate both copied variants before output.
+cp "$ROOT/source/concurrency/internal/submission_pool.d" "$TMP/modified-M0.d"
+printf '\n// source pin negative\n' >>"$TMP/modified-M0.d"
+if python3 "$ROOT/tools/research/m1_p18_park_boundary_make_fixture.py" \
+    "$TMP/modified-M0.d" "$TMP/forbidden-park-fixture" \
+    >"$TMP/park-pin-negative.log" 2>&1; then
+    echo "ERROR: P18 park boundary generator accepted drifted M0" >&2
+    exit 1
+fi
+test ! -e "$TMP/forbidden-park-fixture"
+
 # Separately timestamped research-only P13 driver: NOT the historical
 # uninstrumented timing baseline. Both arms get identical phase instrumentation.
 python3 "$ROOT/tools/research/m1_p18_phase_make_fixture.py" \
@@ -398,6 +421,15 @@ if [[ "$(basename -- "$DC")" == ldc2* ]]; then
     done
     python3 "$ROOT/tools/research/m1_p18_cadence_smoke.py" "$TMP" \
         --prefix release- --count 128 --waves 2
+    # Native exact-source park boundary semantics also qualify under
+    # whole-release LDC (non-speed, no hot-path instrumentation).
+    for boundary in park-boundary-control park-boundary-grace; do
+        timeout --signal=TERM --kill-after=5s 80s \
+            dub run --root="$BASE" --compiler="$DC" --build=release \
+            --config="$boundary" >"$TMP/release-$boundary.log"
+        grep -q '^P18_PARK_BOUNDARY_PASS scenarios=96' \
+            "$TMP/release-$boundary.log"
+    done
     # Phase-boundary snapshots also compile and conserve work in LDC release.
     # Phase-timed binaries are NOT direct historical throughput baselines.
     for mode in phase-control phase-grace; do
