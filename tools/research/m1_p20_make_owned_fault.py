@@ -26,7 +26,7 @@ def main() -> None:
     source_path, target_path = map(Path, sys.argv[1:])
     raw = source_path.read_bytes()
     blob = hashlib.sha1(
-        b"blob " + str(len(raw)).encode("ascii") + b"\\0" + raw
+        b"blob " + str(len(raw)).encode("ascii") + b"\0" + raw
     ).hexdigest()
     if blob != EXPECTED_BLOB:
         raise SystemExit(f"P20 M0 source drift: {blob} != {EXPECTED_BLOB}")
@@ -38,8 +38,8 @@ def main() -> None:
         "module identity",
     )
     src = swap_once(
-        src, "import std.traits :\\n    ReturnType;",
-        "import std.traits :\\n    ReturnType;\\n"
+        src, "import std.traits :\n    ReturnType;",
+        "import std.traits :\n    ReturnType;\n"
         "import core.stdc.stdlib : abort;",
         "fail-stop import",
     )
