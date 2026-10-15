@@ -87,6 +87,15 @@ configuration "park-boundary-grace" {
     mainSourceFile "generated/boundary/main.d"
     versions "P18BoundaryGrace"
 }
+// Actual multi-producer/multi-worker bounded progress correctness probe.
+// No speed or energy claim, no public TaskScope API.
+configuration "fairness-control" {
+    mainSourceFile "fairness/main.d"
+}
+configuration "fairness-grace" {
+    mainSourceFile "fairness/main.d"
+    versions "P18Grace"
+}
 configuration "race-control" {
     mainSourceFile "generated/race/main.d"
 }
