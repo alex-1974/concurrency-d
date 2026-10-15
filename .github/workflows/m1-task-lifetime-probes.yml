@@ -51,6 +51,7 @@ on:
       - "tools/research/m1_p34_compare.py"
       - "tools/research/m1_p34_xps.sh"
       - "tools/research/m1_p34_three_arm.py"
+      - "tools/research/m1_p35_source_audit.py"
       - "tools/research/m1_p20_make_owned_fault.py"
       - "tools/research/m1_owned_gc_real_pool.sh"
       - "tools/research/m1_matched_pool_benchmark.sh"
@@ -141,6 +142,7 @@ on:
       - "tools/research/m1_p34_compare.py"
       - "tools/research/m1_p34_xps.sh"
       - "tools/research/m1_p34_three_arm.py"
+      - "tools/research/m1_p35_source_audit.py"
       - "tools/research/m1_p20_make_owned_fault.py"
       - "tools/research/m1_owned_gc_real_pool.sh"
       - "tools/research/m1_matched_pool_benchmark.sh"
@@ -327,6 +329,10 @@ jobs:
       - name: P34 observational analyzer syntax
         shell: bash
         run: python3 -m py_compile tools/research/m1_p34_observe.py
+
+      - name: P35 pinned owner and manager critical-section anatomy
+        shell: bash
+        run: python3 tools/research/m1_p35_source_audit.py
 
       - name: P34 source-pinned owned admission and manager phase preflight
         shell: bash
