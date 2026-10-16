@@ -46,10 +46,14 @@ private final class TaskInbox""")
         """            p38ThreadCounters = P38WorkerCounters.init;
             workerLoop(workerIndex);
             _p38Workers[workerIndex] = p38ThreadCounters;""")
-    s=once(s,"        foreach (index; 0 .. _started)\n            _workers[index].join();",
+    shutdown=s.index("    void closeAndJoin()")
+    leading, trailing = s[:shutdown], s[shutdown:]
+    trailing=once(trailing,"        foreach (index; 0 .. _started)\n            _workers[index].join();",
         "        foreach (index; 0 .. _started)"+chr(10)+
         "            _workers[index].join();"+chr(10)+
-        "        _p38Joined = true;")\n    s=once(s,"    size_t acceptedCount()\n    {",
+        "        _p38Joined = true;")
+    s=leading+trailing
+    s=once(s,"    size_t acceptedCount()\n    {",
         """    P38WorkerCounters[] researchWorkerCounters()
     {
         if (!_p38Joined)
