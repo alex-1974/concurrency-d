@@ -39,3 +39,7 @@ Then use the familiar rotated XPS three-arm protocol (3 sessions, 9 measured rou
 ## Incremental P38 worker-count integration
 
 The pool generator now anchors the worker-counter accessor inside `SubmissionWorkerPool` only (not the similarly named inbox method). The P38 owner exports the counter snapshot only after STOPPED and the native pool join; the P31-derived consumer aggregates per-worker `parkCalls`, `waitEntries`, and `waitReturns` after shutdown and asserts `waitEntries == waitReturns`. This is a **correctness-only** consumer slice: the values are not yet CSV columns, timed worker wake phases, or native evidence. Do not infer useful wakeups or notification correspondence from this invariant. DMD/LDC confirmation pending.
+
+## P38 worker CSV gate — 2026-10-16
+
+The P31-derived consumer now appends `park_calls`, `wait_entries`, and `wait_returns` to the P37 CSV. These are **post-join totals for instrumented workers**, zero by definition for M0. The paired validator checks `wait_entries == wait_returns <= park_calls` independently in both null/timed arms and delegates the unchanged task/phase/matrix invariants to the P37 validator on a projected CSV. This **does not** establish a causal correspondence between producer notifications and worker wakeups. Compiler confirmation for the CSV integration is pending.
