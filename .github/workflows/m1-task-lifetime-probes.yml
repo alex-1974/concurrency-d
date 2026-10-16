@@ -57,6 +57,7 @@ on:
       - "tools/research/m1_p35_make_consumer.py"
       - "tools/research/m1_p35_compile.sh"
       - "tools/research/m1_p35_compare.py"
+      - "tools/research/m1_p35_xps.sh"
       - "tools/research/m1_p20_make_owned_fault.py"
       - "tools/research/m1_owned_gc_real_pool.sh"
       - "tools/research/m1_matched_pool_benchmark.sh"
@@ -341,6 +342,10 @@ jobs:
         shell: bash
         run: |
           python3 -m py_compile tools/research/m1_p35_make_owner.py tools/research/m1_p35_make_consumer.py tools/research/m1_p35_compare.py
+
+      - name: P35 native XPS capture syntax preflight
+        shell: bash
+        run: bash -n tools/research/m1_p35_xps.sh
 
       - name: P35 generated real-owner TLS null and timed DUB correctness
         shell: bash
