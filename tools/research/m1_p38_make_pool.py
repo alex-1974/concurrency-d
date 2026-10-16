@@ -54,7 +54,9 @@ private final class TaskInbox""")
         "            _workers[index].join();"+chr(10)+
         "        _p38Joined = true;")
     s=leading+trailing
-    s=once(s,"    size_t acceptedCount()\n    {",
+    pool_start=s.index("package(concurrency) final class SubmissionWorkerPool")
+    prefix,body=s[:pool_start],s[pool_start:]
+    body=once(body,"    size_t acceptedCount()\n    {",
         """    P38WorkerCounters[] researchWorkerCounters()
     {
         if (!_p38Joined)
@@ -64,6 +66,7 @@ private final class TaskInbox""")
 
     size_t acceptedCount()
     {""")
+    s=prefix+body
     out.parent.mkdir(parents=True,exist_ok=True)
     out.write_text(s)
     print("P38_WORKER_OVERLAY_GENERATED source_pinned=true")
