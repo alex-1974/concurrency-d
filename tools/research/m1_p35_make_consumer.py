@@ -22,6 +22,8 @@ def main():
                      "module concurrency.research.p35_generational_owner;")
     s = replace_once(s, "import concurrency.research.m1_p23_owned : OwnedTaskExecutor;",
                      "import concurrency.research.m1_p35_owned : OwnedTaskExecutor, p35Take;")
+    s = replace_once(s, "        size_t producerBytes;"+chr(10)+"    }",
+                     "        size_t producerBytes;"+chr(10)+"        ulong p35Calls, p35WaitNs, p35HoldNs;"+chr(10)+"    }")
     dst.parent.mkdir(parents=True, exist_ok=True)
     dst.write_text(s)
     print("P35_CONSUMER_SOURCE_PIN_PASS")
