@@ -41,6 +41,11 @@ def main():
     for row in a.values():
         if row['accepted']!=row['count'] or row['completed']!=row['count']:
             raise ValueError('P36 missing task')
+    for k,y in b.items():
+        x=a[k]
+        for name in ('count','workers','ingress','retained','accepted','completed','executed','checksum'):
+            if x[name]!=y[name]: raise ValueError('P36 mismatched task work')
+        if any(x[n] for n in PHASES): raise ValueError('P36 null has clocks')
     print('P36_PAIR_KEYS_PASS')
 
 if __name__=='__main__':
