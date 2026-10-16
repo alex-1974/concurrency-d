@@ -48,7 +48,7 @@ def main():
         if any(x[n] for n in PHASES): raise ValueError('P37 null has clocks')
     for k,y in b.items():
         if y['mode']!='m0' and any(y[name]<=0 for name in PHASES):
-            raise ValueError('P37 timed phase missing')
+            raise ValueError('P37 timed phase missing: '+str((k,{name:y[name] for name in PHASES},y['owner_calls'],y['accepted'])))
         for arm, record in (('null', a[k]), ('timed', y)):
             expected = 0 if record['mode']=='m0' else record['accepted']
             if record['owner_calls'] != expected:
