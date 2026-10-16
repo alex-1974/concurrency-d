@@ -19,6 +19,21 @@ def main():
     text=raw.decode()
     text=once(text,"module concurrency.internal.submission_pool;",
               "module concurrency.research.m1_p37_pool;")
+    stats='''import core.time : MonoTime;
+package(concurrency) struct P37InboxStats
+{
+    ulong calls, waitNs, queueNs, notifyNs, rejects;
+}
+private P37InboxStats p37Local;
+package(concurrency) P37InboxStats p37Take()
+{
+    auto result=p37Local;
+    p37Local=P37InboxStats.init;
+    return result;
+}
+'''
+    text=once(text,"import core.sync.condition :",
+              stats+"import core.sync.condition :")
     out.parent.mkdir(parents=True,exist_ok=True)
     out.write_text(text)
     print("P37_POOL_PIN_PASS")
