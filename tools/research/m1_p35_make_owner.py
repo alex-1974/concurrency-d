@@ -32,6 +32,28 @@ package(concurrency) P35Stats p35Take()
 }
 '''
     text = text.replace(point, point + stats)
+    start = '        TaskHandle!R handle;\\n\\n        synchronized (_mutex)\\n        {'
+    if text.count(start) != 1:
+        raise ValueError('P35 submission start drift')
+    timed = '''        TaskHandle!R handle;
+        ++p35ThreadStats.calls;
+        version (P35Timed)
+            const p35Before = MonoTime.currTime;
+        synchronized (_mutex)
+        {
+            version (P35Timed)
+            {
+                const p35Entered = MonoTime.currTime;
+                p35ThreadStats.waitNs += cast(ulong)
+                    (p35Entered - p35Before).total!"nsecs";
+                scope (exit)
+                {
+                    const p35Exit = MonoTime.currTime;
+                    p35ThreadStats.holdNs += cast(ulong)
+                        (p35Exit - p35Entered).total!"nsecs";
+                }
+            }'''
+    text = text.replace(start, timed)
     p35.parent.mkdir(parents=True,exist_ok=True)
     p35.write_text(text)
     print('P35_OWNER_OVERLAY_PIN_PASS')
