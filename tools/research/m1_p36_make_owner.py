@@ -29,6 +29,14 @@ def main():
               "    return result;"+chr(10)+"}"+chr(10))
     text = replace_once(text, 'import core.time : MonoTime;',
                         'import core.time : MonoTime;'+chr(10)+struct)
+    begin = '        TaskHandle!R handle;'+chr(10)*2+'        synchronized (_mutex)'
+    text = replace_once(text, begin,
+        '        TaskHandle!R handle;'+chr(10)+
+        '        ++p36Local.calls;'+chr(10)+
+        '        synchronized (_mutex)')
+    text = replace_once(text, '                reapCompletedUnderLock();',
+        '                ++p36Local.budgetCold;'+chr(10)+
+        '                reapCompletedUnderLock();')
     p36.parent.mkdir(parents=True,exist_ok=True)
     p36.write_text(text)
     print('P36_OWNER_SOURCE_PIN_PASS')
