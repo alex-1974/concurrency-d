@@ -34,7 +34,9 @@ def main():
     parser.add_argument('timed',type=Path)
     parser.add_argument('--min-rounds',type=int,default=3)
     args=parser.parse_args()
-    print('P36_COMPARE_PENDING')
+    a,b=load(args.null),load(args.timed)
+    if a.keys()!=b.keys(): raise ValueError('P36 unmatched rows')
+    print('P36_PAIR_KEYS_PASS')
 
 if __name__=='__main__':
     main()
