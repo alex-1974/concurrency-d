@@ -37,6 +37,7 @@ def main():
       '            stats.p37QueueNs = observed.queueNs;'+chr(10)+
       '            stats.p37NotifyNs = observed.notifyNs;')
     s=once(s,'            p37QueueNs += stat.p37QueueNs;','            p37QueueNs += stat.p37QueueNs;'+chr(10)+'            p37NotifyNs += stat.p37NotifyNs;')
+    s=once(s,'p37Calls, ",", p37WaitNs, ",", p37QueueNs);','p37Calls, ",", p37WaitNs, ",", p37QueueNs, ",", p37NotifyNs);')
     out.parent.mkdir(parents=True,exist_ok=True)
     out.write_text(s)
     print("P37_CONSUMER_SOURCE_PIN_PASS")
