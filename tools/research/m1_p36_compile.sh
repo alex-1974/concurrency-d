@@ -17,4 +17,5 @@ python3 "$ROOT/tools/research/m1_p36_make_consumer.py" "$ROOT" \
 for arm in null timed; do
   dub run --root="$BASE" --compiler="$DC" --build=debug --config="p36-$arm" --d-version=P31Benchmark -- --count 384 --workers 4 --ingress 32 --retained 128 --warmup 1 --rounds 3 >"$TMP/$arm.raw" 2>&1 || { cat "$TMP/$arm.raw"; exit 1; }
   grep P36_PHASE_BENCHMARK_PASS "$TMP/$arm.raw" >/dev/null
+  grep -E "^(phase,round,work|warmup,|measure,)" "$TMP/$arm.raw" >"$TMP/$arm.csv"
 done
