@@ -54,6 +54,9 @@ on:
       - "tools/research/m1_p35_source_audit.py"
       - "tools/research/m1_p35_make_owner.py"
       - "tools/research/m1_p35_probe.sh"
+      - "tools/research/m1_p35_make_consumer.py"
+      - "tools/research/m1_p35_compile.sh"
+      - "tools/research/m1_p35_compare.py"
       - "tools/research/m1_p20_make_owned_fault.py"
       - "tools/research/m1_owned_gc_real_pool.sh"
       - "tools/research/m1_matched_pool_benchmark.sh"
@@ -333,6 +336,10 @@ jobs:
       - name: P34 observational analyzer syntax
         shell: bash
         run: python3 -m py_compile tools/research/m1_p34_observe.py
+
+      - name: P35 generated real-owner TLS null and timed DUB correctness
+        shell: bash
+        run: bash tools/research/m1_p35_compile.sh "$DC"
 
       - name: P35 source-pinned owner TLS overlay generation preflight
         shell: bash
