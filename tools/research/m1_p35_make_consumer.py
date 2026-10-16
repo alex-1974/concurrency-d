@@ -30,6 +30,14 @@ def main():
                      "            stats.p35WaitNs = observed.waitNs;"+chr(10)+
                      "            stats.p35HoldNs = observed.holdNs;"+chr(10)+
                      "            const endBytes = GC.allocatedInCurrentThread();")
+    s = replace_once(s, "        size_t attempts, acknowledged, producerBytes;"+chr(10),
+                     "        size_t attempts, acknowledged, producerBytes;"+chr(10)+
+                     "        ulong p35Calls, p35WaitNs, p35HoldNs;"+chr(10))
+    s = replace_once(s, "            producerBytes += stat.producerBytes;",
+                     "            producerBytes += stat.producerBytes;"+chr(10)+
+                     "            p35Calls += stat.p35Calls;"+chr(10)+
+                     "            p35WaitNs += stat.p35WaitNs;"+chr(10)+
+                     "            p35HoldNs += stat.p35HoldNs;")
     dst.parent.mkdir(parents=True, exist_ok=True)
     dst.write_text(s)
     print("P35_CONSUMER_SOURCE_PIN_PASS")
