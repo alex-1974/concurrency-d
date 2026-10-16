@@ -38,6 +38,16 @@ def main():
         if before not in text:
             raise ValueError('P36 missing consumer mapping '+before)
         text = text.replace(before, after)
+    header = 'ulong p36Calls, p36CapacityNs, p36ConstructNs;'
+    if text.count(header) != 2:
+        raise ValueError('P36 two telemetry declarations missing')
+    text = text.replace(header,
+        'ulong p36Calls, p36CapacityNs, p36ConstructNs, p36RetainNs, p36PublishNs;')
+    text = once(text,
+        '            stats.p36ConstructNs = observed.constructNs;',
+        '            stats.p36ConstructNs = observed.constructNs;'+chr(10)+
+        '            stats.p36RetainNs = observed.retainNs;'+chr(10)+
+        '            stats.p36PublishNs = observed.publishNs;')
     target.parent.mkdir(parents=True,exist_ok=True)
     target.write_text(text)
     print('P36_CONSUMER_PIN_PASS')
