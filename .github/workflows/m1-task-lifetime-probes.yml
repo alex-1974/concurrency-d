@@ -62,6 +62,9 @@ on:
       - "tools/research/m1_p37_make_pool.py"
       - "tools/research/m1_p37_make_owner.py"
       - "tools/research/m1_p37_probe.sh"
+      - "tools/research/m1_p37_make_consumer.py"
+      - "tools/research/m1_p37_compare.py"
+      - "tools/research/m1_p37_compile.sh"
       - "tools/research/m1_p36_source_audit.py"
       - "tools/research/m1_p36_make_owner.py"
       - "tools/research/m1_p36_make_consumer.py"
@@ -367,6 +370,10 @@ jobs:
       - name: P36 pinned phase null and timed compiler qualification
         shell: bash
         run: bash tools/research/m1_p36_compile.sh "$DC"
+
+      - name: P37 paired inbox compiler and task-lifetime gate
+        shell: bash
+        run: bash tools/research/m1_p37_compile.sh "$DC"
 
       - name: P37 generated inbox and owner preflight
         shell: bash
