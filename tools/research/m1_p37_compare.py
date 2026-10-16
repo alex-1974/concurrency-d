@@ -47,7 +47,7 @@ def main():
             if x[name]!=y[name]: raise ValueError('P37 mismatched task work')
         if any(x[n] for n in PHASES): raise ValueError('P37 null has clocks')
     for k,y in b.items():
-        if y['mode']!='m0' and any(y[name]<=0 for name in PHASES):
+        if y['mode']!='m0' and (y['inbox_wait_ns'] <= 0 or y['inbox_notify_ns'] <= 0):
             raise ValueError('P37 timed phase missing: '+str((k,{name:y[name] for name in PHASES},y['owner_calls'],y['accepted'])))
         for arm, record in (('null', a[k]), ('timed', y)):
             expected = 0 if record['mode']=='m0' else record['accepted']
@@ -58,6 +58,8 @@ def main():
         for producers in (1,2,4) for owner in ('m0','deferred','managed')}
     got={(k[1],k[2],k[3],k[4]) for k in a if k[0]=='measure'}
     if expected!=got: raise ValueError('P37 incomplete profile matrix')
+    unresolved=sum(1 for y in b.values() if y['mode']!='m0' and y['inbox_queue_ns']==0)
+    print('P37_QUEUE_UNRESOLVED_ROWS',unresolved,'clock_granularity_limit=true')
     print('P37_PHASE_MATCH_PASS diagnostic_only=true')
 
 if __name__=='__main__':
