@@ -43,3 +43,7 @@ The pool generator now anchors the worker-counter accessor inside `SubmissionWor
 ## P38 worker CSV gate — 2026-10-16
 
 The P31-derived consumer now appends `park_calls`, `wait_entries`, and `wait_returns` to the P37 CSV. These are **post-join totals for instrumented workers**, zero by definition for M0. The paired validator checks `wait_entries == wait_returns <= park_calls` independently in both null/timed arms and delegates the unchanged task/phase/matrix invariants to the P37 validator on a projected CSV. This **does not** establish a causal correspondence between producer notifications and worker wakeups. Compiler confirmation for the CSV integration is pending.
+
+## Native diagnostic protocol
+
+`tools/research/m1_p38_xps.sh` is prepared for the same three rotated sessions and workload dimensions as P37. Its null/timed arms add joined worker park/return columns while the original remains the fixed P31 consumer. The paired validator checks P38 worker conservation plus P37 task/phase semantics; the P34 three-arm check guards matching task work across arms. Generated modules are cleaned on exit; the script refuses preexisting generated files and archives raw logs and checksums. **Not yet run on XPS.** Compiler qualification of this slice must pass before its observations can be used for analysis.
