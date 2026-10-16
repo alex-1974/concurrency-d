@@ -59,6 +59,8 @@ on:
       - "tools/research/m1_p35_compare.py"
       - "tools/research/m1_p35_xps.sh"
       - "tools/research/m1_p38_source_audit.py"
+      - "tools/research/m1_p38_make_pool.py"
+      - "tools/research/m1_p38_probe.sh"
       - "tools/research/m1_p37_source_audit.py"
       - "tools/research/m1_p37_make_pool.py"
       - "tools/research/m1_p37_make_owner.py"
@@ -375,6 +377,10 @@ jobs:
       - name: P37 paired inbox compiler and task-lifetime gate
         shell: bash
         run: bash tools/research/m1_p37_compile.sh "$DC"
+
+      - name: P38 worker-local wake counter preflight
+        shell: bash
+        run: bash tools/research/m1_p38_probe.sh
 
       - name: P38 pinned wake generation and park ordering
         shell: bash
