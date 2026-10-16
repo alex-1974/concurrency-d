@@ -29,7 +29,7 @@ def main():
        '            auto p37Prior = p37Take();'+chr(10)+'            const startBytes = GC.allocatedInCurrentThread();')
     s=once(s,'            stats.p37Calls = observed.calls;',
        '            stats.p37Calls = observed.calls;'+chr(10)+
-       '            check(stats.p37Calls == (mode == P31Mode.m0 ? 0 : stats.attempts), "P37 producer calls mismatch");')
+       '            check(stats.p37Calls == (mode == P31Mode.m0 ? 0 : stats.accepted), "P37 inbox calls differ from producer admissions");')
     decl='ulong p37Calls, p37WaitNs, p37QueueNs;'
     if s.count(decl)!=2: raise ValueError('P37 declarations drift')
     s=s.replace(decl,'ulong p37Calls, p37WaitNs, p37QueueNs, p37NotifyNs;')
