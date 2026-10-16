@@ -16,9 +16,16 @@ def main():
        "import concurrency.research.m1_p38_pool :")):
         if s.count(old)!=1: raise ValueError("P38 owner source anchor drift: "+old)
         s=s.replace(old,new,1)
-    old="    size_t acceptedCount()\\n    {"
+    old="    size_t acceptedCount()\n    {"
     if s.count(old)!=1: raise ValueError("P38 owner telemetry hook drift")
-    s=s.replace(old,"    auto researchWorkerCounters()\\n    {\\n        if (!isStopped())\\n            throw new Exception(\\\"P38 worker counters require stopped owner\\\");\\n        return _pool.researchWorkerCounters();\\n    }\\n\\n"+old,1)
+    s=s.replace(old,'''    auto researchWorkerCounters()
+    {
+        if (!isStopped())
+            throw new Exception("P38 worker counters require stopped owner");
+        return _pool.researchWorkerCounters();
+    }
+
+'''+old,1)
     out.parent.mkdir(parents=True,exist_ok=True)
     out.write_text(s)
     print("P38_OWNER_ROUTING_PASS")
