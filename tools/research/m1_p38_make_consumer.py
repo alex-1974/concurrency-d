@@ -44,6 +44,7 @@ def main():
                 "P38 worker wait entries differ from returns");
         }''',1)
     s=front+tail
+    s=s.replace('inbox_notify_ns','inbox_notify_ns,park_calls,wait_entries,wait_returns')
     out.parent.mkdir(parents=True,exist_ok=True)
     out.write_text(s)
     print("P38_CONSUMER_SOURCE_PIN_PASS")
