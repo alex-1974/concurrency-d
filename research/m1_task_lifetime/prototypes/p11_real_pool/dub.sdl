@@ -135,3 +135,11 @@ configuration "p35-timed-optimized" {
     mainSourceFile "consumer/p35_generational_owner.d"
     dflags "-O3" "-version=P35Timed"
 }
+
+configuration "p36-null" {
+    mainSourceFile "consumer/p36_generational_owner.d"
+}
+configuration "p36-timed" {
+    mainSourceFile "consumer/p36_generational_owner.d"
+    dflags "-version=P36Timed"
+}
