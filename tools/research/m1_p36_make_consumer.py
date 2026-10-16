@@ -59,6 +59,11 @@ def main():
         '            p36RetainNs, ",", p36PublishNs);')
     text = once(text, 'capacity_ns,construct_ns',
                      'capacity_ns,construct_ns,retain_ns,publish_ns')
+    text = once(text,
+        '            const startBytes = GC.allocatedInCurrentThread();',
+        '            // Reset TLS at the start of this measured producer scope.'+chr(10)+
+        '            auto p36Prior = p36Take();'+chr(10)+
+        '            const startBytes = GC.allocatedInCurrentThread();')
     target.parent.mkdir(parents=True,exist_ok=True)
     target.write_text(text)
     print('P36_CONSUMER_PIN_PASS')
