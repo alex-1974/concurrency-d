@@ -20,6 +20,8 @@ def main():
     s = raw.decode()
     s = replace_once(s, "module concurrency.research.p29_generational_owner;",
                      "module concurrency.research.p35_generational_owner;")
+    s = replace_once(s, "import concurrency.research.m1_p23_owned : OwnedTaskExecutor;",
+                     "import concurrency.research.m1_p35_owned : OwnedTaskExecutor, p35Take;")
     dst.parent.mkdir(parents=True, exist_ok=True)
     dst.write_text(s)
     print("P35_CONSUMER_SOURCE_PIN_PASS")
