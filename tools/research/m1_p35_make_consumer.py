@@ -38,6 +38,13 @@ def main():
                      "            p35Calls += stat.p35Calls;"+chr(10)+
                      "            p35WaitNs += stat.p35WaitNs;"+chr(10)+
                      "            p35HoldNs += stat.p35HoldNs;")
+    s = replace_once(s, "        ulong executed, checksum;",
+                     "        check(p35Calls == (mode == P31Mode.m0 ? 0 : attempts),"+chr(10)+
+                     "              \"P35 owner calls differ from attempts\");"+chr(10)+
+                     "        ulong executed, checksum;")
+    s = replace_once(s, "            (stopped - begin).total!\"nsecs\");",
+                     "            (stopped - begin).total!\"nsecs\", \",","+chr(10)+
+                     "            p35Calls, \",\", p35WaitNs, \",\", p35HoldNs);")
     dst.parent.mkdir(parents=True, exist_ok=True)
     dst.write_text(s)
     print("P35_CONSUMER_SOURCE_PIN_PASS")
