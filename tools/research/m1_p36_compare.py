@@ -46,7 +46,13 @@ def main():
         for name in ('count','workers','ingress','retained','accepted','completed','executed','checksum'):
             if x[name]!=y[name]: raise ValueError('P36 mismatched task work')
         if any(x[n] for n in PHASES): raise ValueError('P36 null has clocks')
-    print('P36_PAIR_KEYS_PASS')
+    for k,y in b.items():
+        if y['mode']!='m0' and any(y[name]<=0 for name in PHASES):
+            raise ValueError('P36 timed phase missing')
+        expected=0 if y['mode']=='m0' else y['attempts']
+        if y['owner_calls']!=expected or a[k]['owner_calls']!=expected:
+            raise ValueError('P36 call conservation failure')
+    print('P36_PHASE_MATCH_PASS diagnostic_only=true')
 
 if __name__=='__main__':
     main()
