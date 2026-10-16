@@ -48,6 +48,20 @@ def main():
         '            version (P36Timed)'+chr(10)+
         '                p36Local.constructNs += cast(ulong)'+chr(10)+
         '                    (MonoTime.currTime - p36BuildStart).total!"nsecs";')
+    text = replace_once(text, '            _retained ~= RetainedTask(node, node.returnedFlag());',
+        '            version (P36Timed)'+chr(10)+
+        '                const p36RetainStart = MonoTime.currTime;'+chr(10)+
+        '            _retained ~= RetainedTask(node, node.returnedFlag());'+chr(10)+
+        '            version (P36Timed)'+chr(10)+
+        '                p36Local.retainNs += cast(ulong)'+chr(10)+
+        '                    (MonoTime.currTime - p36RetainStart).total!"nsecs";')
+    text = replace_once(text, '            const status = _pool.trySubmit(node.reference());',
+        '            version (P36Timed)'+chr(10)+
+        '                const p36PublishStart = MonoTime.currTime;'+chr(10)+
+        '            const status = _pool.trySubmit(node.reference());'+chr(10)+
+        '            version (P36Timed)'+chr(10)+
+        '                p36Local.publishNs += cast(ulong)'+chr(10)+
+        '                    (MonoTime.currTime - p36PublishStart).total!"nsecs";')
     p36.parent.mkdir(parents=True,exist_ok=True)
     p36.write_text(text)
     print('P36_OWNER_SOURCE_PIN_PASS')
