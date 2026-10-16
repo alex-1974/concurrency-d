@@ -21,3 +21,7 @@ Generate a source-pinned **research-only copy** of the pool and route the genera
 The capacity precheck and nested publication both acquire the inbox mutex but eliminating either lock is **not** yet justified. Removing the precheck can allocate on rejected submissions, violating the contract P36 preserved. A worker may drain the queue between capacity check and publication, and the wake-generation predicate must remain tied to the same inbox mutex. Timed phase sums may omit entry/exit accounting and must not be subtracted from original uninstrumented time.
 
 **Stage:** source anatomy and experiment contract, executable P37 overlay and native results not yet qualified. PR #38 Draft; ADR-0001 Proposed.
+
+## Executable P37 slice (2026-10-16)
+
+A source-pinned Research inbox and owner now feed a P31-derived consumer. Producer-local counters separately report inbox mutex wait, ring publication, and `notify()` duration. Null/timed configurations and a full-profile DMD/LDC debug correctness gate are committed. Clock sums are diagnostic only and omit some validation/release costs. Each arm checks its own retry attempts; null clocks must remain zero. Compiler and native XPS qualification remain pending; production source is unchanged.
