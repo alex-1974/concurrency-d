@@ -50,9 +50,9 @@ def main():
         if y['mode']!='m0' and any(y[name]<=0 for name in PHASES):
             raise ValueError('P37 timed phase missing')
         for arm, record in (('null', a[k]), ('timed', y)):
-            expected = 0 if record['mode']=='m0' else record['attempts']
+            expected = 0 if record['mode']=='m0' else record['accepted']
             if record['owner_calls'] != expected:
-                raise ValueError('P37 calls: '+str((k,arm,expected,record['owner_calls'])))
+                raise ValueError('P37 inbox admitted calls: '+str((k,arm,expected,record['owner_calls'])))
     expected={(rid,kind,producers,owner) for rid in rounds
         for kind in ('minimal','shared_atomic','sharded_atomic')
         for producers in (1,2,4) for owner in ('m0','deferred','managed')}
