@@ -34,6 +34,17 @@ package(concurrency) P37InboxStats p37Take()
 '''
     text=once(text,"import core.sync.condition :",
               stats+"import core.sync.condition :")
+    text=once(text,
+        '        synchronized (_mutex)'+chr(10)+'        {'+chr(10)+
+        '            if (_closed)',
+        '        ++p37Local.calls;'+chr(10)+
+        '        version (P37Timed)'+chr(10)+
+        '            const p37Before = MonoTime.currTime;'+chr(10)+
+        '        synchronized (_mutex)'+chr(10)+'        {'+chr(10)+
+        '            version (P37Timed)'+chr(10)+
+        '                p37Local.waitNs += cast(ulong)'+chr(10)+
+        '                    (MonoTime.currTime - p37Before).total!"nsecs";'+chr(10)+
+        '            if (_closed)')
     out.parent.mkdir(parents=True,exist_ok=True)
     out.write_text(text)
     print("P37_POOL_PIN_PASS")
