@@ -32,7 +32,7 @@ package(concurrency) P35Stats p35Take()
 }
 '''
     text = text.replace(point, point + stats)
-    start = '        TaskHandle!R handle;\\n\\n        synchronized (_mutex)\\n        {'
+    start = '        TaskHandle!R handle;' + chr(10)*2 + '        synchronized (_mutex)' + chr(10) + '        {'
     if text.count(start) != 1:
         raise ValueError('P35 submission start drift')
     timed = '''        TaskHandle!R handle;
