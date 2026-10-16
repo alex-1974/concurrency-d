@@ -18,6 +18,17 @@ def main():
                        'module concurrency.research.m1_p36_owned;')
     text = replace_once(text, 'import core.sync.semaphore : Semaphore;',
         'import core.sync.semaphore : Semaphore;'+chr(10)+'import core.time : MonoTime;')
+    fields = ("calls", "admitted", "budgetCold", "capacityNs",
+              "constructNs", "retainNs", "publishNs")
+    struct = ("package(concurrency) struct P36Stats"+chr(10)+"{"+chr(10)+
+              "".join("    ulong "+field+";"+chr(10) for field in fields)+
+              "}"+chr(10)+"private P36Stats p36Local;"+chr(10)+
+              "package(concurrency) P36Stats p36Take()"+chr(10)+"{"+chr(10)+
+              "    auto result = p36Local;"+chr(10)+
+              "    p36Local = P36Stats.init;"+chr(10)+
+              "    return result;"+chr(10)+"}"+chr(10))
+    text = replace_once(text, 'import core.time : MonoTime;',
+                        'import core.time : MonoTime;'+chr(10)+struct)
     p36.parent.mkdir(parents=True,exist_ok=True)
     p36.write_text(text)
     print('P36_OWNER_SOURCE_PIN_PASS')
