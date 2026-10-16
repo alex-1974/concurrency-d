@@ -12,9 +12,9 @@ Worker wait-entry medians per 8192 tasks in session 1 (across minimal/shared/sha
 
 | Producers | Null | Timed |
 |---:|---:|---:|
-| 1 | 3,607 | 4,001 |
-| 2 | 5,998.5 | 6,044.5 |
-| 4 | 6,647.5 | 6,622 |
+| 1 | 3,615 | 4,022 |
+| 2 | 5,998.5 | 6,065 |
+| 4 | 6,691 | 6,628 |
 
 These are worker **condition-wait entries**, not distinct OS wakeups or causal notification matches. Differences between independently instrumented arms are not performance evidence.
 
