@@ -64,7 +64,7 @@ def main():
         '            // Reset TLS at the start of this measured producer scope.'+chr(10)+
         '            auto p36Prior = p36Take();'+chr(10)+
         '            const startBytes = GC.allocatedInCurrentThread();')
-    target.parent.mkdir # P36 local-conservation diagnostics pending(parents=True,exist_ok=True)
+    target.parent.mkdir(parents=True,exist_ok=True)
     target.write_text(text)
     print('P36_CONSUMER_PIN_PASS')
 
