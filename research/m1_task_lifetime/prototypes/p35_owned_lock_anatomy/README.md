@@ -28,4 +28,4 @@ For each arm validate rejected and accepted paths, native completion and worker 
 - Any slowdown with instrumented critical-section clocks disqualifies direct subtraction of accumulated wait/hold times from wall-clock submission. Promote no production optimization without a semantics-matched uninstrumented candidate-vs-baseline native result.
 - Abort or fail-stop on unproven native join. Retention roots are cleared only following proven native quiescence.
 
-**Status:** research design only; no P35 implementation or native result. Draft PR #38 and ADR-0001 remain unpromoted.
+**Status (2026-10-16):** source-pinned P35 generated P23 owner and exact P31 consumer have an initial producer-TLS owner lock wait/hold probe. Two DUB configurations (null/timed) and full 27-cell matrix validation are wired into the compiler CI. **Compiler qualification is still pending**; no native XPS evidence exists, and no allocator-versus-retention subphase measurement has been added. The timestamped critical section may perturb the result, so no uninstrumented wait-time or optimization claim follows. Draft PR #38 and ADR-0001 remain unpromoted.
