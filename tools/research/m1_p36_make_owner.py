@@ -66,6 +66,11 @@ def main():
         '            version (P36Timed)'+chr(10)+
         '                const p36CapacityStart = MonoTime.currTime;'+chr(10)+
         '            if (_lifecycle != Lifecycle.running)')
+    text = replace_once(text, '            auto cell = new ResultCell!R();',
+        '            version (P36Timed)'+chr(10)+
+        '                p36Local.capacityNs += cast(ulong)'+chr(10)+
+        '                    (MonoTime.currTime - p36CapacityStart).total!"nsecs";'+chr(10)+
+        '            auto cell = new ResultCell!R();')
     p36.parent.mkdir(parents=True,exist_ok=True)
     p36.write_text(text)
     print('P36_OWNER_SOURCE_PIN_PASS')
