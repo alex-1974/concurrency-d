@@ -51,7 +51,7 @@ def main():
             raise ValueError('P36 timed phase missing')
         expected=0 if y['mode']=='m0' else y['attempts']
         if y['owner_calls']!=expected or a[k]['owner_calls']!=expected:
-            raise ValueError('P36 call conservation failure')
+            raise ValueError('P36 calls: '+str((k,expected,a[k]['owner_calls'],y['owner_calls'])))
     expected={(rid,kind,producers,owner) for rid in rounds
         for kind in ('minimal','shared_atomic','sharded_atomic')
         for producers in (1,2,4) for owner in ('m0','deferred','managed')}
