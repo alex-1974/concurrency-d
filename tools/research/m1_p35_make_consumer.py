@@ -24,6 +24,12 @@ def main():
                      "import concurrency.research.m1_p35_owned : OwnedTaskExecutor, p35Take;")
     s = replace_once(s, "        size_t producerBytes;"+chr(10)+"    }",
                      "        size_t producerBytes;"+chr(10)+"        ulong p35Calls, p35WaitNs, p35HoldNs;"+chr(10)+"    }")
+    s = replace_once(s, "            const endBytes = GC.allocatedInCurrentThread();",
+                     "            auto observed = p35Take();"+chr(10)+
+                     "            stats.p35Calls = observed.calls;"+chr(10)+
+                     "            stats.p35WaitNs = observed.waitNs;"+chr(10)+
+                     "            stats.p35HoldNs = observed.holdNs;"+chr(10)+
+                     "            const endBytes = GC.allocatedInCurrentThread();")
     dst.parent.mkdir(parents=True, exist_ok=True)
     dst.write_text(s)
     print("P35_CONSUMER_SOURCE_PIN_PASS")
