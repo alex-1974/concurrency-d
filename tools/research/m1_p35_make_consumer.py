@@ -45,6 +45,10 @@ def main():
     s = replace_once(s, "            (stopped - begin).total!\"nsecs\");",
                      "            (stopped - begin).total!\"nsecs\", \",","+chr(10)+
                      "            p35Calls, \",\", p35WaitNs, \",\", p35HoldNs);")
+    s = replace_once(s, '            ~ "join_release_ns,total_ns");',
+                     '            ~ "join_release_ns,total_ns,owner_calls,owner_wait_ns,owner_hold_ns");')
+    s = replace_once(s, 'writeln("P31_FIXED_DIMENSIONS_BENCHMARK_PASS");',
+                     'writeln("P35_OWNER_MUTEX_BENCHMARK_PASS");')
     dst.parent.mkdir(parents=True, exist_ok=True)
     dst.write_text(s)
     print("P35_CONSUMER_SOURCE_PIN_PASS")
