@@ -67,6 +67,10 @@ def main():
     text = once(text, '            stats.p36Calls = observed.calls;',
                 '            stats.p36Calls = observed.calls;'+chr(10)+
                 '            assert(stats.p36Calls == (mode == P31Mode.m0 ? 0 : stats.attempts));')
+    text = once(text,
+        '            assert(stats.p36Calls == (mode == P31Mode.m0 ? 0 : stats.attempts));',
+        '            check(stats.p36Calls == (mode == P31Mode.m0 ? 0 : stats.attempts),'+chr(10)+
+        '                  "P36 thread-local owner-call mismatch");')
     target.parent.mkdir(parents=True,exist_ok=True)
     target.write_text(text)
     print('P36_CONSUMER_PIN_PASS')
