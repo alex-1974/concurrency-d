@@ -25,6 +25,11 @@ def main():
     for old,new in (("p35Take","p37Take"),("p35Calls","p37Calls"),("p35WaitNs","p37WaitNs"),("p35HoldNs","p37QueueNs"),("observed.holdNs","observed.queueNs"),("owner_wait_ns","inbox_wait_ns"),("owner_hold_ns","inbox_queue_ns"),("P35_OWNER_MUTEX_BENCHMARK_PASS","P37_INBOX_BENCHMARK_PASS")):
         if old not in s: raise ValueError("P37 field drift: "+old)
         s=s.replace(old,new)
+    s=once(s,'            const startBytes = GC.allocatedInCurrentThread();',
+       '            auto p37Prior = p37Take();'+chr(10)+'            const startBytes = GC.allocatedInCurrentThread();')
+    s=once(s,'            stats.p37Calls = observed.calls;',
+       '            stats.p37Calls = observed.calls;'+chr(10)+
+       '            check(stats.p37Calls == (mode == P31Mode.m0 ? 0 : stats.attempts), "P37 producer calls mismatch");')
     out.parent.mkdir(parents=True,exist_ok=True)
     out.write_text(s)
     print("P37_CONSUMER_SOURCE_PIN_PASS")
