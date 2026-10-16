@@ -41,12 +41,18 @@ package(concurrency) P35Stats p35Take()
             const p35Before = MonoTime.currTime;
         synchronized (_mutex)
         {
+            MonoTime p35Entered;
             version (P35Timed)
             {
-                const p35Entered = MonoTime.currTime;
+                p35Entered = MonoTime.currTime;
                 p35ThreadStats.waitNs += cast(ulong)
                     (p35Entered - p35Before).total!"nsecs";
-                scope (exit)
+            }
+            // Must be in the synchronized block, not the version block:
+            // its exit corresponds to releasing the executor mutex.
+            scope (exit)
+            {
+                version (P35Timed)
                 {
                     const p35Exit = MonoTime.currTime;
                     p35ThreadStats.holdNs += cast(ulong)
