@@ -119,3 +119,19 @@ configuration "p34-timed-optimized" {
     mainSourceFile "consumer/p34_generational_owner.d"
     dflags "-O3" "-version=P34Timed"
 }
+
+configuration "p35-null" {
+    mainSourceFile "consumer/p35_generational_owner.d"
+}
+configuration "p35-timed" {
+    mainSourceFile "consumer/p35_generational_owner.d"
+    dflags "-version=P35Timed"
+}
+configuration "p35-null-optimized" {
+    mainSourceFile "consumer/p35_generational_owner.d"
+    dflags "-O3"
+}
+configuration "p35-timed-optimized" {
+    mainSourceFile "consumer/p35_generational_owner.d"
+    dflags "-O3" "-version=P35Timed"
+}
