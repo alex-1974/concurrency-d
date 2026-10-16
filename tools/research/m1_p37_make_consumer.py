@@ -33,6 +33,9 @@ def main():
     decl='ulong p37Calls, p37WaitNs, p37QueueNs;'
     if s.count(decl)!=2: raise ValueError('P37 declarations drift')
     s=s.replace(decl,'ulong p37Calls, p37WaitNs, p37QueueNs, p37NotifyNs;')
+    s=once(s,'            stats.p37QueueNs = observed.queueNs;',
+      '            stats.p37QueueNs = observed.queueNs;'+chr(10)+
+      '            stats.p37NotifyNs = observed.notifyNs;')
     out.parent.mkdir(parents=True,exist_ok=True)
     out.write_text(s)
     print("P37_CONSUMER_SOURCE_PIN_PASS")
