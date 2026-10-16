@@ -25,3 +25,7 @@ The capacity precheck and nested publication both acquire the inbox mutex but el
 ## Executable P37 slice (2026-10-16)
 
 A source-pinned Research inbox and owner now feed a P31-derived consumer. Producer-local counters separately report inbox mutex wait, ring publication, and `notify()` duration. Null/timed configurations and a full-profile DMD/LDC debug correctness gate are committed. Clock sums are diagnostic only and omit some validation/release costs. Each arm checks its own retry attempts; null clocks must remain zero. Compiler and native XPS qualification remain pending; production source is unchanged.
+
+## Clock-resolution finding (2026-10-16)
+
+DMD 2.111.0 produced one valid 384-admission profile with inbox wait 74800 ns, ring queue 0 ns, and notify 955100 ns. The queue block is only a few primitive operations, so elapsed ticks can quantize to zero even when 384 tasks have been accepted. Zero `inbox_queue_ns` is therefore reported as **unresolved**, not as zero queue cost or a missing execution. The paired analyzer still requires positive wait and notification durations in owned modes, zero null-arm clocks, matched task semantics, and inbox calls equal to admissions. Further queue-cost attribution needs a clock-resolution-aware or amortized microprobe.
