@@ -38,7 +38,7 @@ private final class TaskInbox""")
                 ++p38ThreadCounters.waitReturns;""")
     s=once(s,"    private size_t _started;",
         """    private size_t _started;
-    private P38WorkerCounters[] _p38Workers;""")
+    private P38WorkerCounters[] _p38Workers;\n    private bool _p38Joined;""")
     s=once(s,"        _workers = new Thread[workerCount];",
         """        _workers = new Thread[workerCount];
         _p38Workers = new P38WorkerCounters[workerCount];""")
@@ -46,7 +46,7 @@ private final class TaskInbox""")
         """            p38ThreadCounters = P38WorkerCounters.init;
             workerLoop(workerIndex);
             _p38Workers[workerIndex] = p38ThreadCounters;""")
-    s=once(s,"    size_t acceptedCount()\n    {",
+    s=once(s,"        foreach (index; 0 .. _started)\n            _workers[index].join();",\n        "        foreach (index; 0 .. _started)"+chr(10)+\n        "            _workers[index].join();"+chr(10)+\n        "        _p38Joined = true;")\n    s=once(s,"    size_t acceptedCount()\n    {",
         """    P38WorkerCounters[] researchWorkerCounters()
     {
         // Read only after closeAndJoin has joined every worker.
