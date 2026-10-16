@@ -16,6 +16,8 @@ def main():
     text = p23.read_text()
     text = replace_once(text,'module concurrency.research.m1_p23_owned;',
                        'module concurrency.research.m1_p36_owned;')
+    text = replace_once(text, 'import core.sync.semaphore : Semaphore;',
+        'import core.sync.semaphore : Semaphore;'+chr(10)+'import core.time : MonoTime;')
     p36.parent.mkdir(parents=True,exist_ok=True)
     p36.write_text(text)
     print('P36_OWNER_SOURCE_PIN_PASS')
