@@ -45,6 +45,7 @@ package(concurrency) P37InboxStats p37Take()
         '                p37Local.waitNs += cast(ulong)'+chr(10)+
         '                    (MonoTime.currTime - p37Before).total!"nsecs";'+chr(10)+
         '            if (_closed)')
+    text=once(text,'            const tail = (_head + _used) % _slots.length;', '            version (P37Timed)'+chr(10)+'                const p37QueueStart = MonoTime.currTime;'+chr(10)+'            const tail = (_head + _used) % _slots.length;')
     out.parent.mkdir(parents=True,exist_ok=True)
     out.write_text(text)
     print("P37_POOL_PIN_PASS")
