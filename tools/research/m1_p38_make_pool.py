@@ -38,7 +38,8 @@ private final class TaskInbox""")
                 ++p38ThreadCounters.waitReturns;""")
     s=once(s,"    private size_t _started;",
         """    private size_t _started;
-    private P38WorkerCounters[] _p38Workers;\n    private bool _p38Joined;""")
+    private P38WorkerCounters[] _p38Workers;
+    private bool _p38Joined;""")
     s=once(s,"        _workers = new Thread[workerCount];",
         """        _workers = new Thread[workerCount];
         _p38Workers = new P38WorkerCounters[workerCount];""")
