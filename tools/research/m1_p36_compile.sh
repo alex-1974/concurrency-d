@@ -10,3 +10,7 @@ TMP="$(mktemp -d)"
 cleanup() { rm -f -- "$P23" "$OWNER" "$CONSUMER"; rm -rf -- "$TMP"; }
 trap cleanup EXIT
 [[ ! -e "$P23" && ! -e "$OWNER" && ! -e "$CONSUMER" ]] || exit 2
+python3 "$ROOT/tools/research/m1_p36_source_audit.py"
+python3 "$ROOT/tools/research/m1_p36_make_owner.py" "$ROOT" "$P23" "$OWNER"
+python3 "$ROOT/tools/research/m1_p36_make_consumer.py" "$ROOT" \
+ "$BASE/consumer/p29_generational_owner.d" "$CONSUMER"
