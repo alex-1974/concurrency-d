@@ -25,6 +25,25 @@ def main():
     for old,new in changes:
         if old not in s: raise ValueError("P38 consumer drift: "+old)
         s=s.replace(old,new)
+    marker='        const stopped = MonoTime.currTime;'
+    if s.count(marker)<1: raise ValueError('P38 join snapshot anchor missing')
+    pos=s.index('    private void p31Measure')
+    front,tail=s[:pos],s[pos:]
+    if tail.count(marker)!=1: raise ValueError('P38 P31 stopped anchor drift')
+    tail=tail.replace(marker,marker+'''\n
+        ulong p38ParkCalls, p38WaitEntries, p38WaitReturns;
+        if (mode != P31Mode.m0)
+        {
+            foreach (worker; owned.researchWorkerCounters())
+            {
+                p38ParkCalls += worker.parkCalls;
+                p38WaitEntries += worker.waitEntries;
+                p38WaitReturns += worker.waitReturns;
+            }
+            check(p38WaitEntries == p38WaitReturns,
+                "P38 worker wait entries differ from returns");
+        }''',1)
+    s=front+tail
     out.parent.mkdir(parents=True,exist_ok=True)
     out.write_text(s)
     print("P38_CONSUMER_SOURCE_PIN_PASS")
