@@ -30,6 +30,9 @@ def main():
     s=once(s,'            stats.p37Calls = observed.calls;',
        '            stats.p37Calls = observed.calls;'+chr(10)+
        '            check(stats.p37Calls == (mode == P31Mode.m0 ? 0 : stats.attempts), "P37 producer calls mismatch");')
+    decl='ulong p37Calls, p37WaitNs, p37QueueNs;'
+    if s.count(decl)!=2: raise ValueError('P37 declarations drift')
+    s=s.replace(decl,'ulong p37Calls, p37WaitNs, p37QueueNs, p37NotifyNs;')
     out.parent.mkdir(parents=True,exist_ok=True)
     out.write_text(s)
     print("P37_CONSUMER_SOURCE_PIN_PASS")
