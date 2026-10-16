@@ -36,6 +36,8 @@ def main():
     args=parser.parse_args()
     a,b=load(args.null),load(args.timed)
     if a.keys()!=b.keys(): raise ValueError('P36 unmatched rows')
+    rounds={k[1] for k in a if k[0]=='measure'}
+    if len(rounds)<args.min_rounds: raise ValueError('P36 too few rounds')
     print('P36_PAIR_KEYS_PASS')
 
 if __name__=='__main__':
