@@ -22,6 +22,22 @@ def main():
         intermediate.unlink(missing_ok=True)
     text = once(text, 'module concurrency.research.p35_generational_owner;',
                 'module concurrency.research.p36_generational_owner;')
+    mapping = {
+        'm1_p35_owned': 'm1_p36_owned',
+        'p35Take': 'p36Take',
+        'p35Calls': 'p36Calls',
+        'p35WaitNs': 'p36CapacityNs',
+        'p35HoldNs': 'p36ConstructNs',
+        'observed.waitNs': 'observed.capacityNs',
+        'observed.holdNs': 'observed.constructNs',
+        'owner_wait_ns': 'capacity_ns',
+        'owner_hold_ns': 'construct_ns',
+        'P35_OWNER_MUTEX_BENCHMARK_PASS': 'P36_PHASE_BENCHMARK_PASS',
+    }
+    for before, after in mapping.items():
+        if before not in text:
+            raise ValueError('P36 missing consumer mapping '+before)
+        text = text.replace(before, after)
     target.parent.mkdir(parents=True,exist_ok=True)
     target.write_text(text)
     print('P36_CONSUMER_PIN_PASS')
