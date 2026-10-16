@@ -43,8 +43,10 @@ def main():
             check(p38WaitEntries == p38WaitReturns,
                 "P38 worker wait entries differ from returns");
         }''',1)
-    if tail.count('p37Calls, \\\',\\\', p37WaitNs, \\\',\\\', p37QueueNs, \\\',\\\', p37NotifyNs);')!=1: raise ValueError('P38 output drift')
-    tail=tail.replace('p37Calls, \\\',\\\', p37WaitNs, \\\',\\\', p37QueueNs, \\\',\\\', p37NotifyNs);','p37Calls, \\\',\\\', p37WaitNs, \\\',\\\', p37QueueNs, \\\',\\\', p37NotifyNs, \\\',\\\','+chr(10)+'            p38ParkCalls, \\\',\\\', p38WaitEntries, \\\',\\\', p38WaitReturns);')
+    if tail.count('p37NotifyNs);')!=1: raise ValueError('P38 output drift')
+    tail=tail.replace('p37NotifyNs);',
+        'p37NotifyNs, ",",'+chr(10)+
+        '            p38ParkCalls, ",", p38WaitEntries, ",", p38WaitReturns);')
     s=front+tail
     s=s.replace('inbox_notify_ns','inbox_notify_ns,park_calls,wait_entries,wait_returns')
     out.parent.mkdir(parents=True,exist_ok=True)
