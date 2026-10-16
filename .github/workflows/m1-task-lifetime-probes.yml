@@ -337,6 +337,11 @@ jobs:
         shell: bash
         run: python3 -m py_compile tools/research/m1_p34_observe.py
 
+      - name: P35 source generators Python syntax
+        shell: bash
+        run: |
+          python3 -m py_compile tools/research/m1_p35_make_owner.py tools/research/m1_p35_make_consumer.py tools/research/m1_p35_compare.py
+
       - name: P35 generated real-owner TLS null and timed DUB correctness
         shell: bash
         run: bash tools/research/m1_p35_compile.sh "$DC"
