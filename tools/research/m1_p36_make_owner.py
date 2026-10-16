@@ -37,6 +37,17 @@ def main():
     text = replace_once(text, '                reapCompletedUnderLock();',
         '                ++p36Local.budgetCold;'+chr(10)+
         '                reapCompletedUnderLock();')
+    text = replace_once(text, '            auto cell = new ResultCell!R();',
+        '            version (P36Timed)'+chr(10)+
+        '                const p36BuildStart = MonoTime.currTime;'+chr(10)+
+        '            auto cell = new ResultCell!R();')
+    text = replace_once(text,
+        '            auto node = new OwnedNode!(F, R)(callable, cell);',
+        '            auto node = new OwnedNode!(F, R)(callable, cell);'+chr(10)+
+        '            ++p36Local.admitted;'+chr(10)+
+        '            version (P36Timed)'+chr(10)+
+        '                p36Local.constructNs += cast(ulong)'+chr(10)+
+        '                    (MonoTime.currTime - p36BuildStart).total!"nsecs";')
     p36.parent.mkdir(parents=True,exist_ok=True)
     p36.write_text(text)
     print('P36_OWNER_SOURCE_PIN_PASS')
