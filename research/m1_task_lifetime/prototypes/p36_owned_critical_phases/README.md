@@ -37,4 +37,4 @@ Arms: untouched P31; a null overlay with exactly corresponding thread-local coun
 3. **Performance gate:** distinguish null/timed observer effects; a faster non-instrumented candidate must be compared directly against original P31 under semantically identical backpressure and failure behavior.
 4. **Stop:** do not promote an optimization based only on instrumented critical-path timing, or if unaccepted attempts acquire new allocation work.
 
-**State:** P36 protocol and source audit only. No P36 executable timings or optimization implemented yet. ADR-0001 Proposed; PR #38 Draft.
+**State (2026-10-16):** P36 protocol, source audit, generated producer-local four-phase owner and consumer, null/timed DUB configurations, paired CSV validator and CI compiler step are committed. **DMD/LDC correctness results pending**; no valid P36 native XPS timings or optimization candidate yet. Budget/reap events are counted separately; capacity timing currently records the successful-admission interval, not each rejected path. ADR-0001 Proposed; PR #38 Draft.
