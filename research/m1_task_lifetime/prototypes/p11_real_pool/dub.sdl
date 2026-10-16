@@ -143,3 +143,12 @@ configuration "p36-timed" {
     mainSourceFile "consumer/p36_generational_owner.d"
     dflags "-version=P36Timed"
 }
+
+configuration "p36-null-optimized" {
+    mainSourceFile "consumer/p36_generational_owner.d"
+    dflags "-O3"
+}
+configuration "p36-timed-optimized" {
+    mainSourceFile "consumer/p36_generational_owner.d"
+    dflags "-O3" "-version=P36Timed"
+}
