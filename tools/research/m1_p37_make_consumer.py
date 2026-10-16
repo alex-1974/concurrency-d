@@ -22,6 +22,9 @@ def main():
     s=once(s,"import concurrency.research.m1_p35_owned : OwnedTaskExecutor, p35Take;",
            "import concurrency.research.m1_p37_owned : OwnedTaskExecutor;\n"
            "import concurrency.research.m1_p37_pool : p37Take;")
+    for old,new in (("p35Take","p37Take"),("p35Calls","p37Calls"),("p35WaitNs","p37WaitNs"),("p35HoldNs","p37QueueNs"),("observed.holdNs","observed.queueNs"),("owner_wait_ns","inbox_wait_ns"),("owner_hold_ns","inbox_queue_ns"),("P35_OWNER_MUTEX_BENCHMARK_PASS","P37_INBOX_BENCHMARK_PASS")):
+        if old not in s: raise ValueError("P37 field drift: "+old)
+        s=s.replace(old,new)
     out.parent.mkdir(parents=True,exist_ok=True)
     out.write_text(s)
     print("P37_CONSUMER_SOURCE_PIN_PASS")
