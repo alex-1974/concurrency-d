@@ -356,6 +356,10 @@ jobs:
         shell: bash
         run: bash tools/research/m1_p35_probe.sh
 
+      - name: P36 pinned phase null and timed compiler qualification
+        shell: bash
+        run: bash tools/research/m1_p36_compile.sh "$DC"
+
       - name: P36 pinned owned critical-phase and GC-root order
         shell: bash
         run: python3 tools/research/m1_p36_source_audit.py
