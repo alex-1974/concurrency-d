@@ -152,3 +152,11 @@ configuration "p36-timed-optimized" {
     mainSourceFile "consumer/p36_generational_owner.d"
     dflags "-O3" "-version=P36Timed"
 }
+
+configuration "p37-null" {
+    mainSourceFile "consumer/p37_generational_owner.d"
+}
+configuration "p37-timed" {
+    mainSourceFile "consumer/p37_generational_owner.d"
+    dflags "-version=P37Timed"
+}
