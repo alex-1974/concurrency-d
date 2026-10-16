@@ -38,7 +38,7 @@ for session in 1 2 3; do
     case "$arm" in
       original) config=p29-generational-optimized; marker=P31_FIXED_DIMENSIONS_BENCHMARK_PASS;;
       null) config=p38-null-optimized; marker=P38_WAKE_BENCHMARK_PASS;;
-      timed) config=p38-timed-optimized; marker=P38_INBOX_BENCHMARK_PASS;;
+      timed) config=p38-timed-optimized; marker=P38_WAKE_BENCHMARK_PASS;;
     esac
     raw="$OUT/session$session-$arm.raw"
     timeout --signal=TERM --kill-after=5s 1200s dub run --root="$BASE" --compiler="$DC" --build=release --config="$config" --d-version=P31Benchmark -- --count 8192 --workers 4 --ingress 128 --retained 1024 --warmup 3 --rounds 9 > "$raw" 2>&1 || { cat "$raw" >&2; exit 1; }
