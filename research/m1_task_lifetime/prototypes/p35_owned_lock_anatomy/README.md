@@ -29,3 +29,7 @@ For each arm validate rejected and accepted paths, native completion and worker 
 - Abort or fail-stop on unproven native join. Retention roots are cleared only following proven native quiescence.
 
 **Status (2026-10-16):** source-pinned P35 generated P23 owner and exact P31 consumer have an initial producer-TLS owner lock wait/hold probe. Two DUB configurations (null/timed) and full 27-cell matrix validation are wired into the compiler CI. **Compiler qualification is still pending**; no native XPS evidence exists, and no allocator-versus-retention subphase measurement has been added. The timestamped critical section may perturb the result, so no uninstrumented wait-time or optimization claim follows. Draft PR #38 and ADR-0001 remain unpromoted.
+
+## P35 hold-clock correction (2026-10-16)
+
+The first native XPS attempt stopped during null/timed validation with `P35 timed timestamps missing`. Audit found `scope(exit)` inside a nested `version(P35Timed)` block; it executed at exit of that *inner block*, not at release of the enclosing synchronized block. Corrected generated owner code places the exit guard at synchronized-block scope. A zero total lock-wait counter is valid for uncontended acquisitions; timed hold durations must still be positive on non-M0 owner paths. The failed run is **not valid native evidence**, and its partial output must not be interpreted as owner-lock time. Re-run DMD/LDC CI and collect new source-pinned native XPS evidence before any conclusion.
