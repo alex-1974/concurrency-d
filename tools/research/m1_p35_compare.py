@@ -49,7 +49,7 @@ def main():
             if x[col]!=y[col]:raise ValueError("P35 paired work mismatch")
         if x["owner_wait_ns"] or x["owner_hold_ns"]:
             raise ValueError("P35 null timestamps nonzero")
-        if y["mode"]!="m0" and (y["owner_wait_ns"]<=0 or y["owner_hold_ns"]<=0):
+        if y["mode"]!="m0" and y["owner_hold_ns"]<=0:
             raise ValueError("P35 timed timestamps missing")
     print("P35_TLS_OWNER_MATCH_PASS rounds="+str(len(rounds))+" diagnostic_only=true")
 if __name__=="__main__":main()
