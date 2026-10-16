@@ -52,6 +52,11 @@ def main():
         expected=0 if y['mode']=='m0' else y['attempts']
         if y['owner_calls']!=expected or a[k]['owner_calls']!=expected:
             raise ValueError('P36 call conservation failure')
+    expected={(rid,kind,producers,owner) for rid in rounds
+        for kind in ('minimal','shared_atomic','sharded_atomic')
+        for producers in (1,2,4) for owner in ('m0','deferred','managed')}
+    got={(k[1],k[2],k[3],k[4]) for k in a if k[0]=='measure'}
+    if expected!=got: raise ValueError('P36 incomplete profile matrix')
     print('P36_PHASE_MATCH_PASS diagnostic_only=true')
 
 if __name__=='__main__':
