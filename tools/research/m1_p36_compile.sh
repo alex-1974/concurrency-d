@@ -20,3 +20,4 @@ for arm in null timed; do
   grep -E "^(phase,round,work|warmup,|measure,)" "$TMP/$arm.raw" >"$TMP/$arm.csv"
 done
 python3 "$ROOT/tools/research/m1_p36_compare.py" "$TMP/null.csv" "$TMP/timed.csv" --min-rounds 3
+echo P36_PHASE_COMPILER_CORRECTNESS_PASS
