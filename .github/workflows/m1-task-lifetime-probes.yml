@@ -58,6 +58,7 @@ on:
       - "tools/research/m1_p35_compile.sh"
       - "tools/research/m1_p35_compare.py"
       - "tools/research/m1_p35_xps.sh"
+      - "tools/research/m1_p36_source_audit.py"
       - "tools/research/m1_p20_make_owned_fault.py"
       - "tools/research/m1_owned_gc_real_pool.sh"
       - "tools/research/m1_matched_pool_benchmark.sh"
@@ -354,6 +355,10 @@ jobs:
       - name: P35 source-pinned owner TLS overlay generation preflight
         shell: bash
         run: bash tools/research/m1_p35_probe.sh
+
+      - name: P36 pinned owned critical-phase and GC-root order
+        shell: bash
+        run: python3 tools/research/m1_p36_source_audit.py
 
       - name: P35 pinned owner and manager critical-section anatomy
         shell: bash
