@@ -48,6 +48,17 @@ def main():
         '            stats.p36ConstructNs = observed.constructNs;'+chr(10)+
         '            stats.p36RetainNs = observed.retainNs;'+chr(10)+
         '            stats.p36PublishNs = observed.publishNs;')
+    text = once(text,
+        '            p36ConstructNs += stat.p36ConstructNs;',
+        '            p36ConstructNs += stat.p36ConstructNs;'+chr(10)+
+        '            p36RetainNs += stat.p36RetainNs;'+chr(10)+
+        '            p36PublishNs += stat.p36PublishNs;')
+    text = once(text,
+        'p36Calls, ",", p36CapacityNs, ",", p36ConstructNs);',
+        'p36Calls, ",", p36CapacityNs, ",", p36ConstructNs, ",",'+chr(10)+
+        '            p36RetainNs, ",", p36PublishNs);')
+    text = once(text, 'capacity_ns,construct_ns',
+                     'capacity_ns,construct_ns,retain_ns,publish_ns')
     target.parent.mkdir(parents=True,exist_ok=True)
     target.write_text(text)
     print('P36_CONSUMER_PIN_PASS')
