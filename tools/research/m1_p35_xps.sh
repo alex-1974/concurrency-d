@@ -85,7 +85,7 @@ for session in 1 2 3; do
   python3 "$ROOT/tools/research/m1_p35_compare.py" \
     "$OUT/session$session-null.csv" "$OUT/session$session-timed.csv" \
     --min-rounds 9 >"$OUT/session$session-null-timed-validation.txt"
-  python3 "$ROOT/tools/research/m1_p35_three_arm.py" \
+  python3 "$ROOT/tools/research/m1_p34_three_arm.py" \
     "$OUT/session$session-original.csv" "$OUT/session$session-null.csv" \
     "$OUT/session$session-timed.csv" --min-rounds 9 \
     >"$OUT/session$session-three-arm.txt"
