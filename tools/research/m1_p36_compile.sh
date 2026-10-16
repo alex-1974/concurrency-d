@@ -19,3 +19,4 @@ for arm in null timed; do
   grep P36_PHASE_BENCHMARK_PASS "$TMP/$arm.raw" >/dev/null
   grep -E "^(phase,round,work|warmup,|measure,)" "$TMP/$arm.raw" >"$TMP/$arm.csv"
 done
+python3 "$ROOT/tools/research/m1_p36_compare.py" "$TMP/null.csv" "$TMP/timed.csv" --min-rounds 3
