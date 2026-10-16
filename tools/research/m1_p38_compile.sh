@@ -23,5 +23,5 @@ for arm in null timed; do
   grep -Fx P38_WAKE_BENCHMARK_PASS "$TMP/$arm.raw" >/dev/null
   grep -E '^(phase,round,work|warmup,|measure,)' "$TMP/$arm.raw" >"$TMP/$arm.csv"
 done
-python3 "$ROOT/tools/research/m1_p37_compare.py" "$TMP/null.csv" "$TMP/timed.csv" --min-rounds 3
-echo P38_COMPILER_CORRECTNESS_PASS worker_counts_generated_not_yet_exported=true
+python3 "$ROOT/tools/research/m1_p38_compare.py" "$TMP/null.csv" "$TMP/timed.csv" --min-rounds 3
+echo P38_COMPILER_CORRECTNESS_PASS worker_counts_exported=true
