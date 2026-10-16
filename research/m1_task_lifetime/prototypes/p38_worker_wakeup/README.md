@@ -35,3 +35,7 @@ Then use the familiar rotated XPS three-arm protocol (3 sessions, 9 measured rou
 ## State
 
 **P38 protocol/source anatomy only. No executable P38 instrumentation, compiler qualification or XPS data yet.** P37 remains the last natively measured slice. PR #38 Draft; ADR-0001 Proposed.
+
+## Incremental P38 worker-count integration
+
+The pool generator now anchors the worker-counter accessor inside `SubmissionWorkerPool` only (not the similarly named inbox method). The P38 owner exports the counter snapshot only after STOPPED and the native pool join; the P31-derived consumer aggregates per-worker `parkCalls`, `waitEntries`, and `waitReturns` after shutdown and asserts `waitEntries == waitReturns`. This is a **correctness-only** consumer slice: the values are not yet CSV columns, timed worker wake phases, or native evidence. Do not infer useful wakeups or notification correspondence from this invariant. DMD/LDC confirmation pending.
