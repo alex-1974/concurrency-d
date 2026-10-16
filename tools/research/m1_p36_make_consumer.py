@@ -64,6 +64,9 @@ def main():
         '            // Reset TLS at the start of this measured producer scope.'+chr(10)+
         '            auto p36Prior = p36Take();'+chr(10)+
         '            const startBytes = GC.allocatedInCurrentThread();')
+    text = once(text, '            stats.p36Calls = observed.calls;',
+                '            stats.p36Calls = observed.calls;'+chr(10)+
+                '            assert(stats.p36Calls == (mode == P31Mode.m0 ? 0 : stats.attempts));')
     target.parent.mkdir(parents=True,exist_ok=True)
     target.write_text(text)
     print('P36_CONSUMER_PIN_PASS')
