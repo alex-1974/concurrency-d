@@ -63,6 +63,7 @@ on:
       - "tools/research/m1_p38_make_owner.py"
       - "tools/research/m1_p38_make_consumer.py"
       - "tools/research/m1_p38_compile.sh"
+      - "tools/research/m1_p38_compare.py"
       - "tools/research/m1_p38_probe.sh"
       - "tools/research/m1_p37_source_audit.py"
       - "tools/research/m1_p37_make_pool.py"
