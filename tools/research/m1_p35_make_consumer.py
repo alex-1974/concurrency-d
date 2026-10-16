@@ -43,7 +43,7 @@ def main():
                      "              \"P35 owner calls differ from attempts\");"+chr(10)+
                      "        ulong executed, checksum;")
     s = replace_once(s, "            (stopped - begin).total!\"nsecs\");",
-                     "            (stopped - begin).total!\"nsecs\", \",","+chr(10)+
+                     "            (stopped - begin).total!\"nsecs\", \",\", "+chr(10)+
                      "            p35Calls, \",\", p35WaitNs, \",\", p35HoldNs);")
     s = replace_once(s, '            ~ "join_release_ns,total_ns");',
                      '            ~ "join_release_ns,total_ns,owner_calls,owner_wait_ns,owner_hold_ns");')
