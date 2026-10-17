@@ -271,3 +271,11 @@ configuration "p42-bench-conditional-medium" {
     mainSourceFile "consumer/p42_benchmark.d"
     dflags "-version=P42MediumTask"
 }
+
+configuration "p42-idle-baseline" {
+    mainSourceFile "consumer/p42_idle_latency.d"
+    versions "P42Baseline"
+}
+configuration "p42-idle-conditional" {
+    mainSourceFile "consumer/p42_idle_latency.d"
+}
