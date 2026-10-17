@@ -45,6 +45,20 @@ void main()
         const before = MonoTime.currTime.ticks;
         if (pool.trySubmit(TaskRef(&record[0].header)) != SubmissionResult.accepted)
             throw new Exception("admission rejected");
+        // Do not close before execution: close() broadcasts and would
+        // contaminate the publish-notify wakeup comparison.
+        bool executed;
+        foreach (_; 0 .. 500_000)
+        {
+            if (atomicLoad!(MemoryOrder.acq)(record[0].hits) == 1u)
+            {
+                executed = true;
+                break;
+            }
+            Thread.yield();
+        }
+        if (!executed)
+            throw new Exception("task did not execute before close");
         pool.closeAndJoin();
         const start = atomicLoad!(MemoryOrder.acq)(record[0].startedTicks);
         if (atomicLoad!(MemoryOrder.acq)(record[0].hits) != 1u ||
