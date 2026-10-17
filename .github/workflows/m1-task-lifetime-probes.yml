@@ -59,6 +59,7 @@ on:
       - "tools/research/m1_p35_compare.py"
       - "tools/research/m1_p35_xps.sh"
       - "tools/research/m1_p41_protocol_model.py"
+      - "tools/research/m1_p41_ordered_scenarios.py"
       - "tools/research/m1_p40_make_pool.py"
       - "tools/research/m1_p40_make_owner.py"
       - "tools/research/m1_p40_make_consumer.py"
@@ -402,6 +403,10 @@ jobs:
       - name: P39 notify-site compiler and runtime gate
         shell: bash
         run: bash tools/research/m1_p39_compile.sh "$DC"
+
+      - name: P41 ordered shutdown and publication scenarios
+        shell: bash
+        run: python3 tools/research/m1_p41_ordered_scenarios.py
 
       - name: P41 bounded generation and shutdown model
         shell: bash
