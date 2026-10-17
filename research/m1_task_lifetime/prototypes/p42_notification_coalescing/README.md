@@ -1,6 +1,12 @@
 # P42 proposal — notification coalescing, research-only
 
-Status: **hypothesis and test protocol, not implemented** (2026-10-17).
+Status: **research-only implementation and ongoing qualification** (2026-10-17).
+The initial protocol below is retained as historical design evidence; the
+conditional source-pinned overlay was subsequently built and tested through
+P42.15. P42.16 now targets symmetric four-worker waiter observation and
+per-task worker attribution (see
+[`p42_15_multi_idle_protocol.md`](p42_15_multi_idle_protocol.md)).
+This is neither a production change nor a release/performance acceptance.
 
 ## Motivation and baseline
 
