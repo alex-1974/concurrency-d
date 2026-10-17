@@ -13,3 +13,67 @@ No public API or production scheduler modification. Original and conditional onl
 The conditional research overlay now provides `waiterCount()`, read under the inbox mutex. It increments immediately before `Condition.wait()` and decrements after the call returns while reacquiring that mutex. With four pool workers, a count of four shows **four concurrent wait enrollments** (one per worker), rather than four potentially repeated historical wait entries. The conditional multi-idle consumer requires this new observation before publication. The original production baseline remains uninstrumented and is still gated only by historical `parkCount()`. Thus the two arms have **different pre-publication evidence** and cannot yet support a fair performance comparison, even though both execute the same tasks.
 
 This does not establish that all workers have entered OS kernel sleep or that they stay parked throughout the time between the count observation and submission. The next research step is a **source-derived, similarly instrumented baseline overlay** and worker-specific entry/exit records before any comparative wakeup tail-latency claim. The original production pool and pre-existing P42.14 evidence are not modified.
+
+
+## P42.16 matched-observation refinement — implementation gate pending
+
+The historical refinement above describes the **initial unequal-arm state**.
+The next change uses two disposable, source-pinned research overlays:
+`concurrency.research.m1_p42_baseline_pool` and the existing
+`concurrency.research.m1_p42_pool`. The baseline continues to execute
+**unconditional** `Condition.notify()` for each successful inbox publication;
+the conditional arm only notifies on publication when `_waiters != 0`.
+Other notification sites (local work announcement, close and final completion)
+are unchanged. A generator preflight canonicalizes module names and the
+single publication-policy block and asserts **all remaining generated text
+matches**. No production source file is modified.
+
+Both overlays count `_waiters` under the original inbox mutex, enroll immediately
+before `Condition.wait()`, and leave enrollment after that call reacquires
+the mutex. Both also maintain per-worker wait-entry counts and current
+enrollment flags under that mutex. Worker IDs are set once at worker-loop
+entry and read through a research-only thread-local getter in the callback.
+The multi-idle consumer now rejects publication until one coherent mutex
+snapshot sees **exactly four simultaneous, distinct worker enrollments** in
+both arms. No allocation, snapshot read or output is performed from the
+worker's task-execution hot path beyond the per-task record timestamps,
+worker-ID store and completion hit. Per-worker wait counters deliberately
+instrument the parking path in **both** arms.
+
+For each arm, 12 rounds at each task count 1, 4, and 32 record:
+
+- per-worker historical wait entries and current enrollment before publication;
+- one task ID, per-task pre-`trySubmit` timestamp, task-start timestamp and
+  executing worker ID for every accepted task;
+- exactly-once hits, accepted/completed counts, the distribution of executed
+  tasks over four workers, and the burst maximum since its first timestamp;
+- completion of every task **before** the close/broadcast, with shutdown and
+  native worker joins only after observing all task hits.
+
+`P42_MULTI_IDLE_WAIT`, `P42_MULTI_IDLE_TASK`, `P42_MULTI_IDLE` and
+`P42_MULTI_IDLE_PASS` are machine-readable diagnostic lines. This is a
+**debug correctness/observability gate**. The additional TLS, per-worker
+counters and timestamp writes are not appropriate for an uninstrumented
+end-to-end throughput claim. Prior P42.9–P42.14 benchmark baselines still
+use the original production module; those measurements must not be compared
+as if they had the same instrumentation as P42.16.
+
+### Explicit epistemic limits
+
+Concurrent enrollment in D's condition-variable wait protocol does not prove
+four OS threads are already blocked in the kernel at publication. A spurious
+wake can change state after the observation; the attempt to submit cannot
+atomically freeze all workers. Per-task publish-to-start time includes
+admission, lock contention, scheduler delay, and execution start. Burst
+maxima additionally include serial publication time. Seeing a task's worker
+ID shows actual execution distribution, **not** which other workers woke
+and found no work. A 12-round smoke cannot establish fairness, starvation
+freedom or stable tail latency. Handle individual rounds as correlated
+experiments, not independent data points when interpreting tails.
+
+The research driver generates files only when absent and removes both files
+via its exit trap. It does not touch the canonical M0 scheduler, frozen
+package surface, PR destination, or prior XPS evidence. DMD 2.111.0 /
+LDC 1.41.0 correctness and exact-head CI qualification are required before
+a new dedicated, optimized XPS multi-worker raw-data protocol is proposed.
+ADR-0001 remains PROPOSED, PR #38 DRAFT, and this is not a merge decision.
