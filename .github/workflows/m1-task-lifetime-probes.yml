@@ -58,6 +58,8 @@ on:
       - "tools/research/m1_p35_compile.sh"
       - "tools/research/m1_p35_compare.py"
       - "tools/research/m1_p35_xps.sh"
+      - "tools/research/m1_p39_make_pool.py"
+      - "tools/research/m1_p39_probe.sh"
       - "tools/research/m1_p38_source_audit.py"
       - "tools/research/m1_p38_make_pool.py"
       - "tools/research/m1_p38_make_owner.py"
@@ -385,6 +387,10 @@ jobs:
       - name: P38 paired worker wake counter compiler gate
         shell: bash
         run: bash tools/research/m1_p38_compile.sh "$DC"
+
+      - name: P39 notification-site source preflight
+        shell: bash
+        run: bash tools/research/m1_p39_probe.sh
 
       - name: P38 worker-local wake counter preflight
         shell: bash
