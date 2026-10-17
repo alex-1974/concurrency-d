@@ -1,5 +1,8 @@
 module concurrency.research.p42_multi_producer;
-import concurrency.research.m1_p42_pool : SubmissionWorkerPool, SubmissionResult;
+version (P42Baseline)
+    import concurrency.internal.submission_pool : SubmissionWorkerPool, SubmissionResult;
+else
+    import concurrency.research.m1_p42_pool : SubmissionWorkerPool, SubmissionResult;
 import concurrency.internal.task_record : TaskHeader, TaskRef;
 import core.atomic : atomicFetchAdd, atomicLoad, MemoryOrder;
 import core.thread : Thread;
