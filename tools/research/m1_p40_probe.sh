@@ -27,3 +27,14 @@ for delta in (0,1,2,3,17):
     assert internal + pending == delta
 print("P40_OUTCOME_PREFLIGHT_PASS source_only=true compiler_untested=true")
 PY
+
+python3 - "$ROOT/tools/research/m1_p40_xps.sh" <<'PY'
+from pathlib import Path
+import sys
+script=Path(sys.argv[1]).read_text()
+for arm in ("null", "timed"):
+    anchor=f"{arm}) config=p40-{arm}-optimized; marker=P40_OUTCOME_BENCHMARK_PASS;;"
+    if script.count(anchor)!=1:
+        raise ValueError(f"P40 XPS completion marker drift: {arm}")
+print("P40_XPS_MARKER_PREFLIGHT_PASS")
+PY
