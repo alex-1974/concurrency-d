@@ -39,3 +39,11 @@ This tests one very specific lost-work pattern, **not** starvation freedom, noti
 ## P42.3 local work and idle thieves
 
 The P42.3 bounded model explores a two-task inbox batch. A worker executes one task and places the other on its local deque, while a second worker waits. The baseline wakes the second worker upon local-work announcement. A control variant without the local-work notification demonstrates delayed stealing, not a global deadlock: the owner can eventually execute both tasks. This does not establish any safe notification optimization, nor model full thread scheduling. CI is required before claiming the model has passed.
+
+## P42.6 initial conditional publish overlay (experimental)
+
+`tools/research/m1_p42_make_conditional_pool.py` generates `m1_p42_pool.d` from the unchanged production `submission_pool.d`. The *only* synchronization-policy change is in `TaskInbox.trySubmit`: a publication still inserts its task, increments accepted and generation under the inbox mutex; `notify()` is issued only if `_waiters != 0`. The research-only waiter counter is incremented immediately before `Condition.wait()` and decremented after its return, under that same mutex. Local deque `announceLocalWork()`, close `notifyAll()`, final completion broadcast, work search and FIFO ordering are unchanged.
+
+`tools/research/m1_p42_conditional_gate.sh` executes a first source-pinned native D race smoke test (12 one-worker cases with a task published after an observed wait entry), with a bounded external timeout. This is a **partial correctness gate**, not proof of general progress with multiple waiters or competing producers. The broader P42.5 adversarial model is not a runtime test. A subsequent gate must cover idle-to-active races, at least two workers/two producers, batch handoff, close, accepted-task once-only completion and lifetime constraints before running optimized performance measurements.
+
+Do not interpret a lower publish notification count as throughput improvement without matched, uninstrumented XPS evidence. The hypothesis might still be invalid or slower. No production code is changed.
