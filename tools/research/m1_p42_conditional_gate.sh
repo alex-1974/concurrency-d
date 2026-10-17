@@ -13,4 +13,6 @@ timeout 90s dub run --root="$BASE" --compiler="$DC" --build=debug --config=p42-m
 timeout 90s dub run --root="$BASE" --compiler="$DC" --build=debug --config=p42-multi-producer
 timeout 90s dub run --root="$BASE" --compiler="$DC" --build=debug --config=p42-close-baseline
 timeout 90s dub run --root="$BASE" --compiler="$DC" --build=debug --config=p42-close-conditional
+timeout 90s dub run --root="$BASE" --compiler="$DC" --build=debug --config=p42-bench-baseline-medium -- 4 4 256
+timeout 90s dub run --root="$BASE" --compiler="$DC" --build=debug --config=p42-bench-conditional-medium -- 4 4 256
 echo "P42_CONDITIONAL_RACE_GATE_PASS compiler=$DC"
