@@ -245,3 +245,11 @@ configuration "p42-multi-baseline" {
     mainSourceFile "consumer/p42_multi_producer.d"
     dflags "-version=P42Baseline"
 }
+
+configuration "p42-close-baseline" {
+    mainSourceFile "consumer/p42_close_race.d"
+    dflags "-version=P42Baseline"
+}
+configuration "p42-close-conditional" {
+    mainSourceFile "consumer/p42_close_race.d"
+}
