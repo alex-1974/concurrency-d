@@ -101,7 +101,58 @@ def collect(path, session, pair, arm):
     return task_rows, round_rows
 
 
+def self_test():
+    """Exercise a complete synthetic log and an invalid worker negative control."""
+    from tempfile import TemporaryDirectory
+    with TemporaryDirectory(prefix="p42-16-extract-") as tmp:
+        path = Path(tmp) / "s1-p1-baseline.txt"
+        lines = []
+        for shape in SHAPES:
+            for round_id in range(ROUNDS):
+                lines.append(
+                    f"P42_MULTI_IDLE_WAIT arm=baseline tasks={shape} "
+                    f"round={round_id} simultaneous_waiters=4 "
+                    f"wait_entries=1,1,1,1 enrolled=true,true,true,true"
+                )
+                counts = [0] * 4
+                for task_id in range(shape):
+                    worker = task_id % 4
+                    counts[worker] += 1
+                    lines.append(
+                        f"P42_MULTI_IDLE_TASK arm=baseline tasks={shape} "
+                        f"round={round_id} task={task_id} worker={worker} "
+                        f"publish_ticks={100+task_id} "
+                        f"start_ticks={200+task_id} own_publish_to_start_ticks=100"
+                    )
+                lines.append(
+                    f"P42_MULTI_IDLE arm=baseline tasks={shape} round={round_id} "
+                    f"max_publish_to_start_ticks=120 "
+                    f"work_per_worker={','.join(map(str, counts))}"
+                )
+        lines.append(
+            "P42_MULTI_IDLE_PASS workers=4 rounds=12 cases=3 "
+            "wait_evidence=simultaneous_per_worker_enrollments "
+            "worker_distribution=recorded"
+        )
+        path.write_text("\\n".join(lines) + "\\n", encoding="utf-8")
+        samples, rounds = collect(path, 1, 1, "baseline")
+        assert len(samples) == EXPECTED_TASKS and len(rounds) == 36
+        broken = path.read_text(encoding="utf-8").replace(
+            "task=0 worker=0", "task=0 worker=7", 1)
+        path.write_text(broken, encoding="utf-8")
+        try:
+            collect(path, 1, 1, "baseline")
+        except ValueError:
+            pass
+        else:
+            raise AssertionError("negative worker-ID control was accepted")
+    print("P42_MULTI_IDLE_EXTRACT_SELF_TEST_PASS")
+
+
 def main():
+    if sys.argv[1:] == ["--self-test"]:
+        self_test()
+        return
     if len(sys.argv) != 2:
         raise SystemExit("usage: m1_p42_multi_idle_extract.py EXISTING-RESULTS-DIR")
     root = Path(sys.argv[1])
