@@ -1,0 +1,7 @@
+# P42.13 — idle-to-active publication latency research probe
+
+Source `consumer/p42_idle_latency.d`: unchanged and conditional pool selected by Dub configuration. Each of 64 independent rounds creates a one-worker pool, observes at least one recorded condition-variable wait entry, publishes one task, waits for task execution **before** calling `closeAndJoin()`, then validates exactly-one execution and lifecycle completion. This ordering prevents the shutdown `notifyAll()` from becoming the wake mechanism being measured.
+
+The producer captures `MonoTime.currTime.ticks` immediately **before** `trySubmit`; the task callback captures the same monotonic counter as its first action. Each raw `P42_IDLE_SAMPLE` is a tick difference including producer admission and OS scheduling, and is **not** a pure kernel wakeup latency. Observing a past wait entry also does not atomically establish that the worker remained asleep at publication. The probe cannot prove starvation freedom; its bounded poll is a correctness gate and can itself perturb scheduling.
+
+The CI script runs both baseline and conditional cases with DMD 2.111.0 and LDC 1.41.0; current CI must be checked before marking the probe qualified. This stage provides first reproducible native raw timing instrumentation, **not a fair optimized-XPS performance comparison**. Before comparing distributions, run prebuilt optimized binaries on the same host, use alternating arm order, verify counter frequency/units and capture system state. No production changes or release conclusions.
