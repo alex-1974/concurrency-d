@@ -66,15 +66,10 @@ def main():
     s=once(s,anchor,insertion+anchor)
     s=once(s,"    private size_t _started;",
            "    private size_t _started;\n    private P41Barrier _p41Barrier;")
-    s=once(s,"    SubmissionResult trySubmit(TaskRef task)\n    {\n        return _inbox.trySubmit(task);",
-           """    void researchSetBarrier(P41Barrier barrier)
-    {
-        _p41Barrier = barrier;
-    }
-
-    SubmissionResult trySubmit(TaskRef task)
-    {
-        return _inbox.trySubmit(task);""")
+    s=once(s,"        void function(TaskRef) nothrow afterExecution = null)",
+           "        void function(TaskRef) nothrow afterExecution = null,\\n        P41Barrier p41Barrier = null)")
+    s=once(s,"        _inbox = new TaskInbox(ingressCapacity);",
+           "        _p41Barrier = p41Barrier;\\n        _inbox = new TaskInbox(ingressCapacity);")
     s=once(s,"            const observed = _inbox.wakeGeneration();",
            """            const observed = _inbox.wakeGeneration();
             if (_p41Barrier !is null)
