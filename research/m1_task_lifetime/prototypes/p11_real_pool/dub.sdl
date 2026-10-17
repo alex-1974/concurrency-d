@@ -253,3 +253,12 @@ configuration "p42-close-baseline" {
 configuration "p42-close-conditional" {
     mainSourceFile "consumer/p42_close_race.d"
 }
+
+configuration "p42-bench-baseline" {
+    mainSourceFile "consumer/p42_benchmark.d"
+    dflags "-O3" "-version=P42Baseline"
+}
+configuration "p42-bench-conditional" {
+    mainSourceFile "consumer/p42_benchmark.d"
+    dflags "-O3"
+}
