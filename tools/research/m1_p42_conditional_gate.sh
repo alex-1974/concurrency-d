@@ -4,10 +4,17 @@ DC="${1:-dmd}"
 ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)"
 BASE="$ROOT/research/m1_task_lifetime/prototypes/p11_real_pool"
 POOL="$BASE/concurrency/research/m1_p42_pool.d"
-[[ ! -e "$POOL" ]] || { echo "P42 refuses overwrite: $POOL" >&2; exit 2; }
-cleanup() { rm -f -- "$POOL"; }
+OBSERVED_BASELINE="$BASE/concurrency/research/m1_p42_baseline_pool.d"
+for path in "$POOL" "$OBSERVED_BASELINE"; do
+    [[ ! -e "$path" ]] || { echo "P42 refuses overwrite: $path" >&2; exit 2; }
+done
+cleanup() { rm -f -- "$POOL" "$OBSERVED_BASELINE"; }
 trap cleanup EXIT
-python3 "$ROOT/tools/research/m1_p42_make_conditional_pool.py" "$ROOT/source/concurrency/internal/submission_pool.d" "$POOL"
+GEN="$ROOT/tools/research/m1_p42_make_conditional_pool.py"
+SOURCE="$ROOT/source/concurrency/internal/submission_pool.d"
+python3 -m py_compile "$GEN"
+python3 "$GEN" "$SOURCE" "$POOL" conditional
+python3 "$GEN" "$SOURCE" "$OBSERVED_BASELINE" baseline
 timeout --signal=TERM --kill-after=5s 90s dub run --root="$BASE" --compiler="$DC" --build=debug --config=p42-wait-publish
 timeout 90s dub run --root="$BASE" --compiler="$DC" --build=debug --config=p42-multi-baseline
 timeout 90s dub run --root="$BASE" --compiler="$DC" --build=debug --config=p42-multi-producer
