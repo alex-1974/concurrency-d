@@ -232,3 +232,7 @@ configuration "p41-ticket-barrier" {
 configuration "p41-wait-publish" {
     mainSourceFile "consumer/p41_wait_publish.d"
 }
+
+configuration "p42-wait-publish" {
+    mainSourceFile "consumer/p42_wait_publish.d"
+}
