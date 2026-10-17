@@ -211,3 +211,12 @@ configuration "p40-timed" {
     mainSourceFile "consumer/p40_generational_owner.d"
     dflags "-version=P37Timed"
 }
+
+configuration "p40-null-optimized" {
+    mainSourceFile "consumer/p40_generational_owner.d"
+    dflags "-O3"
+}
+configuration "p40-timed-optimized" {
+    mainSourceFile "consumer/p40_generational_owner.d"
+    dflags "-O3" "-version=P37Timed"
+}
