@@ -38,12 +38,13 @@ private Thread makeProducer(SubmissionWorkerPool pool, shared Record[] tasks,
 }
 void main(string[] args)
 {
-    assert(args.length == 4, "usage: benchmark producers workers tasks");
+    if (args.length != 4) throw new Exception("usage: benchmark producers workers tasks");
     const producers = args[1].to!size_t;
     const workers = args[2].to!size_t;
     const count = args[3].to!size_t;
-    assert(producers > 0 && workers > 0 && count >= producers &&
-           count % producers == 0);
+    if (producers == 0 || workers == 0 || count < producers ||
+        count % producers != 0)
+        throw new Exception("invalid benchmark dimensions");
     auto records = new shared Record[count];
     foreach (ref r; records) r.header.execute = &execute;
     StopWatch timer;
@@ -57,9 +58,11 @@ void main(string[] args)
     foreach (t; producersThreads) t.join();
     pool.closeAndJoin();
     timer.stop();
-    assert(pool.acceptedCount() == count && pool.completedCount() == count);
+    if (pool.acceptedCount() != count || pool.completedCount() != count)
+        throw new Exception("accepted/completed task totals mismatch");
     foreach (ref r; records)
-        assert(atomicLoad!(MemoryOrder.acq)(r.hits) == 1u);
+        if (atomicLoad!(MemoryOrder.acq)(r.hits) != 1u)
+            throw new Exception("task executed other than once");
     version (P42Baseline) enum arm = "baseline";
     else enum arm = "conditional";
     writeln("P42_BENCH arm=", arm, " producers=", producers, " workers=",workers,
