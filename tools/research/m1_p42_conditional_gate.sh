@@ -12,7 +12,8 @@ cleanup() { rm -f -- "$POOL" "$OBSERVED_BASELINE"; }
 trap cleanup EXIT
 GEN="$ROOT/tools/research/m1_p42_make_conditional_pool.py"
 SOURCE="$ROOT/source/concurrency/internal/submission_pool.d"
-python3 -m py_compile "$GEN"
+python3 -m py_compile "$GEN" "$ROOT/tools/research/m1_p42_multi_idle_extract.py"
+bash -n "$ROOT/tools/research/m1_p42_multi_idle_native.sh"
 python3 "$GEN" "$SOURCE" "$POOL" conditional
 python3 "$GEN" "$SOURCE" "$OBSERVED_BASELINE" baseline
 # Reject any drift beyond the intended publish-notify policy and module name.
