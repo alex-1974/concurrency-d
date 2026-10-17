@@ -23,7 +23,8 @@ def main():
     arm = sys.argv[3]
     s = source.read_text()
     s = once(s, "module concurrency.internal.submission_pool;",
-             "module concurrency.research.m1_p42_" + arm + "_pool;")
+             ("module concurrency.research.m1_p42_baseline_pool;" if arm == "baseline"
+              else "module concurrency.research.m1_p42_pool;"))
 
     # The TLS identity is used only by diagnostic callbacks. It is not an
     # ownership token and is never part of a normal performance build.
