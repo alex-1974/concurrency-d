@@ -10,10 +10,16 @@ import std.datetime.stopwatch : StopWatch;
 import std.conv : to;
 import std.stdio : writeln;
 
-private struct Record { TaskHeader header; shared uint hits; }
+private struct Record { TaskHeader header; shared uint hits; shared uint work; }
 private void execute(shared(TaskHeader)* p) @trusted nothrow
 {
     auto r = cast(shared(Record)*) p;
+    // A dependent, per-task atomic sequence keeps work observable under -O3.
+    version (P42MediumTask)
+    {
+        foreach (_; 0 .. 32)
+            atomicFetchAdd!(MemoryOrder.rel)(r.work, 1u);
+    }
     atomicFetchAdd!(MemoryOrder.rel)(r.hits, 1u);
 }
 private void producer(SubmissionWorkerPool pool, shared Record[] tasks,
@@ -63,6 +69,10 @@ void main(string[] args)
     foreach (ref r; records)
         if (atomicLoad!(MemoryOrder.acq)(r.hits) != 1u)
             throw new Exception("task executed other than once");
+    version (P42MediumTask)
+        foreach (ref r; records)
+            if (atomicLoad!(MemoryOrder.acq)(r.work) != 32u)
+                throw new Exception("medium task work count mismatch");
     version (P42Baseline) enum arm = "baseline";
     else enum arm = "conditional";
     writeln("P42_BENCH arm=", arm, " producers=", producers, " workers=",workers,
