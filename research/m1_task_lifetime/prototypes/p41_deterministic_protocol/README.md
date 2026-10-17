@@ -21,3 +21,7 @@ P41 is intended to establish confidence in the existing close/publish ordering, 
 ## Source-pinned real pool close gate
 
 `tools/research/m1_p41_real_pool_close.sh` builds P38's exact-source research pool and runs `consumer/p41_real_pool_close.d` under a timeout. Eight fresh four-worker pools are closed and joined, with alternating attempts to observe idle parking. Accepted/completed counts remain zero. This tests actual worker creation, close and join but **does not force a worker to wait** (a bounded observation loop is not a synchronization barrier), and it does not test accepted-task execution or controlled publication races. The stronger deterministic full-pool barrier remains open. The new CI result must be checked before claiming qualification.
+
+## Publish after observed real-pool wait
+
+The new `p41_wait_publish.d` fixture uses the pinned P38 pool with one worker and one task. It observes `parkCount() > 0`, publishes a task, then closes and joins. Across twelve cases it checks one acceptance, one completion, and exactly one execution. The observation is bounded and synchronized via the inbox counter accessor. **It proves a wait-entry counter was reached, not that the worker remains asleep at the exact instant of publication.** The deterministic ticket-to-publish barrier remains a separate scenario. Both DMD and LDC CI must be checked before qualifying this fixture.
