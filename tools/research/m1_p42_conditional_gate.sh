@@ -9,5 +9,6 @@ cleanup() { rm -f -- "$POOL"; }
 trap cleanup EXIT
 python3 "$ROOT/tools/research/m1_p42_make_conditional_pool.py" "$ROOT/source/concurrency/internal/submission_pool.d" "$POOL"
 timeout --signal=TERM --kill-after=5s 90s dub run --root="$BASE" --compiler="$DC" --build=debug --config=p42-wait-publish
+timeout 90s dub run --root="$BASE" --compiler="$DC" --build=debug --config=p42-multi-baseline
 timeout 90s dub run --root="$BASE" --compiler="$DC" --build=debug --config=p42-multi-producer
 echo "P42_CONDITIONAL_RACE_GATE_PASS compiler=$DC"
