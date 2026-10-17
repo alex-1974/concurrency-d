@@ -67,9 +67,9 @@ def main():
     s=once(s,"    private size_t _started;",
            "    private size_t _started;\n    private P41Barrier _p41Barrier;")
     s=once(s,"        void function(TaskRef) nothrow afterExecution = null)",
-           "        void function(TaskRef) nothrow afterExecution = null,\\n        P41Barrier p41Barrier = null)")
+           "        void function(TaskRef) nothrow afterExecution = null,\n        P41Barrier p41Barrier = null)")
     s=once(s,"        _inbox = new TaskInbox(ingressCapacity);",
-           "        _p41Barrier = p41Barrier;\\n        _inbox = new TaskInbox(ingressCapacity);")
+           "        _p41Barrier = p41Barrier;\n        _inbox = new TaskInbox(ingressCapacity);")
     s=once(s,"            const observed = _inbox.wakeGeneration();",
            """            const observed = _inbox.wakeGeneration();
             if (_p41Barrier !is null)
