@@ -39,8 +39,8 @@ for session in 1 2 3; do
       [[ "$(grep -c "^P42_IDLE_SAMPLE arm=$arm " "$raw")" == 64 ]]
       awk -v s="$session" -v p="$pair" -v a="$arm" '
         /^P42_IDLE_SAMPLE / {
-          split($4, v, "=")
-          split($5, t, "=")
+          split($3, v, "=")
+          split($4, t, "=")
           if (v[2] !~ /^[0-9]+$/ || t[2] !~ /^[0-9]+$/) exit 3
           print s "," p "," a "," v[2] "," t[2]
         }
