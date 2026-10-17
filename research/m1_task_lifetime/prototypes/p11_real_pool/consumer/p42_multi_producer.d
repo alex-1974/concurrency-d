@@ -36,6 +36,11 @@ private void produce(SubmissionWorkerPool pool, shared Record[] records,
         }
     }
 }
+private Thread makeProducer(SubmissionWorkerPool pool, shared Record[] data,
+                            size_t first, size_t last)
+{
+    return new Thread({ produce(pool, data, first, last); });
+}
 void main()
 {
     enum producers = 4;
@@ -50,11 +55,9 @@ void main()
         Thread[] threads;
         foreach (index; 0 .. producers)
         {
-            const start = index * perProducer;
-            const finish = start + perProducer;
-            threads ~= new Thread({
-                produce(pool, records, start, finish);
-            });
+            const first = index * perProducer;
+            const last = first + perProducer;
+            threads ~= makeProducer(pool, records, first, last);
         }
         foreach (thread; threads) thread.start();
         foreach (thread; threads) thread.join();
