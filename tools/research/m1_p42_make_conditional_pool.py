@@ -32,7 +32,7 @@ def main():
         s = once(s, "module concurrency.internal.submission_pool;",
                  "module concurrency.research.m1_p42_pool;")
         s = once(s, "    private size_t _parkCount;",
-                 "    private size_t _parkCount;\\n    private size_t _waiters;")
+                 "    private size_t _parkCount;\n    private size_t _waiters;")
         s = once(s, """            ++_accepted;
             ++_generation;
             _changed.notify();
@@ -51,14 +51,14 @@ def main():
                 _changed.wait();
                 assert(_waiters != 0);
                 --_waiters;""")
-        pool_anchor = """    size_t parkCount()\\n    {\\n        return _inbox.parkCount();\\n    }"""
-        s = once(s, pool_anchor, pool_anchor + """\\n\\n    // Research-only instantaneous count under the same inbox mutex.
+        pool_anchor = """    size_t parkCount()\n    {\n        return _inbox.parkCount();\n    }"""
+        s = once(s, pool_anchor, pool_anchor + """\n\n    // Research-only instantaneous count under the same inbox mutex.
     size_t waiterCount()
     {
         return _inbox.waiterCount();
     }""")
-        inbox_anchor = """    size_t parkCount()\\n    {\\n        synchronized (_mutex)\\n        {\\n            return _parkCount;\\n        }\\n    }"""
-        s = once(s, inbox_anchor, inbox_anchor + """\\n\\n    size_t waiterCount()
+        inbox_anchor = """    size_t parkCount()\n    {\n        synchronized (_mutex)\n        {\n            return _parkCount;\n        }\n    }"""
+        s = once(s, inbox_anchor, inbox_anchor + """\n\n    size_t waiterCount()
     {
         synchronized (_mutex)
             return _waiters;
