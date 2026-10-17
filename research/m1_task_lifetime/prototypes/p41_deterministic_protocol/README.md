@@ -13,3 +13,7 @@ P41 is intended to establish confidence in the existing close/publish ordering, 
 ## Ordered regression scenarios
 
 `tools/research/m1_p41_ordered_scenarios.py` reuses the same state transitions but insists on six explicit orderings: close before ticket, close between ticket and park, close during wait, two artificial spurious returns followed by close, publication before park, and publication while waiting followed by close and completion. Each has an expected bounded terminal state. This is a deterministic *model-level* regression, not yet a source-pinned D thread-barrier test. CI runs both model enumerator and scenarios on the DMD/LDC matrix (Python test itself is compiler-independent).
+
+## Native D Condition gate
+
+`p41_condition_runtime.d` is a standalone **real D Thread/Mutex/Condition** regression. Four bounded cases cover close before generation snapshot, close after snapshot but before worker park, close after an actual wait entry, and an unchanged-state notifyAll followed by close. Mutex-protected counters establish the wait-entry barrier; each case joins its thread and conserves wait entries/returns. The bounded runner `tools/research/m1_p41_native_condition.sh` compiles under DMD/LDC and applies a 30-second external timeout. This standalone fixture deliberately does **not** exercise the source-pinned `TaskInbox` or `SubmissionWorkerPool`; the Python protocol source audit is performed alongside it. A source-pinned full-pool thread barrier test remains an open qualification step.
