@@ -17,3 +17,7 @@ P41 is intended to establish confidence in the existing close/publish ordering, 
 ## Native D Condition gate
 
 `p41_condition_runtime.d` is a standalone **real D Thread/Mutex/Condition** regression. Four bounded cases cover close before generation snapshot, close after snapshot but before worker park, close after an actual wait entry, and an unchanged-state notifyAll followed by close. Mutex-protected counters establish the wait-entry barrier; each case joins its thread and conserves wait entries/returns. The bounded runner `tools/research/m1_p41_native_condition.sh` compiles under DMD/LDC and applies a 30-second external timeout. This standalone fixture deliberately does **not** exercise the source-pinned `TaskInbox` or `SubmissionWorkerPool`; the Python protocol source audit is performed alongside it. A source-pinned full-pool thread barrier test remains an open qualification step.
+
+## Source-pinned real pool close gate
+
+`tools/research/m1_p41_real_pool_close.sh` builds P38's exact-source research pool and runs `consumer/p41_real_pool_close.d` under a timeout. Eight fresh four-worker pools are closed and joined, with alternating attempts to observe idle parking. Accepted/completed counts remain zero. This tests actual worker creation, close and join but **does not force a worker to wait** (a bounded observation loop is not a synchronization barrier), and it does not test accepted-task execution or controlled publication races. The stronger deterministic full-pool barrier remains open. The new CI result must be checked before claiming qualification.
