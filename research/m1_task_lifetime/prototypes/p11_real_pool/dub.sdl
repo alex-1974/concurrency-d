@@ -265,9 +265,9 @@ configuration "p42-bench-conditional" {
 
 configuration "p42-bench-baseline-medium" {
     mainSourceFile "consumer/p42_benchmark.d"
-    dflags "-O3" "-version=P42Baseline" "-version=P42MediumTask"
+    dflags "-version=P42Baseline" "-version=P42MediumTask"
 }
 configuration "p42-bench-conditional-medium" {
     mainSourceFile "consumer/p42_benchmark.d"
-    dflags "-O3" "-version=P42MediumTask"
+    dflags "-version=P42MediumTask"
 }
