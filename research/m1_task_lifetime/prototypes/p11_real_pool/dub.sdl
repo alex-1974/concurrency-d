@@ -236,3 +236,7 @@ configuration "p41-wait-publish" {
 configuration "p42-wait-publish" {
     mainSourceFile "consumer/p42_wait_publish.d"
 }
+
+configuration "p42-multi-producer" {
+    mainSourceFile "consumer/p42_multi_producer.d"
+}
