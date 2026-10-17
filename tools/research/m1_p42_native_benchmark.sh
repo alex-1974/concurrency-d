@@ -14,6 +14,7 @@ sha256sum "$ROOT/source/concurrency/internal/submission_pool.d" "$POOL" > "$OUT/
 git -C "$ROOT" rev-parse HEAD > "$OUT/commit.txt"
 ldc2 --version > "$OUT/toolchain.txt"
 uname -a > "$OUT/platform.txt"
+date -Is > "$OUT/start-time.txt"
 lscpu > "$OUT/cpu.txt"
 for arm in baseline conditional; do
   echo "BUILD $arm"
@@ -33,7 +34,7 @@ for config in 1:1 2:2 4:4; do
     done
   done
 done
-for session in 1 2 3; do
+for session in 1 2 3 4 5 6; do
   for config in 1:1 2:2 4:4; do
     IFS=: read -r producers workers <<< "$config"
     for position in 1 2 3 4; do
@@ -49,5 +50,6 @@ for session in 1 2 3; do
     done
   done
 done
+date -Is > "$OUT/end-time.txt"
 sha256sum "$OUT/results.csv" > "$OUT/results.sha256"
 echo "P42_NATIVE_BENCHMARK_COMPLETE $OUT"
