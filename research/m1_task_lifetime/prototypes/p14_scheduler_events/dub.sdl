@@ -1,0 +1,23 @@
+name "m1-p14-scheduler-events"
+description "Research only: exact-M0 control vs event-counter overlay"
+targetType "executable"
+mainSourceFile "generated/consumer/main.d"
+sourcePaths "generated"
+dependency "concurrency-d" path="../../../../"
+dflags "-preview=dip1000"
+
+configuration "control" {
+    mainSourceFile "generated/consumer/main.d"
+}
+configuration "trace" {
+    mainSourceFile "generated/consumer/main.d"
+    dflags "-version=P14Instrumented"
+}
+configuration "control-optimized" {
+    mainSourceFile "generated/consumer/main.d"
+    dflags "-O3"
+}
+configuration "trace-optimized" {
+    mainSourceFile "generated/consumer/main.d"
+    dflags "-O3" "-version=P14Instrumented"
+}

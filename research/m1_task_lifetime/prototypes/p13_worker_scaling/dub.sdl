@@ -1,0 +1,18 @@
+name "m1-p13-worker-scaling"
+description "Research-only M0 scaling: fixed work, randomized worker configurations"
+targetType "executable"
+sourcePaths "concurrency"
+mainSourceFile "consumer/main.d"
+dependency "concurrency-d" path="../../../../"
+dflags "-preview=dip1000"
+
+configuration "smoke" {
+    mainSourceFile "consumer/main.d"
+}
+configuration "optimized" {
+    mainSourceFile "consumer/main.d"
+    dflags "-O3"
+}
+configuration "release-mode" {
+    mainSourceFile "consumer/main.d"
+}

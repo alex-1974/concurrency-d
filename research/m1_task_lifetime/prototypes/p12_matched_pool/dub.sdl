@@ -1,0 +1,20 @@
+name "m1-p12-matched-pool"
+description "Research benchmark: identical M0 TaskRef dispatch, stack vs GC array"
+targetType "executable"
+mainSourceFile "consumer/main.d"
+sourcePaths "concurrency"
+dependency "concurrency-d" path="../../../../"
+dflags "-preview=dip1000"
+
+configuration "smoke" {
+    mainSourceFile "consumer/main.d"
+}
+configuration "optimized" {
+    mainSourceFile "consumer/main.d"
+    dflags "-O3"
+}
+
+configuration "release-mode" {
+    mainSourceFile "consumer/main.d"
+    // Used with DUB --build=release to qualify the full dependency graph.
+}
