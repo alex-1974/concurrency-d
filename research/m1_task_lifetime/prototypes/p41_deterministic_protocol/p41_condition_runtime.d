@@ -68,6 +68,19 @@ private final class Gate
     }
 }
 
+private void untilEntries(Gate gate, size_t minimum)
+{
+    foreach (_; 0 .. 100_000)
+    {
+        size_t e, r, d;
+        gate.snapshot(e, r, d);
+        if (e >= minimum)
+            return;
+        Thread.yield();
+    }
+    assert(false, "P41 unchanged generation failed to re-enter wait");
+}
+
 private void untilWait(Gate gate)
 {
     foreach (_; 0 .. 100_000)
@@ -131,11 +144,17 @@ void main()
         worker.start();
         untilWait(gate);
         gate.signalWithoutStateChange();
+        // The second wait entry is observed through the same mutex as the
+        // condition: the unchanged generation must cause a real re-wait.
+        untilEntries(gate, 2);
+        size_t beforeEntries, beforeReturns, beforeDone;
+        gate.snapshot(beforeEntries, beforeReturns, beforeDone);
+        assert(beforeReturns >= 1 && beforeDone == 0);
         gate.close();
         worker.join();
         size_t e, r, d;
         gate.snapshot(e, r, d);
-        assert(e >= 1 && r == e && d == 1);
+        assert(e >= 2 && r == e && d == 1);
     }
 
     import std.stdio : writeln;
