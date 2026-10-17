@@ -17,15 +17,57 @@ def once(s, old, new):
 
 
 def main():
-    # Preserve existing P42.9–P42.14 runner invocations with two paths.
-    # The optional third argument selects the diagnostic baseline overlay.
+    # Two-argument invocations used by P42.9–P42.14 MUST reproduce the
+    # original conditional source byte-for-byte. The P42.16 observed arms
+    # are opt-in and symmetrically instrumented.
     if len(sys.argv) not in (3, 4):
-        raise SystemExit("usage: generator SOURCE OUTPUT [baseline|conditional]")
-    arm = sys.argv[3] if len(sys.argv) == 4 else "conditional"
-    if arm not in ("baseline", "conditional"):
+        raise SystemExit("usage: generator SOURCE OUTPUT [legacy|baseline|conditional]")
+    arm = sys.argv[3] if len(sys.argv) == 4 else "legacy"
+    if arm not in ("legacy", "baseline", "conditional"):
         raise SystemExit("unknown P42 overlay arm: " + arm)
     source, output = map(Path, sys.argv[1:3])
     s = source.read_text()
+
+    if arm == "legacy":
+        s = once(s, "module concurrency.internal.submission_pool;",
+                 "module concurrency.research.m1_p42_pool;")
+        s = once(s, "    private size_t _parkCount;",
+                 "    private size_t _parkCount;\\n    private size_t _waiters;")
+        s = once(s, """            ++_accepted;
+            ++_generation;
+            _changed.notify();
+            return SubmissionResult.accepted;""",
+                 """            ++_accepted;
+            ++_generation;
+            // P42.6 research hypothesis only. Waiter count is protected by
+            // the same mutex as publication and the wait predicate.
+            if (_waiters != 0)
+                _changed.notify();
+            return SubmissionResult.accepted;""")
+        s = once(s, """                ++_parkCount;
+                _changed.wait();""",
+                 """                ++_parkCount;
+                ++_waiters;
+                _changed.wait();
+                assert(_waiters != 0);
+                --_waiters;""")
+        pool_anchor = """    size_t parkCount()\\n    {\\n        return _inbox.parkCount();\\n    }"""
+        s = once(s, pool_anchor, pool_anchor + """\\n\\n    // Research-only instantaneous count under the same inbox mutex.
+    size_t waiterCount()
+    {
+        return _inbox.waiterCount();
+    }""")
+        inbox_anchor = """    size_t parkCount()\\n    {\\n        synchronized (_mutex)\\n        {\\n            return _parkCount;\\n        }\\n    }"""
+        s = once(s, inbox_anchor, inbox_anchor + """\\n\\n    size_t waiterCount()
+    {
+        synchronized (_mutex)
+            return _waiters;
+    }""")
+        output.parent.mkdir(parents=True, exist_ok=True)
+        with output.open("x") as handle:
+            handle.write(s)
+        print("P42_CONDITIONAL_POOL_GENERATED research_only=true")
+        return
     s = once(s, "module concurrency.internal.submission_pool;",
              ("module concurrency.research.m1_p42_baseline_pool;" if arm == "baseline"
               else "module concurrency.research.m1_p42_pool;"))
