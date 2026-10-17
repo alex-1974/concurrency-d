@@ -16,3 +16,7 @@ Maintain P38 `waitEntries == waitReturns <= parkCalls` separately. A `notify()` 
 4. Only then collect native XPS and report separate site calls, wait-entry/return counts, and per-session variability.
 
 No P39 performance conclusions or native evidence exist yet. PR #38 Draft; ADR-0001 Proposed.
+
+## Native measurement handoff
+
+After successful DMD/LDC qualification at `be523a2d9272b99316bfaafecee8b1ef1ccff458`, the rotated 3-session P39 collection script `tools/research/m1_p39_xps.sh` and optimized null/timed configurations were added. The original P31 arm remains unchanged. Run on the XPS only after the latest research-branch CI is green; the generated modules are removed on exit, and the script refuses existing generated files and existing output paths. Save and upload the resulting archive and external SHA-256 receipt. P39 has **no native measurements yet**.
