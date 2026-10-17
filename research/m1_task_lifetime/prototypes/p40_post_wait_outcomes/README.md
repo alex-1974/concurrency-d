@@ -9,3 +9,9 @@ A worker-local pending flag is set after `parkUnlessChanged(observed)` only if t
 If the worker takes a `parkUnlessChanged` path without calling `Condition.wait`, leave the pending state unchanged. If the next park call did wait, the previous pending event is classified as repark before arming the newly returned event. An event terminating after a `wait` return must classify as drained or another branch; assert post-join conservation: localPop + inboxBatch + steal + repark + drained == waitReturns. No per-notification causal pairing is claimed.
 
 Use a source-pinned research overlay only, with worker-local counters. Preserve scheduler work order, generation predicate, root lifetimes and bounded ingress. First deliver source audit/generator and DMD/LDC correctness; only then CSV and native XPS.
+
+## Qualification checkpoint (2026-10-17)
+
+The first P40 runtime CI (commit `483cc41b68be4606ec5356fb2c2c3fa50732aa97`, workflow run `39026687815`) passed DMD 2.111.0 and LDC 1.41.0. Optimized P40 null/timed configurations and a rotated three-session XPS collector were added subsequently; their HEAD CI requires a separate check before native execution.
+
+**Interpretation limit:** the current first-outcome flag describes the next worker-loop branch after a park invocation with at least one Condition.wait return. A Condition variable can return spuriously and repeat within the same park invocation; such multiple returns would not fit the one-flag-per-invocation classification and can trip conservation. Existing passing tests do not establish completeness under all spurious-wakeup schedules. Before interpreting counts as a one-to-one taxonomy of individual returns, extend the overlay to account for all returns within a park invocation (or explicitly count coalesced internal returns), with focused regression tests. Do not infer per-notification causality.
