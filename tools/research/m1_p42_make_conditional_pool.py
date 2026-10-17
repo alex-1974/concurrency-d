@@ -17,10 +17,14 @@ def once(s, old, new):
 
 
 def main():
-    if len(sys.argv) != 4 or sys.argv[3] not in ("baseline", "conditional"):
-        raise SystemExit("usage: generator SOURCE OUTPUT baseline|conditional")
+    # Preserve existing P42.9–P42.14 runner invocations with two paths.
+    # The optional third argument selects the diagnostic baseline overlay.
+    if len(sys.argv) not in (3, 4):
+        raise SystemExit("usage: generator SOURCE OUTPUT [baseline|conditional]")
+    arm = sys.argv[3] if len(sys.argv) == 4 else "conditional"
+    if arm not in ("baseline", "conditional"):
+        raise SystemExit("unknown P42 overlay arm: " + arm)
     source, output = map(Path, sys.argv[1:3])
-    arm = sys.argv[3]
     s = source.read_text()
     s = once(s, "module concurrency.internal.submission_pool;",
              ("module concurrency.research.m1_p42_baseline_pool;" if arm == "baseline"
