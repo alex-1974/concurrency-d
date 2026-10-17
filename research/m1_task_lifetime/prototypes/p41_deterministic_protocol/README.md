@@ -25,3 +25,7 @@ P41 is intended to establish confidence in the existing close/publish ordering, 
 ## Publish after observed real-pool wait
 
 The new `p41_wait_publish.d` fixture uses the pinned P38 pool with one worker and one task. It observes `parkCount() > 0`, publishes a task, then closes and joins. Across twelve cases it checks one acceptance, one completion, and exactly one execution. The observation is bounded and synchronized via the inbox counter accessor. **It proves a wait-entry counter was reached, not that the worker remains asleep at the exact instant of publication.** The deterministic ticket-to-publish barrier remains a separate scenario. Both DMD and LDC CI must be checked before qualifying this fixture.
+
+## P41 native predicate re-wait strengthening
+
+The standalone native `Condition` fixture now explicitly waits for a **second** mutex-observed wait entry after sending a notification **without** changing the generation. It asserts that at least one wait returned but the worker had not completed, then closes, joins and checks wait-entry/return conservation. This exercises a repeated real `Condition.wait` cycle (not a randomly occurring OS spurious wakeup). It is still a standalone fixture rather than a full-pool forced-wait proof. The bounded process timeout remains in place.
