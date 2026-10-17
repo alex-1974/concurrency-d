@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+set -euo pipefail
+ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)"
+TMP="$(mktemp -d)"
+trap 'rm -rf -- "$TMP"' EXIT
+bash "$ROOT/tools/research/m1_p39_probe.sh"
+python3 "$ROOT/tools/research/m1_p40_make_pool.py" "$ROOT" \
+ "$ROOT/source/concurrency/internal/submission_pool.d" "$TMP/m1_p40_pool.d"
+python3 - "$TMP/m1_p40_pool.d" <<'PY'
+from pathlib import Path
+import sys
+s=Path(sys.argv[1]).read_text()
+for token in ("postLocal","postInbox","postSteal","postRepark","postDrained"):
+    if s.count("++p38ThreadCounters."+token+";")!=1:
+        raise ValueError("P40 outcome counter missing: "+token)
+if s.count("p40Pending = true;")!=1:
+    raise ValueError("P40 pending arm drift")
+if s.count("p38ThreadCounters.waitReturns != p40Before")!=1:
+    raise ValueError("P40 real-wait guard drift")
+print("P40_OUTCOME_PREFLIGHT_PASS source_only=true compiler_untested=true")
+PY
