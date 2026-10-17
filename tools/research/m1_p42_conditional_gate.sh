@@ -15,6 +15,26 @@ SOURCE="$ROOT/source/concurrency/internal/submission_pool.d"
 python3 -m py_compile "$GEN"
 python3 "$GEN" "$SOURCE" "$POOL" conditional
 python3 "$GEN" "$SOURCE" "$OBSERVED_BASELINE" baseline
+# Reject any drift beyond the intended publish-notify policy and module name.
+python3 - "$POOL" "$OBSERVED_BASELINE" <<'PY'
+from pathlib import Path
+import sys
+cond, base = (Path(x).read_text() for x in sys.argv[1:])
+cond = cond.replace("module concurrency.research.m1_p42_pool;",
+                    "module concurrency.research.p42_matched;")
+base = base.replace("module concurrency.research.m1_p42_baseline_pool;",
+                    "module concurrency.research.p42_matched;")
+cnotify = """// P42 conditional hypothesis; guarded by the inbox mutex.
+            if (_waiters != 0)
+                _changed.notify();"""
+bnotify = """// P42 baseline: retain unconditional publication notification.
+            _changed.notify();"""
+assert cond.count(cnotify) == 1 and base.count(bnotify) == 1, (
+    "P42 publish policy anchor mismatch")
+assert cond.replace(cnotify, "P42_POLICY") == base.replace(bnotify, "P42_POLICY"), (
+    "P42 observed overlays differ outside the intended notify policy")
+print("P42_MATCHED_OBSERVATION_PREFLIGHT_PASS")
+PY
 timeout --signal=TERM --kill-after=5s 90s dub run --root="$BASE" --compiler="$DC" --build=debug --config=p42-wait-publish
 timeout 90s dub run --root="$BASE" --compiler="$DC" --build=debug --config=p42-multi-baseline
 timeout 90s dub run --root="$BASE" --compiler="$DC" --build=debug --config=p42-multi-producer
