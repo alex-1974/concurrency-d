@@ -224,3 +224,7 @@ configuration "p40-timed-optimized" {
 configuration "p41-real-pool-close" {
     mainSourceFile "consumer/p41_real_pool_close.d"
 }
+
+configuration "p41-ticket-barrier" {
+    mainSourceFile "consumer/p41_ticket_barrier.d"
+}
