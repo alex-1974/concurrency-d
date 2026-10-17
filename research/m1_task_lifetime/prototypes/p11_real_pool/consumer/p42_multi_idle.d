@@ -4,7 +4,7 @@ version (P42Baseline)
 else
     import concurrency.research.m1_p42_pool : SubmissionWorkerPool, SubmissionResult;
 import concurrency.internal.task_record : TaskHeader, TaskRef;
-import core.atomic : atomicFetchAdd, atomicLoad, MemoryOrder;
+import core.atomic : atomicFetchAdd, atomicLoad, atomicStore, MemoryOrder;
 import core.thread : Thread;
 import core.time : MonoTime;
 import std.stdio : writeln;
@@ -18,7 +18,7 @@ private struct Record
 private void execute(shared(TaskHeader)* p) @trusted nothrow
 {
     auto record = cast(shared(Record)*) p;
-    record.startTicks = MonoTime.currTime.ticks;
+    atomicStore!(MemoryOrder.rel)(record.startTicks, MonoTime.currTime.ticks);
     atomicFetchAdd!(MemoryOrder.rel)(record.hits, 1u);
 }
 private void awaitWaitEntries(SubmissionWorkerPool pool, size_t count)
@@ -67,7 +67,7 @@ void main()
             {
                 if (atomicLoad!(MemoryOrder.acq)(rec.hits) != 1u)
                     throw new Exception("once-only invariant");
-                const duration = rec.startTicks - begin;
+                const duration = atomicLoad!(MemoryOrder.acq)(rec.startTicks) - begin;
                 if (duration < 0) throw new Exception("nonmonotonic timestamp");
                 if (duration > maxTicks) maxTicks = duration;
             }
