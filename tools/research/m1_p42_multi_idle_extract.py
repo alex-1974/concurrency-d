@@ -134,7 +134,7 @@ def self_test():
             "wait_evidence=simultaneous_per_worker_enrollments "
             "worker_distribution=recorded"
         )
-        path.write_text("\\n".join(lines) + "\\n", encoding="utf-8")
+        path.write_text("\n".join(lines) + "\n", encoding="utf-8")
         samples, rounds = collect(path, 1, 1, "baseline")
         assert len(samples) == EXPECTED_TASKS and len(rounds) == 36
         broken = path.read_text(encoding="utf-8").replace(
