@@ -74,8 +74,15 @@ def main():
             }
             const p40Before = p38ThreadCounters.waitReturns;
             _inbox.parkUnlessChanged(observed);
-            if (p38ThreadCounters.waitReturns != p40Before)
-                p40Pending = true;""")
+            const p40Delta = p38ThreadCounters.waitReturns - p40Before;
+            if (p40Delta != 0)
+            {
+                // Earlier returns within the same predicate loop did not
+                // transfer control to the worker search. Classify them as
+                // internal re-waits; only the final return is pending.
+                p38ThreadCounters.postRepark += p40Delta - 1;
+                p40Pending = true;
+            }""")
     s=prefix+loop+suffix
     s=once(s,"            _p38Workers[workerIndex] = p38ThreadCounters;",
         """            assert(p38ThreadCounters.postLocal +
