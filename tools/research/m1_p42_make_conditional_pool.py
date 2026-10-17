@@ -34,6 +34,12 @@ def main():
                 assert(_waiters != 0);
                 --_waiters;"""
     s=once(s,old,new)
+    anchor = """    size_t parkCount()\n    {\n        return _inbox.parkCount();\n    }"""
+    replacement = anchor + """\n\n    // Research-only instantaneous count under the same inbox mutex.\n    size_t waiterCount()\n    {\n        return _inbox.waiterCount();\n    }"""
+    s=once(s,anchor,replacement)
+    inbox_anchor = """    size_t parkCount()\n    {\n        synchronized (_mutex)\n        {\n            return _parkCount;\n        }\n    }"""
+    inbox_replacement = inbox_anchor + """\n\n    size_t waiterCount()\n    {\n        synchronized (_mutex)\n            return _waiters;\n    }"""
+    s=once(s,inbox_anchor,inbox_replacement)
     out.parent.mkdir(parents=True,exist_ok=True)
     out.write_text(s)
     print("P42_CONDITIONAL_POOL_GENERATED research_only=true")
