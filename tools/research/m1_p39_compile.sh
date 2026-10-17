@@ -14,7 +14,7 @@ trap cleanup EXIT
 for path in "$POOL" "$P23" "$OWNER" "$CONSUMER"; do
   [[ ! -e "$path" ]] || { echo "P39 refuses existing: $path" >&2; exit 2; }
 done
-python3 "$ROOT/tools/research/m1_p39_source_audit.py"
+bash "$ROOT/tools/research/m1_p39_probe.sh"
 python3 "$ROOT/tools/research/m1_p39_make_pool.py" "$ROOT" "$ROOT/source/concurrency/internal/submission_pool.d" "$POOL"
 python3 "$ROOT/tools/research/m1_p39_make_owner.py" "$ROOT" "$P23" "$OWNER"
 python3 "$ROOT/tools/research/m1_p39_make_consumer.py" "$ROOT" "$BASE/consumer/p29_generational_owner.d" "$CONSUMER"
