@@ -220,3 +220,7 @@ configuration "p40-timed-optimized" {
     mainSourceFile "consumer/p40_generational_owner.d"
     dflags "-O3" "-version=P37Timed"
 }
+
+configuration "p41-real-pool-close" {
+    mainSourceFile "consumer/p41_real_pool_close.d"
+}
