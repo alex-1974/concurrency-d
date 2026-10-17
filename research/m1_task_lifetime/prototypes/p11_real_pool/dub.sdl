@@ -228,3 +228,7 @@ configuration "p41-real-pool-close" {
 configuration "p41-ticket-barrier" {
     mainSourceFile "consumer/p41_ticket_barrier.d"
 }
+
+configuration "p41-wait-publish" {
+    mainSourceFile "consumer/p41_wait_publish.d"
+}
