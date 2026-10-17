@@ -23,3 +23,9 @@ Consider batching only after specifying a wake-ticket invariant and a finite pro
 **Stop criteria:** any stuck close/join, missed task, incorrect root lifetime, starvation in tested schedules, changed observable admission/ownership semantics, source drift or inconsistent CI. Do not interpret publish notify count reduction as a throughput victory without native evidence.
 
 The **first deliverable** is the design and adversarial schedule table; no policy switch and no native performance run is authorized by this note. PR #38 Draft; ADR-0001 Proposed.
+
+## P42.1 bounded policy exploration
+
+`tools/research/m1_p42_two_worker_model.py` is a **finite-state abstraction**, not a proposal to suppress production notifications. It explores two workers, two one-shot producers, inbox capacity two, one-task claims, worker park/execute/exit, and shutdown broadcasts. It compares the current always-notify publication policy with an idealized notify-if-waiter policy and a deliberately unsafe no-notify control. The control must yield a concrete quiescent lost-work counterexample, which is reported as an event trace. Source anchors are checked against the unchanged production inbox.
+
+**Limits:** Worker generation capture and search-to-park are abstracted into a single atomic transition; worker waiting registration is idealized. There is no work stealing, local deque, root lifecycle, OS condition wake behavior, fairness bound or admitted-task cancellation. Therefore a green model for `waiter` **does not prove** that a real waiter-count-based strategy is safe. Its next research task is to model generation-ticket capture and waiter enrollment as separate interleavings and seek counterexamples *before* any overlay implementation. P42 is not a performance result.
