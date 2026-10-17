@@ -77,3 +77,49 @@ package surface, PR destination, or prior XPS evidence. DMD 2.111.0 /
 LDC 1.41.0 correctness and exact-head CI qualification are required before
 a new dedicated, optimized XPS multi-worker raw-data protocol is proposed.
 ADR-0001 remains PROPOSED, PR #38 DRAFT, and this is not a merge decision.
+
+
+### Native XPS diagnostic capture (runner added; results pending)
+
+After the first corrected P42.16 DMD/LDC runtime correctness gate succeeded,
+`tools/research/m1_p42_multi_idle_native.sh` and
+`tools/research/m1_p42_multi_idle_extract.py` were added for a **later
+native XPS run**, not as a claim that such a run has already happened.
+The runner uses the two explicit **observed** overlays, not the historical
+unobserved P42.9–P42.14 performance variants. The generator's original
+two-argument invocation remains the historical byte-for-byte conditional
+overlay path (`legacy`); explicit `baseline` and `conditional` select
+matched P42.16 instrumentation only.
+
+From the dedicated XPS worktree (do not move or reset the main worktree):
+
+```bash
+cd ~/Programmiersprachen/dlang/concurrency-d-p42
+git status -sb
+git fetch origin
+git pull --ff-only origin research/m1-task-lifetime-boundaries
+# Pick a NEW, previously nonexistent results directory each time.
+bash tools/research/m1_p42_multi_idle_native.sh "$HOME/Downloads/p42-16-xps-01"
+tar -C "$HOME/Downloads" -czf "$HOME/Downloads/p42-16-xps-01.tar.gz" p42-16-xps-01
+```
+
+**Only run this after an exact-head DMD/LDC green gate.** XPS output is not
+available from GitHub-hosted CI. The script refuses existing directories
+and overlays, removes its temporary modules on exit, prebuilds both LDC
+release binaries, records binary/source hashes plus compiler/CPU/system
+and frequency/thermal snapshots, performs warmups, and alternates arms in
+three sessions with six paired runs each. Every full run emits 36
+four-worker rounds and 444 per-task records; the resulting 36 raw logs
+are validated into `tasks.csv` and `rounds.csv` with cardinality and
+worker-distribution consistency checks. All raw traces are retained;
+no previously recorded evidence is overwritten.
+
+The diagnostic overhead is **intentionally present in both arms**. These
+paired comparisons can inform task placement, concurrent wait enrollment,
+and task-start observations, but they do **not** isolate a kernel wakeup
+cost and are not a replacement for an uninstrumented production-oriented
+throughput baseline. `MonoTime.currTime.ticks` values remain raw ticks:
+no conversion to nanoseconds without a separately justified clock unit.
+Treat rounds within an invocation as correlated, include per-session drift,
+and avoid confidence claims from naive per-task P95/P99 independence.
+No merge, ADR ratification, or public API promotion follows from this run.
