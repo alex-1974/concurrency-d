@@ -240,3 +240,8 @@ configuration "p42-wait-publish" {
 configuration "p42-multi-producer" {
     mainSourceFile "consumer/p42_multi_producer.d"
 }
+
+configuration "p42-multi-baseline" {
+    mainSourceFile "consumer/p42_multi_producer.d"
+    dflags "-version=P42Baseline"
+}
