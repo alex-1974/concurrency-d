@@ -406,6 +406,10 @@ jobs:
         shell: bash
         run: bash tools/research/m1_p39_compile.sh "$DC"
 
+      - name: P41 publish after observed real pool wait
+        shell: bash
+        run: bash tools/research/m1_p41_wait_publish.sh "$DC"
+
       - name: P41 controlled worker ticket gate
         shell: bash
         run: bash tools/research/m1_p41_ticket_barrier.sh "$DC"
