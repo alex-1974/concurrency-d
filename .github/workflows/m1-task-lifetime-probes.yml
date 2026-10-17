@@ -60,6 +60,7 @@ on:
       - "tools/research/m1_p35_xps.sh"
       - "tools/research/m1_p41_real_pool_close.sh"
       - "tools/research/m1_p41_native_condition.sh"
+      - "tools/research/m1_p42_two_worker_model.py"
       - "tools/research/m1_p41_protocol_model.py"
       - "tools/research/m1_p41_ordered_scenarios.py"
       - "tools/research/m1_p40_make_pool.py"
@@ -409,6 +410,10 @@ jobs:
       - name: P41 publish after observed real pool wait
         shell: bash
         run: bash tools/research/m1_p41_wait_publish.sh "$DC"
+
+      - name: P42 bounded two-worker notification policy model
+        shell: bash
+        run: python3 tools/research/m1_p42_two_worker_model.py source/concurrency/internal/submission_pool.d
 
       - name: P41 controlled worker ticket gate
         shell: bash
