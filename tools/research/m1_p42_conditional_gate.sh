@@ -11,4 +11,6 @@ python3 "$ROOT/tools/research/m1_p42_make_conditional_pool.py" "$ROOT/source/con
 timeout --signal=TERM --kill-after=5s 90s dub run --root="$BASE" --compiler="$DC" --build=debug --config=p42-wait-publish
 timeout 90s dub run --root="$BASE" --compiler="$DC" --build=debug --config=p42-multi-baseline
 timeout 90s dub run --root="$BASE" --compiler="$DC" --build=debug --config=p42-multi-producer
+timeout 90s dub run --root="$BASE" --compiler="$DC" --build=debug --config=p42-close-baseline
+timeout 90s dub run --root="$BASE" --compiler="$DC" --build=debug --config=p42-close-conditional
 echo "P42_CONDITIONAL_RACE_GATE_PASS compiler=$DC"
