@@ -60,6 +60,8 @@ on:
       - "tools/research/m1_p35_xps.sh"
       - "tools/research/m1_p41_real_pool_close.sh"
       - "tools/research/m1_p41_native_condition.sh"
+      - "tools/research/m1_p42_make_conditional_pool.py"
+      - "tools/research/m1_p42_conditional_gate.sh"
       - "tools/research/m1_p42_adversarial_scenarios.py"
       - "tools/research/m1_p42_local_handoff_model.py"
       - "tools/research/m1_p42_ticket_enrollment_model.py"
@@ -413,6 +415,10 @@ jobs:
       - name: P41 publish after observed real pool wait
         shell: bash
         run: bash tools/research/m1_p41_wait_publish.sh "$DC"
+
+      - name: P42 conditional publish real-pool correctness gate
+        shell: bash
+        run: bash tools/research/m1_p42_conditional_gate.sh "$DC"
 
       - name: P42 adversarial scheduling oracle
         shell: bash
