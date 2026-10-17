@@ -16,7 +16,12 @@ for session in 1 2 3; do
   for config in 1:1 2:2 4:4; do
     IFS=: read -r producers workers <<< "$config"
     for position in 1 2 3 4; do
-      for arm in baseline conditional; do
+      if (( (session + position) % 2 )); then
+        arms=(conditional baseline)
+      else
+        arms=(baseline conditional)
+      fi
+      for arm in "${arms[@]}"; do
         line="$(timeout 120s dub run --root="$BASE" --compiler=ldc2 --build=release --config="p42-bench-$arm" -- "$producers" "$workers" 8192 | grep P42_BENCH)"
         value="${line##*elapsed_us=}"
         echo "$session,$position,$arm,$producers,$workers,8192,$value" >> "$OUT/results.csv"
