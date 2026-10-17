@@ -25,10 +25,17 @@ private void awaitWaitEntries(SubmissionWorkerPool pool, size_t count)
 {
     foreach (_; 0 .. 500_000)
     {
-        if (pool.parkCount() >= count) return;
+        version (P42Baseline)
+        {
+            if (pool.parkCount() >= count) return;
+        }
+        else
+        {
+            if (pool.waiterCount() >= count) return;
+        }
         Thread.yield();
     }
-    throw new Exception("not all workers entered condition wait");
+    throw new Exception("worker wait prerequisite not observed");
 }
 void main()
 {
@@ -77,5 +84,8 @@ void main()
                 " round=", round, " max_publish_to_start_ticks=", maxTicks);
         }
     }
-    writeln("P42_MULTI_IDLE_PASS workers=4 rounds=12 cases=3");
+    version (P42Baseline)
+        writeln("P42_MULTI_IDLE_PASS workers=4 rounds=12 cases=3 wait_evidence=historical_entries");
+    else
+        writeln("P42_MULTI_IDLE_PASS workers=4 rounds=12 cases=3 wait_evidence=current_waiters");
 }
