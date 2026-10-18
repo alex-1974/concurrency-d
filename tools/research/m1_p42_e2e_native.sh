@@ -121,7 +121,8 @@ for session in 1 2 3 4 5 6; do
             costs=(medium light)
         fi
         for cost in "${costs[@]}"; do
-            if (( (session + pair + (cost == "light" ? 0 : 1)) % 2 == 0 )); then
+            if [[ "$cost" == light ]]; then cost_index=0; else cost_index=1; fi
+            if (( (session + pair + cost_index) % 2 == 0 )); then
                 scenarios=(target control)
             else
                 scenarios=(control target)
@@ -134,8 +135,8 @@ for session in 1 2 3 4 5 6; do
                 fi
                 # Use complementary AB/BA order in different pairs. The
                 # 1P1W control is still policy-exposed, not a pure CPU oracle.
-                if (( (session + pair + (cost == "light" ? 0 : 1) +
-                       (scenario == "target" ? 0 : 1)) % 2 == 0 )); then
+                if [[ "$scenario" == target ]]; then scenario_index=0; else scenario_index=1; fi
+                if (( (session + pair + cost_index + scenario_index) % 2 == 0 )); then
                     arms=(baseline conditional)
                 else
                     arms=(conditional baseline)
