@@ -287,3 +287,14 @@ configuration "p42-multi-idle-baseline" {
 configuration "p42-multi-idle-conditional" {
     mainSourceFile "consumer/p42_multi_idle.d"
 }
+
+# P42.17 diagnostic-only, mutually matched policy arms. Existing P42.16
+# consumer/configurations remain available unchanged.
+configuration "p42-flow-baseline" {
+    mainSourceFile "consumer/p42_multi_idle.d"
+    versions "P42Baseline" "P42Flow"
+}
+configuration "p42-flow-conditional" {
+    mainSourceFile "consumer/p42_multi_idle.d"
+    versions "P42Flow"
+}
