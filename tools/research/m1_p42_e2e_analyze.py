@@ -165,7 +165,7 @@ def self_test():
         original = first.read_text()
         for bad in (
             original.replace("workers=4", "workers=3"),
-            original.replace("elapsed_us=", "elapsed_us=0"),
+            original.replace("elapsed_us=1021", "elapsed_us=0"),
             original.replace("arm=conditional", "arm=baseline"),
             original + original,
         ):
