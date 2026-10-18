@@ -129,7 +129,7 @@ def audit(csv_path):
             if (value > READY_MILLIC or len(recent) != STABLE_READINGS or
                     any(t > READY_MILLIC for _, t in recent) or
                     recent[-1][1] != value or
-                    (recent[-1][0] - recent[0][0]).total_seconds() < 2.5):
+                    (recent[-1][0] - recent[0][0]).total_seconds() < SAMPLE_SECONDS):
                 raise ValueError("invalid cooldown admission " + key)
             ready_counts[key] += 1
             states[key] = 1
@@ -159,6 +159,19 @@ def self_test():
         sensor.write_text("65000\n")
         assert discover(root) == sensor
         assert temp_mc(sensor) == 65000
+        duplicate = root / "hwmon1"
+        duplicate.mkdir()
+        (duplicate / "name").write_text("coretemp\n")
+        (duplicate / "temp1_label").write_text("Package id 0\n")
+        (duplicate / "temp1_input").write_text("63000\n")
+        try:
+            discover(root)
+        except ValueError:
+            pass
+        else:
+            raise AssertionError("ambiguous coretemp sensor accepted")
+        (duplicate / "name").write_text("not-coretemp\n")
+        assert discover(root) == sensor
         sensor.write_text("190000\n")
         try:
             temp_mc(sensor)
@@ -186,6 +199,7 @@ def self_test():
         # a missing temperature-stability interval.
         modifications = (
             (2, 0, "bad_event"),
+            (4, 3, "95000"),
             (2, 3, "85000"),
             (3, 3, "95000"),
             (1, 0, "ready"),
