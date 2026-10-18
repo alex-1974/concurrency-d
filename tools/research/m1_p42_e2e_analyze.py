@@ -188,6 +188,18 @@ def self_test():
             pass
         else:
             raise AssertionError("CSV/raw divergence accepted")
+        # Explicit negative: the parser must reject an AB/BA order reversal,
+        # even when all raw contents and individual CSV rows remain valid.
+        csv_file.write_text(original_csv, encoding="utf-8")
+        lines = original_csv.splitlines()
+        lines[1], lines[2] = lines[2], lines[1]
+        csv_file.write_text("\n".join(lines) + "\n", encoding="utf-8")
+        try:
+            load_capture(root)
+        except ValueError:
+            pass
+        else:
+            raise AssertionError("unbalanced execution-order control accepted")
     print("P42_E2E_ANALYZE_SELF_TEST_PASS")
 
 
