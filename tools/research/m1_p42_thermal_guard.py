@@ -5,7 +5,7 @@ The sensor reports a *snapshot* only: pre/post values do not prove absence
 of in-run thermal excursions. No governor or affinity settings are changed.
 """
 import csv
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 import sys
 import time
@@ -46,10 +46,10 @@ def temp_mc(sensor):
     return value
 
 
-def write_event(csv_path, event, run_id, value):
+def write_event(csv_path, event, run_id, value, when=None):
     with csv_path.open("a", newline="", encoding="utf-8") as target:
         csv.writer(target).writerow(
-            (event, run_id, datetime.now(timezone.utc).isoformat(), value)
+            (event, run_id, (when or datetime.now(timezone.utc)).isoformat(), value)
         )
 
 
@@ -103,6 +103,7 @@ def audit(csv_path):
     states = {run_id: 0 for run_id in ids}
     probe_counts = {run_id: 0 for run_id in ids}
     ready_counts = {run_id: 0 for run_id in ids}
+    last_probes = {run_id: [] for run_id in ids}
     last_timestamp = None
     for row in rows:
         key, event = row["run_id"], row["event"]
@@ -122,8 +123,13 @@ def audit(csv_path):
         stage = states[key]
         if event == "probe" and stage == 0:
             probe_counts[key] += 1
+            last_probes[key] = (last_probes[key] + [(moment, value)])[-2:]
         elif event == "ready" and stage == 0:
-            if value > READY_MILLIC or probe_counts[key] < STABLE_READINGS:
+            recent = last_probes[key]
+            if (value > READY_MILLIC or len(recent) != STABLE_READINGS or
+                    any(t > READY_MILLIC for _, t in recent) or
+                    recent[-1][1] != value or
+                    (recent[-1][0] - recent[0][0]).total_seconds() < 2.5):
                 raise ValueError("invalid cooldown admission " + key)
             ready_counts[key] += 1
             states[key] = 1
@@ -164,27 +170,46 @@ def self_test():
         trace = root / "thermal.csv"
         with trace.open("w", newline="", encoding="utf-8") as file:
             csv.writer(file).writerow(COLUMNS)
-        for run_id in expected_ids():
-            for event, temperature in (("probe", 68000), ("probe", 65000),
-                                       ("ready", 65000), ("post", 73000)):
-                write_event(trace, event, run_id, temperature)
+        started = datetime.now(timezone.utc)
+        for index, run_id in enumerate(expected_ids()):
+            at = started + timedelta(seconds=index * 5)
+            for event, temperature, seconds in (
+                ("probe", 68000, 0), ("probe", 65000, 3),
+                ("ready", 65000, 3.01), ("post", 73000, 3.25)
+            ):
+                write_event(trace, event, run_id, temperature,
+                            at + timedelta(seconds=seconds))
         audit(trace)
-        original = trace.read_text()
-        corruptions = (
-            original.replace(",ready,", ",bad_event,", 1),
-            original.replace(",ready,", ",ready,", 1).replace(",65000\n", ",85000\n", 1),
-            original.replace(",post,", ",probe,", 1),
-            original.replace(",post,", ",post,", 1).replace(",73000\n", ",95000\n", 1),
-            "\n".join(original.splitlines()[:-1]) + "\n",
+        original_rows = list(csv.reader(trace.open(newline="", encoding="utf-8")))
+        # Reject unknown event, hot admission, hot post, premature
+        # admission without two cool probes, incomplete capture and
+        # a missing temperature-stability interval.
+        modifications = (
+            (2, 0, "bad_event"),
+            (2, 3, "85000"),
+            (3, 3, "95000"),
+            (1, 0, "ready"),
+            (2, 2, original_rows[1][2]),
         )
-        for corrupt in corruptions:
-            trace.write_text(corrupt)
+        for line, column, replacement in modifications:
+            damaged = [row[:] for row in original_rows]
+            damaged[line][column] = replacement
+            with trace.open("w", newline="", encoding="utf-8") as handle:
+                csv.writer(handle).writerows(damaged)
             try:
                 audit(trace)
             except ValueError:
                 pass
             else:
                 raise AssertionError("corrupt thermal trace accepted")
+        with trace.open("w", newline="", encoding="utf-8") as handle:
+            csv.writer(handle).writerows(original_rows[:-1])
+        try:
+            audit(trace)
+        except ValueError:
+            pass
+        else:
+            raise AssertionError("incomplete thermal trace accepted")
     print("P42_THERMAL_SELF_TEST_PASS")
 
 
