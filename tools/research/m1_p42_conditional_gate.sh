@@ -14,9 +14,12 @@ cleanup() { rm -f -- "$POOL" "$OBSERVED_BASELINE" "$FLOW_CONDITIONAL" "$FLOW_BAS
 trap cleanup EXIT
 GEN="$ROOT/tools/research/m1_p42_make_conditional_pool.py"
 SOURCE="$ROOT/source/concurrency/internal/submission_pool.d"
-python3 -m py_compile "$GEN" "$ROOT/tools/research/m1_p42_multi_idle_extract.py"
+python3 -m py_compile "$GEN" "$ROOT/tools/research/m1_p42_multi_idle_extract.py" \
+    "$ROOT/tools/research/m1_p42_flow_extract.py"
 bash -n "$ROOT/tools/research/m1_p42_multi_idle_native.sh"
+bash -n "$ROOT/tools/research/m1_p42_flow_native.sh"
 python3 "$ROOT/tools/research/m1_p42_multi_idle_extract.py" --self-test
+python3 "$ROOT/tools/research/m1_p42_flow_extract.py" --self-test
 python3 "$GEN" "$SOURCE" "$POOL" conditional
 python3 "$GEN" "$SOURCE" "$OBSERVED_BASELINE" baseline
 python3 "$GEN" "$SOURCE" "$FLOW_CONDITIONAL" flow-conditional
