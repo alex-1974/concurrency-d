@@ -35,6 +35,23 @@ def expected_keys():
             for cost in COSTS for scenario in SCENARIOS for arm in ARMS}
 
 
+def planned_order():
+    """Balanced, fully specified order is essential for pairing/drift checks."""
+    for session in range(1, 7):
+        for pair in range(1, 7):
+            costs = COSTS if (session + pair) % 2 == 0 else COSTS[::-1]
+            for cost in costs:
+                cost_index = 0 if cost == "light" else 1
+                scenarios = (SCENARIOS if (session + pair + cost_index) % 2 == 0
+                             else SCENARIOS[::-1])
+                for scenario in scenarios:
+                    scenario_index = 0 if scenario == "target" else 1
+                    arms = (ARMS if (session + pair + cost_index + scenario_index) % 2 == 0
+                            else ARMS[::-1])
+                    for arm in arms:
+                        yield session, pair, cost, scenario, arm
+
+
 def load_capture(root):
     """Validate raw records against CSV; refuse omission, duplicates or edits."""
     rawdir = root / "raw"
@@ -67,6 +84,7 @@ def load_capture(root):
     if set(observed) != expected_keys():
         raise ValueError("missing or invalid paired raw filenames")
     csv_map = {}
+    csv_order = []
     with (root / "results.csv").open(newline="", encoding="utf-8") as handle:
         reader = csv.DictReader(handle)
         if tuple(reader.fieldnames or ()) != FIELDS:
@@ -82,8 +100,11 @@ def load_capture(root):
             if key in csv_map or key not in observed or observed[key] != values:
                 raise ValueError("CSV duplicate or raw mismatch " + str(key))
             csv_map[key] = values
+            csv_order.append(key)
     if set(csv_map) != set(observed):
         raise ValueError("CSV missing raw measurements")
+    if csv_order != list(planned_order()):
+        raise ValueError("CSV execution order deviates from balanced plan")
     return observed
 
 
@@ -123,7 +144,7 @@ def self_test():
         root = Path(tmp)
         (root / "raw").mkdir()
         rows = []
-        for key in sorted(expected_keys()):
+        for key in planned_order():
             session, pair, cost, scenario, arm = key
             p, w = (4, 4) if scenario == "target" else (1, 1)
             value = 1000 + 10 * session + pair + (10 if arm == "conditional" else 0)
