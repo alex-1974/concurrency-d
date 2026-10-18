@@ -298,3 +298,22 @@ configuration "p42-flow-conditional" {
     mainSourceFile "consumer/p42_multi_idle.d"
     versions "P42Flow"
 }
+
+# P42.18: same established uninstrumented P42 consumer/workload in both
+# policies. No diagnostic worker/TLS/timestamp/flow overlay. Build=release
+# is supplied identically by the native runner; no per-arm optimization flags.
+configuration "p42-e2e-baseline-light" {
+    mainSourceFile "consumer/p42_benchmark.d"
+    versions "P42Baseline"
+}
+configuration "p42-e2e-conditional-light" {
+    mainSourceFile "consumer/p42_benchmark.d"
+}
+configuration "p42-e2e-baseline-medium" {
+    mainSourceFile "consumer/p42_benchmark.d"
+    versions "P42Baseline" "P42MediumTask"
+}
+configuration "p42-e2e-conditional-medium" {
+    mainSourceFile "consumer/p42_benchmark.d"
+    versions "P42MediumTask"
+}
