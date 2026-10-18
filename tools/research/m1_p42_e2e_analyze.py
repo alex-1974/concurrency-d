@@ -159,8 +159,7 @@ def self_test():
         # CSV must not silently diverge from source logs.
         csv_file = root / "results.csv"
         original_csv = csv_file.read_text()
-        csv_file.write_text(original_csv.replace("1000", "9999", 1))
-        # The synthetic values begin at 1011, so force a known replacement.
+        # The synthetic values begin at 1011; corrupt one known sample.
         csv_file.write_text(original_csv.replace("1011", "9999", 1))
         try:
             load_capture(root)
