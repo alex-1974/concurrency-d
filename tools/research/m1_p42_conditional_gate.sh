@@ -16,13 +16,16 @@ GEN="$ROOT/tools/research/m1_p42_make_conditional_pool.py"
 SOURCE="$ROOT/source/concurrency/internal/submission_pool.d"
 python3 -m py_compile "$GEN" "$ROOT/tools/research/m1_p42_multi_idle_extract.py" \
     "$ROOT/tools/research/m1_p42_flow_extract.py" \
-    "$ROOT/tools/research/m1_p42_e2e_analyze.py"
+    "$ROOT/tools/research/m1_p42_e2e_analyze.py" \
+    "$ROOT/tools/research/m1_p42_thermal_guard.py"
 bash -n "$ROOT/tools/research/m1_p42_multi_idle_native.sh"
 bash -n "$ROOT/tools/research/m1_p42_flow_native.sh"
 bash -n "$ROOT/tools/research/m1_p42_e2e_native.sh"
+bash -n "$ROOT/tools/research/m1_p42_cool_replication_native.sh"
 python3 "$ROOT/tools/research/m1_p42_multi_idle_extract.py" --self-test
 python3 "$ROOT/tools/research/m1_p42_flow_extract.py" --self-test
 python3 "$ROOT/tools/research/m1_p42_e2e_analyze.py" --self-test
+python3 "$ROOT/tools/research/m1_p42_thermal_guard.py" --self-test
 python3 "$GEN" "$SOURCE" "$POOL" conditional
 python3 "$GEN" "$SOURCE" "$OBSERVED_BASELINE" baseline
 python3 "$GEN" "$SOURCE" "$FLOW_CONDITIONAL" flow-conditional
