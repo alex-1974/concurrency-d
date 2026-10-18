@@ -81,9 +81,18 @@ timeout 90s dub run --root="$BASE" --compiler="$DC" --build=debug --config=p42-m
 timeout 90s dub run --root="$BASE" --compiler="$DC" --build=debug --config=p42-multi-idle-conditional
 timeout 90s dub run --root="$BASE" --compiler="$DC" --build=debug --config=p42-flow-baseline
 timeout 90s dub run --root="$BASE" --compiler="$DC" --build=debug --config=p42-flow-conditional
-# P42.18 uses the same, pre-existing, uninstrumented consumer with only
-# the workload and publication policy as intended independent variables.
-# Compiled in debug mode here for correctness, not for timing claims.
+# All preceding P42.16/P42.17 consumers needed the *observed* overlay.
+# P42.18 must instead compile the minimally instrumented historical
+# two-argument legacy overlay, exactly as the native E2E runner does.
+# This file is our own temporary generator output; the initial guard
+# guaranteed it did not pre-exist, and the exit trap still owns cleanup.
+rm -f -- "$POOL"
+python3 "$GEN" "$SOURCE" "$POOL"
+if grep -q -e 'P42FlowSnapshot' -e '_p42WorkerIndex' "$POOL"; then
+    echo "P42.18 unexpectedly compiled observed diagnostics" >&2
+    exit 3
+fi
+# Same pre-existing P42 consumer in both arms; debug tests only.
 for cost in light medium; do
     for arm in baseline conditional; do
         timeout 90s dub run --root="$BASE" --compiler="$DC" --build=debug \
