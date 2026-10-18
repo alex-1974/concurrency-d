@@ -21,10 +21,13 @@ def main():
     # original conditional source byte-for-byte. The P42.16 observed arms
     # are opt-in and symmetrically instrumented.
     if len(sys.argv) not in (3, 4):
-        raise SystemExit("usage: generator SOURCE OUTPUT [legacy|baseline|conditional]")
+        raise SystemExit("usage: generator SOURCE OUTPUT [legacy|baseline|conditional|flow-baseline|flow-conditional]")
     arm = sys.argv[3] if len(sys.argv) == 4 else "legacy"
-    if arm not in ("legacy", "baseline", "conditional"):
+    if arm not in ("legacy", "baseline", "conditional",
+                   "flow-baseline", "flow-conditional"):
         raise SystemExit("unknown P42 overlay arm: " + arm)
+    flow = arm.startswith("flow-")
+    policy_arm = arm[5:] if flow else arm
     source, output = map(Path, sys.argv[1:3])
     s = source.read_text()
 
@@ -68,9 +71,14 @@ def main():
             handle.write(s)
         print("P42_CONDITIONAL_POOL_GENERATED research_only=true")
         return
+    module_name = (
+        "concurrency.research.m1_p42_flow_baseline_pool" if arm == "flow-baseline"
+        else "concurrency.research.m1_p42_flow_pool" if arm == "flow-conditional"
+        else "concurrency.research.m1_p42_baseline_pool" if arm == "baseline"
+        else "concurrency.research.m1_p42_pool"
+    )
     s = once(s, "module concurrency.internal.submission_pool;",
-             ("module concurrency.research.m1_p42_baseline_pool;" if arm == "baseline"
-              else "module concurrency.research.m1_p42_pool;"))
+             "module " + module_name + ";")
 
     # The TLS identity is used only by diagnostic callbacks. It is not an
     # ownership token and is never part of a normal performance build.
@@ -105,7 +113,7 @@ private enum size_t LocalCapacity = 1024;""")
             ++_generation;
             """ + ("""// P42 conditional hypothesis; guarded by the inbox mutex.
             if (_waiters != 0)
-                _changed.notify();""" if arm == "conditional" else """// P42 baseline: retain unconditional publication notification.
+                _changed.notify();""" if policy_arm == "conditional" else """// P42 baseline: retain unconditional publication notification.
             _changed.notify();""") + """
             return SubmissionResult.accepted;""")
 
@@ -183,6 +191,123 @@ private enum size_t LocalCapacity = 1024;""")
     P42WaitSnapshot waitSnapshot()
     {
         return _inbox.waitSnapshot();
+    }""")
+
+    # P42.17 adds *opt-in* flow counters to distinct modules. Existing
+    # P42.16 observed and historical legacy output remain byte-identical.
+    if flow:
+        s = once(s, """struct P42WaitSnapshot
+{
+    size_t total;
+    size_t[] entries;
+    bool[] enrolled;
+}""", """struct P42WaitSnapshot
+{
+    size_t total;
+    size_t[] entries;
+    bool[] enrolled;
+}
+
+// Snapshot copies and counters are diagnostic-only and mutex-protected.
+// A Condition.notify call is NOT equivalent to a worker unblocking.
+struct P42FlowSnapshot
+{
+    size_t publishedWithWaiters;
+    size_t publishedWithoutWaiters;
+    size_t publishNotifyCalls;
+    size_t publishNotifySkipped;
+    size_t[] waitReturns;
+    size_t[] predicateChanged;
+    size_t[] predicateUnchanged;
+}""")
+        s = once(s, "    private bool[] _enrolledByWorker;",
+                 """    private bool[] _enrolledByWorker;
+    private size_t _p42PublishedWithWaiters;
+    private size_t _p42PublishedWithoutWaiters;
+    private size_t _p42PublishNotifyCalls;
+    private size_t _p42PublishNotifySkipped;
+    private size_t[] _p42WaitReturnsByWorker;
+    private size_t[] _p42PredicateChangedByWorker;
+    private size_t[] _p42PredicateUnchangedByWorker;""")
+        policy_cond = """// P42 conditional hypothesis; guarded by the inbox mutex.
+            if (_waiters != 0)
+                _changed.notify();"""
+        policy_base = """// P42 baseline: retain unconditional publication notification.
+            _changed.notify();"""
+        policy_old = policy_cond if policy_arm == "conditional" else policy_base
+        policy_new = ("""// P42_FLOW_POLICY_BEGIN
+            if (_waiters != 0)
+            {
+                ++_p42PublishNotifyCalls;
+                _changed.notify();
+            }
+            else
+                ++_p42PublishNotifySkipped;
+            // P42_FLOW_POLICY_END""" if policy_arm == "conditional"
+        else """// P42_FLOW_POLICY_BEGIN
+            ++_p42PublishNotifyCalls;
+            _changed.notify();
+            // P42_FLOW_POLICY_END""")
+        s = once(s, policy_old, """// Observe wait-enrollment state at publication commit.
+            if (_waiters == 0)
+                ++_p42PublishedWithoutWaiters;
+            else
+                ++_p42PublishedWithWaiters;
+            """ + policy_new)
+        s = once(s, """                _changed.wait();
+                assert(_waiters != 0);""",
+                 """                _changed.wait();
+                // The inbox lock is reacquired. This reports predicate
+                // observations, NOT a causal notification/wakeup mapping.
+                ++_p42WaitReturnsByWorker[workerIndex];
+                if (_generation != observed || _used != 0 ||
+                    (_closed && _completed == _accepted))
+                    ++_p42PredicateChangedByWorker[workerIndex];
+                else
+                    ++_p42PredicateUnchangedByWorker[workerIndex];
+                assert(_waiters != 0);""")
+        s = once(s, """        _enrolledByWorker = new bool[workers];""",
+                 """        _enrolledByWorker = new bool[workers];
+        _p42WaitReturnsByWorker = new size_t[workers];
+        _p42PredicateChangedByWorker = new size_t[workers];
+        _p42PredicateUnchangedByWorker = new size_t[workers];""")
+        inbox_anchor = """    P42WaitSnapshot waitSnapshot()
+    {
+        synchronized (_mutex)
+        {
+            P42WaitSnapshot snapshot;
+            snapshot.total = _waiters;
+            snapshot.entries = _waitEntriesByWorker.dup;
+            snapshot.enrolled = _enrolledByWorker.dup;
+            return snapshot;
+        }
+    }"""
+        s = once(s, inbox_anchor, inbox_anchor + """
+
+    P42FlowSnapshot flowSnapshot()
+    {
+        synchronized (_mutex)
+        {
+            P42FlowSnapshot snapshot;
+            snapshot.publishedWithWaiters = _p42PublishedWithWaiters;
+            snapshot.publishedWithoutWaiters = _p42PublishedWithoutWaiters;
+            snapshot.publishNotifyCalls = _p42PublishNotifyCalls;
+            snapshot.publishNotifySkipped = _p42PublishNotifySkipped;
+            snapshot.waitReturns = _p42WaitReturnsByWorker.dup;
+            snapshot.predicateChanged = _p42PredicateChangedByWorker.dup;
+            snapshot.predicateUnchanged = _p42PredicateUnchangedByWorker.dup;
+            return snapshot;
+        }
+    }""")
+        pool_anchor = """    P42WaitSnapshot waitSnapshot()
+    {
+        return _inbox.waitSnapshot();
+    }"""
+        s = once(s, pool_anchor, pool_anchor + """
+
+    P42FlowSnapshot flowSnapshot()
+    {
+        return _inbox.flowSnapshot();
     }""")
 
     # Hard-stop if the generator is pointed at the wrong source or tries
