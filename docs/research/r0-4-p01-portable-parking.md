@@ -80,7 +80,7 @@ Run on the local XPS (and repeat at least three times under comparable
 CPU/power conditions):
 
 ```bash
-dub run --config=parking-benchmark --compiler=ldc2 --build=release --force -- 4 512
+dub run --root=benchmarks/parking --compiler=ldc2 --build=release --force -- 4 512
 ```
 
 The first CLI argument is worker count and the second is isolated sample

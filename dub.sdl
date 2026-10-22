@@ -5,25 +5,11 @@ sourcePaths "source"
 
 dependency "containers-d" version="0.2.0"
 
-// The default package remains a library. The opt-in benchmark is a separate
-// executable configuration, not part of the public task API.
+authors "Alexander Bernardi"
+copyright "Copyright © 2026 Alexander Bernardi"
+license "MIT"
+homepage "https://github.com/alex-1974/concurrency-d"
+
 configuration "library" {
     targetType "library"
-}
-
-configuration "parking-benchmark" {
-    targetType "executable"
-    mainSourceFile "benchmarks/parking/main.d"
-    sourcePaths "source" "benchmarks/parking"
-    importPaths "source" "benchmarks/parking"
-    targetName "concurrency-parking-benchmark"
-}
-
-// Same-work public facade versus its actual internal owner; diagnostic only.
-configuration "executor-benchmark" {
-    targetType "executable"
-    mainSourceFile "benchmarks/executor/main.d"
-    sourcePaths "source" "benchmarks/executor"
-    importPaths "source" "benchmarks/executor"
-    targetName "concurrency-executor-benchmark"
 }

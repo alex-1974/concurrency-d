@@ -39,12 +39,12 @@ def main():
                    'one same-work binary; owner startup/submission/results/join timed',
                    'no timing threshold; not a public release or speedup claim'],
     }
-    sources = sorted((ROOT / 'source').rglob('*.d')) + [ROOT / 'benchmarks/executor/main.d', ROOT / 'dub.sdl', Path(__file__).resolve()]
+    sources = sorted((ROOT / 'source').rglob('*.d')) + [ROOT / 'benchmarks/executor/main.d', ROOT / 'benchmarks/executor/dub.json', ROOT / 'dub.sdl', Path(__file__).resolve()]
     metadata['source_sha256'] = {str(p.relative_to(ROOT)): hashlib.sha256(p.read_bytes()).hexdigest() for p in sources}
     (out / 'metadata.json').write_text(json.dumps(metadata, indent=2) + '\n')
-    (out / 'build.log').write_text(capture(['dub', 'build', '--config=executor-benchmark',
+    (out / 'build.log').write_text(capture(['dub', 'build', '--root=benchmarks/executor',
         '--compiler=' + args.compiler, '--build=release', '--force']))
-    binary = ROOT / 'concurrency-executor-benchmark'
+    binary = ROOT / 'benchmarks/executor/concurrency-executor-benchmark'
     metadata['binary_sha256'] = hashlib.sha256(binary.read_bytes()).hexdigest()
     rows, summaries = [], []
     with (out / 'raw.log').open('x') as raw, (out / 'warmups.log').open('x') as warm:

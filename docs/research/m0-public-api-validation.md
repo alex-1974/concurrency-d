@@ -105,7 +105,7 @@ branches and their source pins remain unchanged.
 
 ## Matched optimized public-path diagnostic
 
-The opt-in executor-benchmark configuration instantiates the same workload over
+The standalone benchmarks/executor package instantiates the same workload over
 the public facade and its actual internal owner in one LDC release binary. Both
 use identical job values, work kernel, producer/worker counts, ingress 256,
 record budget 512, handle/result checks and explicit join. The measured interval

@@ -6,6 +6,9 @@ on:
       - develop
     paths:
       - "dub.sdl"
+      - ".gitattributes"
+      - "LICENSE"
+      - "tools/validation/m0_package.py"
       - "source/concurrency/**"
       - "tests/public_api/**"
       - "examples/cpu-executor/**"
@@ -21,6 +24,9 @@ on:
       - develop
     paths:
       - "dub.sdl"
+      - ".gitattributes"
+      - "LICENSE"
+      - "tools/validation/m0_package.py"
       - "source/concurrency/**"
       - "tests/public_api/**"
       - "examples/cpu-executor/**"
@@ -76,6 +82,9 @@ jobs:
         shell: bash
         run: python3 tools/validation/m0_public_api.py "$DC"
 
+      - name: Exported package consumer
+        run: python3 tools/validation/m0_package.py "$DC"
+
       - name: Release build
         shell: bash
         run: dub build --build=release --compiler="$DC" --force
@@ -87,13 +96,13 @@ jobs:
       - name: Same-work public/internal executor smoke (no timing threshold)
         shell: bash
         run: |
-          dub build --config=executor-benchmark --build=release --compiler="$DC" --force
-          ./concurrency-executor-benchmark internal 4 4 1024
-          ./concurrency-executor-benchmark public 4 4 1024
+          dub build --root=benchmarks/executor --build=release --compiler="$DC" --force
+          ./benchmarks/executor/concurrency-executor-benchmark internal 4 4 1024
+          ./benchmarks/executor/concurrency-executor-benchmark public 4 4 1024
 
       - name: Portable parking smoke and metrics (not a fixed performance gate)
         shell: bash
-        run: dub run --config=parking-benchmark --build=release --compiler="$DC" --force -- 2 64
+        run: dub run --root=benchmarks/parking --build=release --compiler="$DC" --force -- 2 64
 
   native-arm64:
     name: Consumer / native ARM64 / LDC 1.41
@@ -130,6 +139,9 @@ jobs:
         shell: bash
         run: python3 tools/validation/m0_public_api.py "$DC"
 
+      - name: Exported package consumer
+        run: python3 tools/validation/m0_package.py "$DC"
+
       - name: Release build
         shell: bash
         run: dub build --build=release --compiler="$DC" --force
@@ -141,10 +153,10 @@ jobs:
       - name: Same-work public/internal executor smoke (no timing threshold)
         shell: bash
         run: |
-          dub build --config=executor-benchmark --build=release --compiler="$DC" --force
-          ./concurrency-executor-benchmark internal 4 4 1024
-          ./concurrency-executor-benchmark public 4 4 1024
+          dub build --root=benchmarks/executor --build=release --compiler="$DC" --force
+          ./benchmarks/executor/concurrency-executor-benchmark internal 4 4 1024
+          ./benchmarks/executor/concurrency-executor-benchmark public 4 4 1024
 
       - name: Portable parking smoke and metrics (not a fixed performance gate)
         shell: bash
-        run: dub run --config=parking-benchmark --build=release --compiler="$DC" --force -- 2 64
+        run: dub run --root=benchmarks/parking --build=release --compiler="$DC" --force -- 2 64
