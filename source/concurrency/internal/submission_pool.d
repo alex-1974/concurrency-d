@@ -45,6 +45,7 @@ import concurrency.errors : WorkerSelfJoinException;
 // D thread-local identity: installed once at worker entry, cleared at exit.
 // No identity lookup is added to the per-task scheduling hot path.
 private SubmissionWorkerPool currentWorkerPool;
+private size_t currentWorkerIndex;
 
 package(concurrency) enum SubmissionResult
 {
@@ -75,6 +76,7 @@ private final class TaskInbox
     private size_t _completed;
     private size_t _generation;
     private size_t _parkCount;
+    private size_t _waiters;
     private bool _closed;
 
     this(size_t capacity)
@@ -107,7 +109,13 @@ private final class TaskInbox
             ++_used;
             ++_accepted;
             ++_generation;
-            _changed.notify();
+
+            // A worker between generation capture and wait enrollment will
+            // observe this generation change under the same mutex and skip
+            // sleeping. Notify only an already-enrolled waiter; a Condition
+            // notification is not a stored work token.
+            if (_waiters != 0)
+                _changed.notify();
             return SubmissionResult.accepted;
         }
     }
@@ -209,6 +217,12 @@ private final class TaskInbox
                    !(_closed && _completed == _accepted))
             {
                 ++_parkCount;
+                ++_waiters;
+                scope (exit)
+                {
+                    assert(_waiters != 0);
+                    --_waiters;
+                }
                 _changed.wait();
             }
         }
@@ -262,7 +276,9 @@ private final class TaskInbox
  *
  * Idle workers park on a condition variable using an epoch-style wake
  * generation checked under the same mutex as publication. This is the
- * portable R0.4 P01 baseline, not an optimized spin/yield/futex policy.
+ * portable R0.4 condition/generation protocol. Publish notification is
+ * coalesced when no worker is enrolled in the condition wait; local handoff,
+ * close and final completion retain their original wake policies.
  */
 package(concurrency) final class SubmissionWorkerPool
 {
@@ -363,8 +379,14 @@ package(concurrency) final class SubmissionWorkerPool
     {
         return new Thread({
             auto previous = currentWorkerPool;
+            auto previousIndex = currentWorkerIndex;
             currentWorkerPool = this;
-            scope(exit) currentWorkerPool = previous;
+            currentWorkerIndex = workerIndex;
+            scope(exit)
+            {
+                currentWorkerPool = previous;
+                currentWorkerIndex = previousIndex;
+            }
             try
                 workerLoop(workerIndex);
             catch (Throwable)
@@ -381,6 +403,57 @@ package(concurrency) final class SubmissionWorkerPool
     bool hasIngressCapacity()
     {
         return _inbox.hasCapacity();
+    }
+
+    bool isCurrentWorker()
+    {
+        return currentWorkerPool is this;
+    }
+
+    /** Run one available task when a same-pool worker is blocked on admission. */
+    bool helpCurrentWorkerOnce()
+    {
+        if (currentWorkerPool !is this)
+            return false;
+
+        const self = currentWorkerIndex;
+        size_t nextVictim = _queues.length > 1
+            ? (self + 1) % _queues.length
+            : self;
+        return helpOne(self, nextVictim);
+    }
+
+    /**
+     * A same-pool worker waits cooperatively: it executes runnable work from
+     * its owner deque, ingress, or victim deques before sleeping on the target
+     * result's returned condition. This keeps nested lexical scopes from
+     * exhausting the entire worker set while every worker blocks in join.
+     */
+    void helpUntil(
+        scope bool delegate() completed,
+        scope void delegate() waitCompleted)
+    {
+        if (currentWorkerPool !is this)
+        {
+            waitCompleted();
+            return;
+        }
+
+        const self = currentWorkerIndex;
+        size_t nextVictim = _queues.length > 1
+            ? (self + 1) % _queues.length
+            : self;
+
+        while (!completed())
+        {
+            if (helpOne(self, nextVictim))
+                continue;
+
+            if (completed())
+                break;
+
+            waitCompleted();
+        }
     }
 
     /** Blocks until all admitted tasks have completed and all workers exit. */
@@ -423,6 +496,55 @@ package(concurrency) final class SubmissionWorkerPool
         // has finished and the task's record is no longer accessed here.
         if (_afterExecution !is null)
             _afterExecution(task);
+    }
+
+    /** One bounded scheduling pass for a worker currently waiting in join. */
+    private bool helpOne(size_t self, ref size_t nextVictim)
+    {
+        auto local = _queues[self].pop();
+        if (local.found)
+        {
+            executeOne(local.value);
+            return true;
+        }
+
+        TaskRef[IngressBatchSize] batch;
+        const taken = _inbox.takeBatch(batch[]);
+        if (taken != 0)
+        {
+            bool enqueued;
+            foreach (i; 1 .. taken)
+            {
+                TaskRef task = batch[i];
+                if (_queues[self].tryPush(task))
+                    enqueued = true;
+                else
+                    executeOne(task);
+            }
+
+            if (enqueued)
+                _inbox.announceLocalWork();
+
+            executeOne(batch[0]);
+            return true;
+        }
+
+        foreach (_; 0 .. _queues.length)
+        {
+            const victim = nextVictim;
+            nextVictim = (nextVictim + 1) % _queues.length;
+            if (victim == self)
+                continue;
+
+            auto stolen = _queues[victim].steal();
+            if (!stolen.found)
+                continue;
+
+            executeOne(stolen.value);
+            return true;
+        }
+
+        return false;
     }
 
     private void workerLoop(size_t self)
@@ -790,7 +912,7 @@ version (unittest)
 unittest
 {
     // Producer publishes while workers are idle. Repeated idle->work->idle
-    // transitions exercise the generation/notification protocol.
+    // transitions exercise notification to a confirmed enrolled waiter.
     enum size_t Count = 48;
     auto records = new shared CountingRecord[Count];
     auto tasks = new TaskRef[Count];

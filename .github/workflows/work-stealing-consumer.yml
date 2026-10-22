@@ -15,12 +15,17 @@ on:
       - "source/concurrency/**"
       - "tests/public_api/**"
       - "examples/cpu-executor/**"
+      - "examples/nested-scopes/**"
       - "tools/validation/m0_public_api.py"
       - "tools/validation/m0_public_path.py"
       - "tests/lifecycle/**"
       - "tools/validation/m0_lifecycle.py"
       - "benchmarks/parking/**"
       - "benchmarks/executor/**"
+      - "benchmarks/storage/**"
+      - "benchmarks/owned-storage/**"
+      - "benchmarks/scopes/**"
+      - "benchmarks/fork-join/**"
       - ".github/workflows/work-stealing-consumer.yml"
   push:
     branches:
@@ -36,12 +41,17 @@ on:
       - "source/concurrency/**"
       - "tests/public_api/**"
       - "examples/cpu-executor/**"
+      - "examples/nested-scopes/**"
       - "tools/validation/m0_public_api.py"
       - "tools/validation/m0_public_path.py"
       - "tests/lifecycle/**"
       - "tools/validation/m0_lifecycle.py"
       - "benchmarks/parking/**"
       - "benchmarks/executor/**"
+      - "benchmarks/storage/**"
+      - "benchmarks/owned-storage/**"
+      - "benchmarks/scopes/**"
+      - "benchmarks/fork-join/**"
       - ".github/workflows/work-stealing-consumer.yml"
   workflow_dispatch:
 
@@ -108,6 +118,22 @@ jobs:
           ./benchmarks/executor/concurrency-executor-benchmark internal 4 4 64 2048
           ./benchmarks/executor/concurrency-executor-benchmark public 4 4 64 2048
 
+      - name: Task-record storage reuse smoke (no timing threshold)
+        shell: bash
+        run: dub run --root=benchmarks/storage --build=release --compiler="$DC" --force -- 257 2 2 3 2
+
+      - name: Public owned-storage and GC retention smoke (no timing threshold)
+        shell: bash
+        run: dub run --root=benchmarks/owned-storage --build=release --compiler="$DC" --force -- 64 2 1
+
+      - name: TaskScope versus submit/get smoke (no timing threshold)
+        shell: bash
+        run: dub run --root=benchmarks/scopes --build=release --compiler="$DC" --force -- 32 2 32 2 1
+
+      - name: Two-way fork-join smoke (no timing threshold)
+        shell: bash
+        run: dub run --root=benchmarks/fork-join --build=release --compiler="$DC" --force -- 16 2 32 2 1
+
       - name: Portable parking smoke and metrics (not a fixed performance gate)
         shell: bash
         run: dub run --root=benchmarks/parking --build=release --compiler="$DC" --force -- 2 64
@@ -166,6 +192,14 @@ jobs:
           ./benchmarks/executor/concurrency-executor-benchmark public 4 4 1024
           ./benchmarks/executor/concurrency-executor-benchmark internal 4 4 64 2048
           ./benchmarks/executor/concurrency-executor-benchmark public 4 4 64 2048
+
+      - name: Task-record storage reuse smoke (no timing threshold)
+        shell: bash
+        run: dub run --root=benchmarks/storage --build=release --compiler="$DC" --force -- 257 2 2 3 2
+
+      - name: Public owned-storage and GC retention smoke (no timing threshold)
+        shell: bash
+        run: dub run --root=benchmarks/owned-storage --build=release --compiler="$DC" --force -- 64 2 1
 
       - name: Portable parking smoke and metrics (not a fixed performance gate)
         shell: bash

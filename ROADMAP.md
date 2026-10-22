@@ -1,32 +1,52 @@
 # Roadmap
 
-## M0 — Public CPU executor candidate
+## M0 — Public CPU executor (v0.1.0, released)
 
-The current M0 candidate exposes a bounded CPU executor with typed task handles,
-explicit `closeAndJoin`, task-error delivery through handles, and an independent
-CPU/completion consumer. Submission is `@system`; capture lifetime and shared
-state remain the caller's responsibility. The maintainer has accepted the
-process-fatal policy for uncertain native worker lifetime and the public
-contract. See [the API guide](docs/EXECUTOR.md).
+The bounded CPU executor, typed task handles, explicit `closeAndJoin`,
+per-handle task-error delivery, and independent CPU/completion consumer shipped
+as v0.1.0 on DUB and GitHub. Submission remains `@system`; capture lifetime and
+shared-state synchronization remain the caller's responsibility. The accepted
+native-lifecycle policy is documented in [the API guide](docs/EXECUTOR.md).
 
-The exact-head DMD/LDC/native ARM64 CI passes. The scoped Dell XPS 15 / LDC 1.42
-public-path baseline passed the predeclared 10% bound for its two kernels and
-two producer/worker scenarios; see
-[the qualification record](docs/M0-PERFORMANCE-QUALIFICATION.md). Exact-head
-release CI and the final version/archive/tag/publication checks remain open.
-License metadata and the MIT license file are present.
+The release passed the pinned DMD/LDC/native ARM64 CI and the scoped Dell XPS 15
+/ LDC 1.42 performance qualification; see
+[the qualification record](docs/M0-PERFORMANCE-QUALIFICATION.md). This evidence
+is limited to the recorded machines, kernels, and scenarios.
 
-## M1 — Ownership and scheduler research
+## M1 — Structured tasks and practical lifetime control (planned v0.2.0)
 
-Detailed M1 work, including P42.20 and conditional notification experiments, is
-preserved in [concurrency-d-research](https://github.com/alex-1974/concurrency-d-research/tree/894cfe81bcf41ca88e20a418eb90d6f2de7c83f9).
-These results remain research until separately reviewed and accepted. No general
-`TaskScope`, conditional scheduler change, or broad performance claim is part of
-the M0 public candidate.
+The next design step is to separate independently owned tasks from
+scope-bounded tasks. [ADR-0002](docs/adr/0002-task-lifetime-families.md) records
+the proposed lifetime contract and the gates before it can become a stable API.
+The development branch prototypes structured task groups / `TaskScope`, a
+typed two-way `join`, a cooperative cancellation token, and an evidence-based
+choice of task storage while preserving a small D-native API.
 
-## Longer-term directions
+Detailed prototypes and measurements, including P42.20, remain in the research
+repository at its [pinned evidence corpus](https://github.com/alex-1974/concurrency-d-research/tree/894cfe81bcf41ca88e20a418eb90d6f2de7c83f9).
+They do not authorize a general `@safe` capture contract or platform-general
+performance claim. [ADR-0003](docs/adr/0003-coalesce-idle-publish-notifications.md)
+selects their narrowly qualified conditional publish-notification policy while
+retaining portable condition parking and all other wake sites. The v0.1.0
+public API remains unchanged until the M1 lifetime and runtime gates pass.
 
-Potential follow-up areas include structured task lifetimes, cancellation,
-execution-context integration, alternative allocation strategies and additional
-consumers. Their scope and priority depend on M0 acceptance and demonstrated
-consumer needs.
+The current compiler evidence selects `@system` for owned submission and scoped
+borrows: DIP1000 rejects ordinary safe calls and scope-value copies, but cannot
+prevent deliberate raw-pointer escape or prove transitive capture ownership.
+The scope supplies the runtime join fence; callers supply capture validity and
+synchronization.
+
+[ADR-0004](docs/adr/0004-defer-sender-receiver-layer.md) keeps typed `join` and
+lexical groups as the v0.2 composition boundary. A general lazy Sender/Receiver
+layer is deferred until a real consumer demonstrates a need for scheduler
+handoff or asynchronous operation graphs and can qualify their additional
+lifetime and cancellation semantics.
+
+## M2 — Consumer and performance qualification (planned v0.3.0)
+
+Validate independent CPU-heavy and event-loop-style consumers, including
+completion handoff to a consumer-controlled thread. Compare optimized end-to-end
+performance against semantically comparable alternatives. Parallel range
+helpers remain an evidence- and consumer-driven research question. Fibers, an
+I/O reactor, NUMA policy, and a universal sender/receiver API are not core
+release prerequisites.
