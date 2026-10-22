@@ -105,6 +105,8 @@ jobs:
           dub build --root=benchmarks/executor --build=release --compiler="$DC" --force
           ./benchmarks/executor/concurrency-executor-benchmark internal 4 4 1024
           ./benchmarks/executor/concurrency-executor-benchmark public 4 4 1024
+          ./benchmarks/executor/concurrency-executor-benchmark internal 4 4 64 2048
+          ./benchmarks/executor/concurrency-executor-benchmark public 4 4 64 2048
 
       - name: Portable parking smoke and metrics (not a fixed performance gate)
         shell: bash
@@ -162,6 +164,8 @@ jobs:
           dub build --root=benchmarks/executor --build=release --compiler="$DC" --force
           ./benchmarks/executor/concurrency-executor-benchmark internal 4 4 1024
           ./benchmarks/executor/concurrency-executor-benchmark public 4 4 1024
+          ./benchmarks/executor/concurrency-executor-benchmark internal 4 4 64 2048
+          ./benchmarks/executor/concurrency-executor-benchmark public 4 4 64 2048
 
       - name: Portable parking smoke and metrics (not a fixed performance gate)
         shell: bash
