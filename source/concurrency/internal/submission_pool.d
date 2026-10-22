@@ -39,7 +39,8 @@ import core.thread :
     Thread;
 
 import concurrency.internal.lifecycle :
-    LifecycleFailure, lifecycleFailStop, WorkerSelfJoinException;
+    LifecycleFailure, lifecycleFailStop;
+import concurrency.errors : WorkerSelfJoinException;
 
 // D thread-local identity: installed once at worker entry, cleared at exit.
 // No identity lookup is added to the per-task scheduling hot path.

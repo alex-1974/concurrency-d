@@ -3,7 +3,7 @@ module concurrency.tests.m0_lifecycle;
 import concurrency.internal.owned_task : OwnedTaskExecutor;
 import concurrency.internal.submission_pool : SubmissionWorkerPool, SubmissionResult;
 import concurrency.internal.task_record : TaskHeader, TaskRef;
-import concurrency.internal.lifecycle : WorkerSelfJoinException;
+import concurrency.errors : WorkerSelfJoinException;
 import core.atomic : atomicLoad, atomicStore, MemoryOrder;
 import core.thread : Thread;
 import core.time : MonoTime, dur;
@@ -184,6 +184,11 @@ void main(string[] args)
             job.gate = gate;
             auto handle = executor.submit(job);
             gate.untilEntered(); // A real worker/record is live at the fault.
+        }
+        if (args.length > 2 && args[2] == "result-failure")
+        {
+            auto failed = executor.submit(ExceptionJob.init);
+            failed.get(); // Outcome-publication failure must terminate, not hang.
         }
         executor.closeAndJoin();
         writeln("M0_FATAL_TEST_UNEXPECTED_RETURN");

@@ -18,3 +18,12 @@ configuration "parking-benchmark" {
     importPaths "source" "benchmarks/parking"
     targetName "concurrency-parking-benchmark"
 }
+
+// Same-work public facade versus its actual internal owner; diagnostic only.
+configuration "executor-benchmark" {
+    targetType "executable"
+    mainSourceFile "benchmarks/executor/main.d"
+    sourcePaths "source" "benchmarks/executor"
+    importPaths "source" "benchmarks/executor"
+    targetName "concurrency-executor-benchmark"
+}

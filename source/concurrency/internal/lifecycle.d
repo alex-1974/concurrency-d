@@ -4,15 +4,6 @@ module concurrency.internal.lifecycle;
 import core.stdc.stdio : fputs, fflush, stderr;
 import core.stdc.stdlib : abort;
 
-/** Misuse rejected before admission/close state changes or native join. */
-package(concurrency) final class WorkerSelfJoinException : Exception
-{
-    this()
-    {
-        super("an executor worker cannot close and join its own pool");
-    }
-}
-
 package(concurrency) enum LifecycleFailure
 {
     start,

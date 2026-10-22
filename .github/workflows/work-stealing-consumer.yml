@@ -6,20 +6,30 @@ on:
       - develop
     paths:
       - "dub.sdl"
-      - "source/concurrency/internal/**"
+      - "source/concurrency/**"
+      - "tests/public_api/**"
+      - "examples/cpu-executor/**"
+      - "tools/validation/m0_public_api.py"
+      - "tools/validation/m0_public_path.py"
       - "tests/lifecycle/**"
       - "tools/validation/m0_lifecycle.py"
       - "benchmarks/parking/**"
+      - "benchmarks/executor/**"
       - ".github/workflows/work-stealing-consumer.yml"
   push:
     branches:
       - develop
     paths:
       - "dub.sdl"
-      - "source/concurrency/internal/**"
+      - "source/concurrency/**"
+      - "tests/public_api/**"
+      - "examples/cpu-executor/**"
+      - "tools/validation/m0_public_api.py"
+      - "tools/validation/m0_public_path.py"
       - "tests/lifecycle/**"
       - "tools/validation/m0_lifecycle.py"
       - "benchmarks/parking/**"
+      - "benchmarks/executor/**"
       - ".github/workflows/work-stealing-consumer.yml"
   workflow_dispatch:
 
@@ -62,9 +72,24 @@ jobs:
         shell: bash
         run: python3 tools/validation/m0_lifecycle.py "$DC"
 
+      - name: Public executor consumers and compile-negative contract
+        shell: bash
+        run: python3 tools/validation/m0_public_api.py "$DC"
+
       - name: Release build
         shell: bash
         run: dub build --build=release --compiler="$DC" --force
+
+      - name: Public Ddoc generation
+        shell: bash
+        run: dub build --build=docs --compiler="$DC" --force
+
+      - name: Same-work public/internal executor smoke (no timing threshold)
+        shell: bash
+        run: |
+          dub build --config=executor-benchmark --build=release --compiler="$DC" --force
+          ./concurrency-executor-benchmark internal 4 4 1024
+          ./concurrency-executor-benchmark public 4 4 1024
 
       - name: Portable parking smoke and metrics (not a fixed performance gate)
         shell: bash
@@ -101,9 +126,24 @@ jobs:
         shell: bash
         run: python3 tools/validation/m0_lifecycle.py "$DC"
 
+      - name: Public executor consumers and compile-negative contract
+        shell: bash
+        run: python3 tools/validation/m0_public_api.py "$DC"
+
       - name: Release build
         shell: bash
         run: dub build --build=release --compiler="$DC" --force
+
+      - name: Public Ddoc generation
+        shell: bash
+        run: dub build --build=docs --compiler="$DC" --force
+
+      - name: Same-work public/internal executor smoke (no timing threshold)
+        shell: bash
+        run: |
+          dub build --config=executor-benchmark --build=release --compiler="$DC" --force
+          ./concurrency-executor-benchmark internal 4 4 1024
+          ./concurrency-executor-benchmark public 4 4 1024
 
       - name: Portable parking smoke and metrics (not a fixed performance gate)
         shell: bash

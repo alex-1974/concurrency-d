@@ -66,6 +66,9 @@ def prepare(folder, fault):
         pool = once(pool, '        if (!_inbox.isDrained())', '        if (true) // synthetic failed drain invariant')
     elif fault == 'owner':
         owner = once(owner, '            _pool.closeAndJoin();', '            throw new Exception("M0 injected owner shutdown failure");')
+    elif fault == 'result-failure':
+        owner = once(owner, '                record.cell.fail(failure);',
+                     '                throw new Exception("M0 injected outcome publication failure");')
     elif fault == 'owner-setup':
         owner = once(owner, '        _lifecycleChanged = new Condition(_mutex);',
                      '        throw new Exception("M0 injected before launch");')
@@ -108,7 +111,7 @@ def main():
             execute([str(folder / 'm0-lifecycle-probe')], marker='M0_LIFECYCLE_PASS', timeout=30)
             print('M0_NORMAL_PASS mode=' + mode, flush=True)
             # Rebuild only the source delta for each fault; all run separately.
-            for fault in ['start', 'join', 'close', 'worker', 'returned-worker-error', 'drain', 'owner', 'construction-0', 'construction-1', 'owner-setup']:
+            for fault in ['start', 'join', 'close', 'worker', 'returned-worker-error', 'drain', 'owner', 'result-failure', 'construction-0', 'construction-1', 'owner-setup']:
                 # Restore exact current production sources before each overlay.
                 # prepare() also initializes the descriptor, so use a separate
                 # pristine temporary fixture then transfer its mutated sources.
@@ -127,7 +130,7 @@ def main():
                     if output.count('M0_PROBE_CONFIRMED_JOIN') != expected_joins:
                         raise RuntimeError('partial-construction cleanup did not join every confirmed worker')
                 else:
-                    phase = 'WORKER' if fault == 'returned-worker-error' else fault.upper()
+                    phase = 'WORKER' if fault in ('returned-worker-error', 'result-failure') else fault.upper()
                     execute([str(folder / 'm0-lifecycle-probe'), 'fatal', fault], expected=-signal.SIGABRT,
                             marker='CONCURRENCY_FATAL_' + phase, timeout=15)
                 print(f'M0_FAULT_PASS mode={mode} fault={fault}', flush=True)
