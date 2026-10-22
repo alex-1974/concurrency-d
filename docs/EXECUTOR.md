@@ -142,6 +142,8 @@ present. The M1 Conditional candidate, source-pinned research and proposed
 TaskScope are not silently imported into this API.
 
 For an exploratory matched public/internal LDC release comparison, run
-`python3 tools/validation/m0_public_path.py NEW-RESULT-DIRECTORY`. It records
-alternating same-work pairs and checksums without a speed threshold. It does not
-replace thermally controlled native release-performance qualification.
+`python3 tools/validation/m0_public_path.py NEW-RESULT-DIRECTORY`. Use
+`--iterations 2048` to select a longer per-task CPU kernel; the default is 128.
+It records alternating same-work pairs and checksums without a speed threshold.
+It does not replace thermally controlled native release-performance
+qualification.

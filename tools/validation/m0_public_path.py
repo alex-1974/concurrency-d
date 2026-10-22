@@ -19,9 +19,12 @@ def main():
     parser.add_argument('--compiler', default='ldc2')
     parser.add_argument('--pairs', type=int, default=8)
     parser.add_argument('--tasks', type=int, default=16384)
+    parser.add_argument('--iterations', type=int, default=128,
+                        help='integer-mixing operations per task (1..1000000)')
     args = parser.parse_args()
-    if not Path(args.compiler).name.startswith('ldc') or args.pairs < 1 or not 4 <= args.tasks <= 2**32 - 1:
-        parser.error('requires LDC, positive pair count, and 4..uint.max tasks')
+    if (not Path(args.compiler).name.startswith('ldc') or args.pairs < 1
+            or not 4 <= args.tasks <= 2**32 - 1 or not 1 <= args.iterations <= 1_000_000):
+        parser.error('requires LDC, positive pair count, 4..uint.max tasks, and 1..1000000 iterations')
     args.output.mkdir(parents=True, exist_ok=False)
     out = args.output.resolve()
     (out / 'run_state.txt').write_text('INCOMPLETE\n')
@@ -34,7 +37,7 @@ def main():
         'worktree': capture(['git', 'status', '--porcelain=v1', '-uno']),
         'compiler': capture([args.compiler, '--version']), 'dub': capture(['dub', '--version']),
         'platform': platform.platform(), 'pairs_per_scenario': args.pairs,
-        'tasks_per_process': args.tasks,
+        'tasks_per_process': args.tasks, 'kernel_iterations_per_task': args.iterations,
         'limits': ['single session; no thermal/frequency qualification',
                    'one same-work binary; owner startup/submission/results/join timed',
                    'no timing threshold; not a public release or speedup claim'],
@@ -50,22 +53,25 @@ def main():
     with (out / 'raw.log').open('x') as raw, (out / 'warmups.log').open('x') as warm:
         for producers, workers in [(1, 1), (4, 4)]:
             for arm in ['internal', 'public']:
-                warm.write(capture([str(binary), arm, str(producers), str(workers), str(args.tasks)]))
+                warm.write(capture([str(binary), arm, str(producers), str(workers),
+                                    str(args.tasks), str(args.iterations)]))
                 warm.flush()
             ratios = []
             for pair in range(1, args.pairs + 1):
                 values, checksums = {}, []
                 for arm in (['internal', 'public'] if pair % 2 else ['public', 'internal']):
-                    line = capture([str(binary), arm, str(producers), str(workers), str(args.tasks)]).strip()
+                    line = capture([str(binary), arm, str(producers), str(workers),
+                                    str(args.tasks), str(args.iterations)]).strip()
                     raw.write(line + '\n'); raw.flush()
-                    match = re.fullmatch(r'PUBLIC_PATH_DIAGNOSTIC arm=(\w+) producers=(\d+) workers=(\d+) tasks=(\d+) elapsed_ns=(\d+) checksum=(\d+)', line)
-                    if not match or (match[1], int(match[2]), int(match[3]), int(match[4])) != (arm, producers, workers, args.tasks):
+                    match = re.fullmatch(r'PUBLIC_PATH_DIAGNOSTIC arm=(\w+) producers=(\d+) workers=(\d+) tasks=(\d+) iterations=(\d+) elapsed_ns=(\d+) checksum=(\d+)', line)
+                    if not match or (match[1], int(match[2]), int(match[3]), int(match[4]), int(match[5])) != (arm, producers, workers, args.tasks, args.iterations):
                         raise RuntimeError('invalid diagnostic row: ' + line)
-                    elapsed, checksum = int(match[5]), int(match[6])
+                    elapsed, checksum = int(match[6]), int(match[7])
                     if elapsed <= 0: raise RuntimeError('invalid timing')
                     values[arm] = elapsed; checksums.append(checksum)
                     rows.append(dict(producers=producers, workers=workers, tasks=args.tasks,
-                                     pair=pair, arm=arm, elapsed_ns=elapsed, checksum=checksum))
+                                     iterations=args.iterations, pair=pair, arm=arm,
+                                     elapsed_ns=elapsed, checksum=checksum))
                 if checksums[0] != checksums[1]: raise RuntimeError('arm checksum mismatch')
                 ratios.append(values['public'] / values['internal'])
             summaries.append(dict(producers=producers, workers=workers,
