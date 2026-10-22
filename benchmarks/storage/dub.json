@@ -1,0 +1,12 @@
+{
+  "name": "concurrency-task-storage-benchmark",
+  "targetType": "executable",
+  "sourcePaths": [],
+  "mainSourceFile": "main.d",
+  "targetName": "concurrency-task-storage-benchmark",
+  "dependencies": {
+    "concurrency-d": {
+      "path": "../.."
+    }
+  }
+}

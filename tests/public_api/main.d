@@ -1,11 +1,12 @@
 // Deliberately outside package concurrency: no internal imports or access.
 module public_api_consumer;
 
-import concurrency : Executor, TaskHandle, ExecutorClosedException, WorkerSelfJoinException;
+import concurrency : CancellationToken, Executor, TaskHandle, ExecutorClosedException, WorkerSelfJoinException;
 import core.atomic : atomicLoad, atomicStore, atomicFetchAdd, MemoryOrder;
 import core.thread : Thread;
 import core.time : MonoTime, dur;
 import core.memory : GC;
+import std.algorithm.mutation : move;
 import std.exception : enforce;
 import std.stdio : writeln;
 
@@ -40,8 +41,122 @@ private struct Hits
     int opCall() { atomicFetchAdd!(MemoryOrder.rel)(*hits, 1u); return 42; }
 }
 private int functionResult() { return 42; }
+private void noop() {}
 private struct Fail { void opCall() { throw new Exception("public task exception"); } }
+private struct InlineFail { void opCall() { throw new Exception("inline join failure"); } }
 private struct SelfClose { Executor executor; void opCall() { executor.closeAndJoin(); } }
+private struct SelfScope
+{
+    Executor executor;
+    shared uint* completed;
+    void opCall()
+    {
+        executor.withScope(3, (ref tasks) {
+            foreach (_; 0 .. 3)
+            {
+                Hits child;
+                child.hits = completed;
+                tasks.spawn(child);
+            }
+        });
+        recursiveScopeLeaves(executor, 2, completed);
+    }
+}
+private struct BorrowedScopeTask
+{
+    Gate gate;
+    int* target;
+    int opCall()
+    {
+        gate.wait();
+        *target = 73;
+        return 91;
+    }
+}
+
+private struct CooperativeStop
+{
+    CancellationToken token;
+    Gate* releaseAfterRequest;
+    shared uint* observed;
+    int* borrowed;
+
+    void opCall()
+    {
+        while (!token.isCancellationRequested())
+            Thread.yield();
+        atomicStore!(MemoryOrder.rel)(*observed, 1u);
+        releaseAfterRequest.wait();
+        *borrowed = 117;
+    }
+}
+
+private struct CancellationReceipt
+{
+    CancellationToken token;
+    shared uint* observed;
+
+    int opCall()
+    {
+        const requested = token.isCancellationRequested();
+        atomicStore!(MemoryOrder.rel)(*observed, requested ? 1u : 0u);
+        return requested ? 1 : 0;
+    }
+}
+
+private struct CancellationCompletionRace
+{
+    CancellationToken token;
+    Gate gate;
+    shared uint* calls;
+    shared uint* observed;
+
+    int opCall()
+    {
+        gate.wait();
+        const cancelled = token.isCancellationRequested();
+        atomicStore!(MemoryOrder.rel)(*observed, cancelled ? 1u : 0u);
+        atomicFetchAdd!(MemoryOrder.rel)(*calls, 1u);
+        return cancelled ? 701 : 703;
+    }
+}
+
+private struct ShutdownCancellation
+{
+    CancellationToken token;
+    shared uint* entered;
+    shared uint* calls;
+
+    int opCall()
+    {
+        atomicStore!(MemoryOrder.rel)(*entered, 1u);
+        const end = MonoTime.currTime + dur!"seconds"(5);
+        while (!token.isCancellationRequested())
+        {
+            enforce(MonoTime.currTime < end,
+                "shutdown child did not observe cancellation");
+            Thread.yield();
+        }
+        atomicFetchAdd!(MemoryOrder.rel)(*calls, 1u);
+        return 811;
+    }
+}
+
+private void recursiveScopeLeaves(
+    Executor executor,
+    size_t depth,
+    shared uint* completed)
+{
+    if (depth == 0)
+        return;
+
+    Hits leaf;
+    leaf.hits = completed;
+    executor.withScope(1, (ref tasks) {
+        tasks.spawn(leaf);
+        recursiveScopeLeaves(executor, depth - 1, completed);
+    });
+}
 
 private void resultsAndSelfClose()
 {
@@ -124,6 +239,331 @@ private void backpressure()
     limited.closeAndJoin();
 }
 
+private void scopedTasksAndUnwind()
+{
+    auto executor = new Executor(2, 4, 16);
+    scope(exit) executor.closeAndJoin();
+
+    // A body exception must not let borrowed caller storage expire while an
+    // accepted child can still write through its captured pointer.
+    int borrowed;
+    auto gate = new Gate;
+    TaskHandle!int completed;
+    bool bodyFailureObserved;
+    try
+    {
+        executor.withScope(4, (ref tasks) {
+            BorrowedScopeTask job;
+            job.gate = gate;
+            job.target = &borrowed;
+            completed = tasks.spawn(job);
+            gate.untilEntered();
+            gate.release();
+            throw new Exception("scope body failure");
+        });
+    }
+    catch (Exception error)
+    {
+        bodyFailureObserved = error.msg == "scope body failure";
+    }
+    enforce(bodyFailureObserved && borrowed == 73,
+        "scope returned before borrowed child or lost the body exception");
+    enforce(completed.get() == 91, "scope child result was lost");
+
+    TaskHandle!void voidResult;
+    executor.withScope(1, (ref tasks) {
+        voidResult = tasks.spawn(&noop);
+    });
+    voidResult.get();
+
+    // Join drains every child before propagating a task error.
+    shared uint ran;
+    Hits increment;
+    increment.hits = &ran;
+    bool childFailureObserved;
+    try
+    {
+        executor.withScope(4, (ref tasks) {
+            tasks.spawn(increment);
+            tasks.spawn(Fail.init);
+            tasks.spawn(increment);
+        });
+    }
+    catch (Exception error)
+    {
+        childFailureObserved = error.msg == "public task exception";
+    }
+    enforce(childFailureObserved && atomicLoad!(MemoryOrder.acq)(ran) == 2,
+        "scope did not drain siblings before propagating child failure");
+
+    bool capacityObserved;
+    try
+    {
+        executor.withScope(1, (ref tasks) {
+            tasks.spawn(&functionResult);
+            tasks.spawn(&functionResult);
+        });
+    }
+    catch (Exception error)
+    {
+        capacityObserved = error.msg == "scope maxTasks exceeded";
+    }
+    enforce(capacityObserved, "scope maxTasks was not enforced");
+
+    // Nested lexical groups may be opened by the external controller; each
+    // group still drains its own children before returning to its parent.
+    shared uint nestedCompleted;
+    Hits outerChild;
+    outerChild.hits = &nestedCompleted;
+    Hits innerChild;
+    innerChild.hits = &nestedCompleted;
+    executor.withScope(2, (ref outer) {
+        outer.spawn(outerChild);
+        executor.withScope(1, (ref inner) {
+            inner.spawn(innerChild);
+        });
+    });
+    enforce(atomicLoad!(MemoryOrder.acq)(nestedCompleted) == 2,
+        "nested lexical scopes did not drain both child groups");
+
+    // Moving the public view must not move the join obligation out of the
+    // withScope frame. The frame retains its own reference to the state.
+    int movedBorrowed;
+    auto movedGate = new Gate;
+    BorrowedScopeTask movedChild;
+    movedChild.gate = movedGate;
+    movedChild.target = &movedBorrowed;
+    auto movedReleaser = new Thread({
+        movedGate.untilEntered();
+        movedGate.release();
+    });
+    movedReleaser.start();
+    executor.withScope(1, (ref tasks) {
+        auto moved = move(tasks);
+        moved.spawn(movedChild);
+    });
+    movedReleaser.join();
+    enforce(movedBorrowed == 73,
+        "moving the TaskScope view bypassed the borrowed lifetime join");
+
+    recursiveScopeLeaves(executor, 3, &nestedCompleted);
+    enforce(atomicLoad!(MemoryOrder.acq)(nestedCompleted) == 5,
+        "recursive lexical scopes lost a child");
+
+    // Two-way join returns typed values, handles void on either side, and
+    // drains the forked child if the inline branch throws.
+    Value leftValue;
+    leftValue.value = 13;
+    auto pair = executor.join(leftValue, &functionResult);
+    enforce(pair.left == 39 && pair.right == 42,
+        "fork-join lost or mis-typed a value result");
+    auto rightOnly = executor.join(&noop, &functionResult);
+    enforce(rightOnly.right == 42, "fork-join mishandled a void left result");
+    auto leftOnly = executor.join(&functionResult, &noop);
+    enforce(leftOnly.left == 42, "fork-join mishandled a void right result");
+    executor.join(&noop, &noop);
+
+    shared uint inlineFailureDrain;
+    Hits joinChild;
+    joinChild.hits = &inlineFailureDrain;
+    bool inlineFailureObserved;
+    try
+        executor.join(joinChild, InlineFail.init);
+    catch (Exception error)
+        inlineFailureObserved = error.msg == "inline join failure";
+    enforce(inlineFailureObserved &&
+            atomicLoad!(MemoryOrder.acq)(inlineFailureDrain) == 1,
+        "fork-join returned before draining its child after inline failure");
+
+    bool forkedFailureObserved;
+    try
+        executor.join(Fail.init, &noop);
+    catch (Exception error)
+        forkedFailureObserved = error.msg == "public task exception";
+    enforce(forkedFailureObserved,
+        "fork-join lost the forked child's failure");
+
+    // A worker recursively opens scopes. With one worker, only cooperative
+    // helping can run each nested child and complete the outer task.
+    auto singleWorker = new Executor(1, 1, 8);
+    scope(exit) singleWorker.closeAndJoin();
+    shared uint workerRecursiveCompleted;
+    SelfScope nested;
+    nested.executor = singleWorker;
+    nested.completed = &workerRecursiveCompleted;
+    auto workerScope = singleWorker.submit(nested);
+    workerScope.get();
+    enforce(atomicLoad!(MemoryOrder.acq)(workerRecursiveCompleted) == 5,
+        "single worker did not help admitted or recursive scoped children");
+    singleWorker.closeAndJoin();
+}
+
+private void cooperativeCancellation()
+{
+    CancellationToken inert;
+    enforce(!inert.isCancellationRequested(), "default token was not inert");
+    inert.requestCancellation();
+
+    auto executor = new Executor(1, 4, 4);
+    scope(exit) executor.closeAndJoin();
+
+    auto requestObserved = new Gate;
+    shared uint observed;
+    int borrowed;
+    executor.withScope(1, (ref tasks) {
+        scope(exit) requestObserved.release();
+        auto token = tasks.cancellationToken();
+        CooperativeStop child;
+        child.token = token;
+        child.releaseAfterRequest = &requestObserved;
+        child.observed = &observed;
+        child.borrowed = &borrowed;
+        tasks.spawn(child);
+
+        tasks.requestCancellation();
+        token.requestCancellation(); // repeated requests are harmless
+        const end = MonoTime.currTime + dur!"seconds"(5);
+        while (atomicLoad!(MemoryOrder.acq)(observed) == 0)
+        {
+            enforce(MonoTime.currTime < end,
+                "child did not observe cooperative cancellation");
+            Thread.yield();
+        }
+        requestObserved.untilEntered();
+        requestObserved.release();
+    });
+
+    enforce(borrowed == 117,
+        "scope returned before cooperatively cancelled child quiesced");
+
+    // A request made before publication remains observable by a later child.
+    shared uint alreadyRequested;
+    TaskHandle!int preRequested;
+    executor.withScope(1, (ref tasks) {
+        auto token = tasks.cancellationToken();
+        tasks.requestCancellation();
+        CancellationReceipt child;
+        child.token = token;
+        child.observed = &alreadyRequested;
+        preRequested = tasks.spawn(child);
+    });
+    enforce(preRequested.get() == 1 &&
+        atomicLoad!(MemoryOrder.acq)(alreadyRequested) == 1,
+        "child published after cancellation missed the request");
+
+    // Hold the sole worker so cancellation is requested while the child is
+    // accepted but queued; it must still run and observe the signal.
+    auto queuedGate = new Gate;
+    scope(exit) queuedGate.release();
+    Block blocker;
+    blocker.gate = queuedGate;
+    auto blockedWorker = executor.submit(blocker);
+    queuedGate.untilEntered();
+    shared uint queuedObserved;
+    TaskHandle!int queuedChild;
+    executor.withScope(1, (ref tasks) {
+        CancellationReceipt child;
+        child.token = tasks.cancellationToken();
+        child.observed = &queuedObserved;
+        queuedChild = tasks.spawn(child);
+        tasks.requestCancellation();
+        queuedGate.release();
+    });
+    blockedWorker.get();
+    enforce(queuedChild.get() == 1 &&
+        atomicLoad!(MemoryOrder.acq)(queuedObserved) == 1,
+        "queued child did not observe cancellation or was not joined");
+
+    // Release and cancellation become visible concurrently. Cancellation is
+    // a signal, not a competing result publisher: the callable runs once and
+    // its one selected value remains stable across repeated get calls.
+    foreach (_; 0 .. 64)
+    {
+        auto finish = new Gate;
+        shared uint calls;
+        shared uint raceObserved;
+        TaskHandle!int raced;
+        CancellationToken escaped;
+        executor.withScope(1, (ref tasks) {
+            escaped = tasks.cancellationToken();
+            CancellationCompletionRace child;
+            child.token = escaped;
+            child.gate = finish;
+            child.calls = &calls;
+            child.observed = &raceObserved;
+            raced = tasks.spawn(child);
+            finish.untilEntered();
+
+            auto requester = new Thread({
+                while (atomicLoad!(MemoryOrder.acq)(finish.released) == 0)
+                    Thread.yield();
+                escaped.requestCancellation();
+            });
+            requester.start();
+            finish.release();
+            requester.join();
+        });
+
+        const value = raced.get();
+        enforce((value == 701 || value == 703) && raced.get() == value,
+            "cancel/complete race did not preserve one stable result");
+        enforce(atomicLoad!(MemoryOrder.acq)(calls) == 1u,
+            "cancel/complete race executed the callback more than once");
+        enforce((value == 701) ==
+                (atomicLoad!(MemoryOrder.acq)(raceObserved) == 1u),
+            "cancel/complete result disagreed with the callback observation");
+        enforce(escaped.isCancellationRequested(),
+            "escaped token lost its published request after scope exit");
+    }
+}
+
+private void cancellationDuringShutdown()
+{
+    foreach (_; 0 .. 16)
+    {
+        auto executor = new Executor(1, 2, 4);
+        TaskHandle!int completed;
+        Thread closer;
+        shared uint childEntered;
+        shared uint calls;
+        shared uint closerStarted;
+        shared uint closerFinished;
+
+        executor.withScope(1, (ref tasks) {
+            ShutdownCancellation child;
+            child.token = tasks.cancellationToken();
+            child.entered = &childEntered;
+            child.calls = &calls;
+            completed = tasks.spawn(child);
+
+            const end = MonoTime.currTime + dur!"seconds"(5);
+            while (atomicLoad!(MemoryOrder.acq)(childEntered) == 0u)
+            {
+                enforce(MonoTime.currTime < end,
+                    "shutdown cancellation child did not start");
+                Thread.yield();
+            }
+
+            closer = new Thread({
+                atomicStore!(MemoryOrder.rel)(closerStarted, 1u);
+                executor.closeAndJoin();
+                atomicStore!(MemoryOrder.rel)(closerFinished, 1u);
+            });
+            closer.start();
+            while (atomicLoad!(MemoryOrder.acq)(closerStarted) == 0u)
+                Thread.yield();
+            tasks.requestCancellation();
+        });
+
+        closer.join();
+        enforce(completed.get() == 811 && completed.get() == 811,
+            "shutdown cancellation lost the task's stable result");
+        enforce(atomicLoad!(MemoryOrder.acq)(calls) == 1u &&
+                atomicLoad!(MemoryOrder.acq)(closerFinished) == 1u,
+            "shutdown cancellation duplicated work or failed to join");
+    }
+}
+
 private final class Graph
 {
     int number;
@@ -171,6 +611,33 @@ private void gcAndDroppedHandles()
     foreach (ref receipt; receipts)
         enforce(atomicLoad!(MemoryOrder.acq)(receipt) == 6, "dropped-handle graph lost or duplicated");
     blocker.get();
+
+    // A scoped task keeps the same transitive GC graph reachable even when
+    // its individual handle is dropped and collection runs before dispatch.
+    auto scopedExecutor = new Executor(1, 4, 8);
+    scope(exit) scopedExecutor.closeAndJoin();
+    auto scopedGate = new Gate;
+    Block scopedBlocker;
+    scopedBlocker.gate = scopedGate;
+    auto scopedBlocked = scopedExecutor.submit(scopedBlocker);
+    scopedGate.untilEntered();
+    shared uint scopedReceipt;
+    scopedExecutor.withScope(1, (ref tasks) {
+        GraphJob job;
+        job.payload = new Graph(4, new Graph(5, new Graph(6)));
+        job.receipt = &scopedReceipt;
+        auto dropped = tasks.spawn(job);
+        dropped = null;
+        foreach (_; 0 .. 4)
+            GC.collect();
+        enforce(atomicLoad!(MemoryOrder.acq)(scopedReceipt) == 0u,
+            "scoped graph ran before blocker release");
+        scopedGate.release();
+    });
+    scopedBlocked.get();
+    enforce(atomicLoad!(MemoryOrder.acq)(scopedReceipt) == 15u,
+        "scoped dropped-handle GC graph was not retained through join");
+    scopedExecutor.closeAndJoin();
 }
 private Thread producer(Executor executor, shared uint[] hits, shared uint[] accepted,
     size_t first, size_t last)
@@ -225,6 +692,9 @@ void main()
 {
     resultsAndSelfClose();
     backpressure();
+    scopedTasksAndUnwind();
+    cooperativeCancellation();
+    cancellationDuringShutdown();
     gcAndDroppedHandles();
     concurrentClose();
     // Long-lived executor must re-use its retained budget without public sweep.
@@ -241,5 +711,5 @@ void main()
         catch (Exception) { rejected = true; }
         enforce(rejected, "invalid limits accepted");
     }
-    writeln("PUBLIC_API_PASS typed_void_error=true backpressure=ingress,records gc_graphs=8 close_races=8 budget_reuse=256");
+    writeln("PUBLIC_API_PASS typed_void_error=true backpressure=ingress,records scopes=borrow,unwind,errors,capacity,nested,recursion,moved_view,gc_graph fork_join=typed,void,inline_failure_drain worker_help=admission,join cancellation=running,prepublish,queued,complete_race64,shutdown16 gc_graphs=owned8,scoped1 close_races=8 budget_reuse=256");
 }
