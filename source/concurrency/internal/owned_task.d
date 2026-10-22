@@ -35,6 +35,8 @@ import core.sync.mutex :
 import core.thread :
     Thread;
 
+import concurrency.internal.lifecycle : LifecycleFailure, lifecycleFailStop;
+
 import std.traits :
     ReturnType;
 
@@ -260,19 +262,20 @@ package(concurrency) final class OwnedTaskExecutor
     // _mutex serializes admission against shutdown. Exactly one caller
     // performs the worker join; other closers wait for the same outcome.
     private Lifecycle _lifecycle;
-    private Throwable _shutdownFailure;
 
     this(size_t workers, size_t ingressCapacity, size_t maxRetained = 4096)
     {
         if (maxRetained == 0)
             throw new Exception("maxRetained must be positive");
 
-        _pool = new SubmissionWorkerPool(
-            workers, ingressCapacity, &markReturned);
+        // Finish all owner allocations before any native worker can start.
+        // A setup failure may then unwind without leaking a live idle pool.
         _mutex = new Mutex();
         _lifecycleChanged = new Condition(_mutex);
         _lifecycle = Lifecycle.running;
         _maxRetained = maxRetained;
+        _pool = new SubmissionWorkerPool(
+            workers, ingressCapacity, &markReturned);
     }
 
     /**
@@ -399,14 +402,18 @@ package(concurrency) final class OwnedTaskExecutor
      * Idempotent, thread-safe draining shutdown for external controller
      * threads. The first caller linearizes RUNNING -> DRAINING against task
      * admission and performs the only Thread.join sequence. Other callers
-     * wait for STOPPED and observe the same shutdown outcome.
+     * wait for STOPPED, which is published only after successful native join.
+     * Uncertain native lifetime is process-fatal, not a recoverable STOPPED.
      *
-     * A task running on this executor must not call closeAndJoin(): joining
-     * its own worker would deadlock. Do not race destruction/GC collection
+     * A task running on this executor receives WorkerSelfJoinException before
+     * the lifecycle lock/state transition. Do not race destruction/GC collection
      * of this executor with active methods.
      */
     void closeAndJoin()
     {
+        // Reject a worker even when another controller is already draining:
+        // waiting on that controller here would deadlock its native join.
+        _pool.requireExternalController();
         synchronized (_mutex)
         {
             final switch (_lifecycle)
@@ -418,48 +425,36 @@ package(concurrency) final class OwnedTaskExecutor
                 case Lifecycle.draining:
                     while (_lifecycle != Lifecycle.stopped)
                         _lifecycleChanged.wait();
-
-                    if (_shutdownFailure !is null)
-                        throw _shutdownFailure;
                     return;
 
                 case Lifecycle.stopped:
-                    if (_shutdownFailure !is null)
-                        throw _shutdownFailure;
                     return;
             }
         }
 
         // Joining with _mutex held would block other controller threads
         // (and any final admission already linearized before shutdown).
-        Throwable failure;
         try
         {
             _pool.closeAndJoin();
         }
-        catch (Throwable error)
+        catch (Throwable)
         {
-            failure = error;
+            // Defensive boundary: a pool shutdown failure is not proof of
+            // quiescence. Never publish stopped or allow owner-stack unwind.
+            lifecycleFailStop(LifecycleFailure.owner);
         }
 
         synchronized (_mutex)
         {
-            if (failure is null)
-            {
-                // All worker callbacks have returned by now. Clearing
-                // these references cannot invalidate a queued record.
-                foreach (ref entry; _retained)
-                    entry = RetainedTask.init;
-                _retained.length = 0;
-            }
+            // Every worker has positively joined; final callbacks returned.
+            foreach (ref entry; _retained)
+                entry = RetainedTask.init;
+            _retained.length = 0;
 
-            _shutdownFailure = failure;
             _lifecycle = Lifecycle.stopped;
             _lifecycleChanged.notifyAll();
         }
-
-        if (failure !is null)
-            throw failure;
     }
 
     /** Diagnostic for lifecycle tests, not yet part of the public API. */

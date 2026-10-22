@@ -26,8 +26,10 @@ The transition to DRAINING is the admission **linearization point**.
 - Shutdown **drains**, not cancels, all accepted tasks.
 - Exactly one external controller thread performs the blocking join.
   Concurrent or repeated callers wait for STOPPED on the condition and
-  receive the same shutdown result (if joining itself fails).
-- The executor retains owned task nodes until join finishes. Separate
+  observe the same successful joined state. Uncertain native startup/join is
+  process-fatal in the current implementation candidate, not recoverable STOPPED.
+- The executor retains unreturned owned task nodes and reclaims them using
+  returned markers; successful join clears any final retained nodes. Separate
   `TaskHandle!R` result cells remain usable after shutdown and dropping
   a handle never cancels accepted work.
 
@@ -38,9 +40,10 @@ dispatch and result publication happen before the worker completion count
 increments. A result `get()` waits on its private condition variable and
 may return before the whole executor is shut down.
 
-`closeAndJoin` **must not be called from a task running in the same
-executor**: a worker cannot join itself. The current internal prototype
-also does not support destroying the executor while other methods or
+`closeAndJoin` from a task running in the same executor now throws
+`WorkerSelfJoinException` before the owned lifecycle lock/state transition,
+including when an external controller is already draining. The current internal
+prototype also does not support destroying the executor while other methods or
 worker threads still use it. These restrictions are explicit and are
 not concealed by an `@safe` public API promise.
 
@@ -60,15 +63,17 @@ queue path by this control-plane lifecycle change.
 
 ## Follow-up work
 
-- Worker creation failure injection, cleanup and whole-pool failure
-  propagation from issue #12;
+- See [native lifecycle boundary and worker self-close](m0-native-lifecycle-boundary.md)
+  for the current fail-stop implementation candidate, known pre-launch cleanup,
+  constructor ordering and bounded synthetic failure probes. Real OS failure
+  recovery and public release acceptance remain open;
 - no worker may call blocking `get` on an unmet result in a one-worker
   executor without a helping/wait strategy (document/specialize before
   public release);
 - full task-owned callable lifetime, safe cross-thread capture limits,
   and supported move-only results (#11/#17);
-- resource reclamation without retaining every completed node until
-  executor shutdown (#20).
+- remaining storage/performance work beyond the implemented returned-marker
+  reclamation (#20).
 
 This is a pragmatic internal lifecycle contract, not a lock-free or
 formal-verification exercise.

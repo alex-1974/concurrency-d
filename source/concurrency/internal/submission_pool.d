@@ -38,6 +38,13 @@ import core.sync.condition :
 import core.thread :
     Thread;
 
+import concurrency.internal.lifecycle :
+    LifecycleFailure, lifecycleFailStop, WorkerSelfJoinException;
+
+// D thread-local identity: installed once at worker entry, cleared at exit.
+// No identity lookup is added to the per-task scheduling hot path.
+private SubmissionWorkerPool currentWorkerPool;
+
 package(concurrency) enum SubmissionResult
 {
     accepted,
@@ -286,29 +293,81 @@ package(concurrency) final class SubmissionWorkerPool
             foreach (index; 0 .. workerCount)
             {
                 _workers[index] = makeWorker(index);
-                _workers[index].start();
+                startWorker(_workers[index]);
                 ++_started;
             }
         }
         catch (Throwable failure)
         {
-            // If startup partially succeeds, no tasks have been admitted.
-            // Close the inbox and join every successfully started thread.
-            _inbox.close();
-
-            foreach (index; 0 .. _started)
-                _workers[index].join();
+            // An allocation/worker-construction failure outside startWorker
+            // is known to precede the next native launch. Join confirmed workers
+            // before propagating it. startWorker itself never unwinds uncertainly.
+            if (_started != 0)
+            {
+                closeInbox();
+                joinStartedWorkers();
+            }
 
             throw failure;
         }
     }
 
-    // Separate invocation frame per worker is necessary: each deque must
-    // have exactly one owner. Never capture a reused foreach slot here.
+    private void startWorker(Thread worker)
+    {
+        try
+        {
+            worker.start();
+        }
+        catch (Throwable)
+        {
+            // start can throw after native launch, before _started increments.
+            lifecycleFailStop(LifecycleFailure.start);
+        }
+    }
+
+    private void closeInbox()
+    {
+        try
+            _inbox.close();
+        catch (Throwable)
+            lifecycleFailStop(LifecycleFailure.close);
+    }
+
+    private void joinStartedWorkers()
+    {
+        foreach (index; 0 .. _started)
+        {
+            Throwable unhandled;
+            try
+                unhandled = _workers[index].join(false);
+            catch (Throwable)
+                lifecycleFailStop(LifecycleFailure.join);
+
+            // A returned worker failure is distinct from a native join error.
+            // Neither is an ordinary task Exception at this pool boundary.
+            if (unhandled !is null)
+                lifecycleFailStop(LifecycleFailure.worker);
+        }
+    }
+
+    /** Must run before an owned executor enters its draining state/wait. */
+    void requireExternalController()
+    {
+        if (currentWorkerPool is this)
+            throw new WorkerSelfJoinException();
+    }
+
+    // Separate invocation frame per worker preserves single deque ownership.
     private Thread makeWorker(size_t workerIndex)
     {
         return new Thread({
-            workerLoop(workerIndex);
+            auto previous = currentWorkerPool;
+            currentWorkerPool = this;
+            scope(exit) currentWorkerPool = previous;
+            try
+                workerLoop(workerIndex);
+            catch (Throwable)
+                lifecycleFailStop(LifecycleFailure.worker);
         });
     }
 
@@ -326,12 +385,14 @@ package(concurrency) final class SubmissionWorkerPool
     /** Blocks until all admitted tasks have completed and all workers exit. */
     void closeAndJoin()
     {
-        _inbox.close();
+        requireExternalController();
+        closeInbox();
 
-        // Must be called by the controlling thread; concurrent joins of the
-        // same Thread objects are not an admitted operation in this slice.
-        foreach (index; 0 .. _started)
-            _workers[index].join();
+        // Concurrent raw-pool joins remain excluded; OwnedTaskExecutor
+        // serializes external close callers before entering this method.
+        joinStartedWorkers();
+        if (!_inbox.isDrained())
+            lifecycleFailStop(LifecycleFailure.drain);
     }
 
     size_t acceptedCount()

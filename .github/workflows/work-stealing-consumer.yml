@@ -7,6 +7,8 @@ on:
     paths:
       - "dub.sdl"
       - "source/concurrency/internal/**"
+      - "tests/lifecycle/**"
+      - "tools/validation/m0_lifecycle.py"
       - "benchmarks/parking/**"
       - ".github/workflows/work-stealing-consumer.yml"
   push:
@@ -15,6 +17,8 @@ on:
     paths:
       - "dub.sdl"
       - "source/concurrency/internal/**"
+      - "tests/lifecycle/**"
+      - "tools/validation/m0_lifecycle.py"
       - "benchmarks/parking/**"
       - ".github/workflows/work-stealing-consumer.yml"
   workflow_dispatch:
@@ -54,6 +58,10 @@ jobs:
         shell: bash
         run: dub test --compiler="$DC" --force
 
+      - name: M0 lifecycle and isolated native-failure boundary
+        shell: bash
+        run: python3 tools/validation/m0_lifecycle.py "$DC"
+
       - name: Release build
         shell: bash
         run: dub build --build=release --compiler="$DC" --force
@@ -88,6 +96,10 @@ jobs:
       - name: Unit tests
         shell: bash
         run: dub test --compiler="$DC" --force
+
+      - name: M0 lifecycle and isolated native-failure boundary
+        shell: bash
+        run: python3 tools/validation/m0_lifecycle.py "$DC"
 
       - name: Release build
         shell: bash
