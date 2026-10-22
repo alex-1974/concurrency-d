@@ -141,8 +141,9 @@ cancellation is not converted into a separate cancelled outcome.
 This is an initial bounded API candidate. It does not make arbitrary captures
 safe, does not prevent a caller from deliberately escaping borrowed pointers
 through `@system`, and has no v0.1.0 compatibility promise. Its compiler and
-runtime gates remain open in
-[ADR-0002](adr/0002-task-lifetime-families.md).
+runtime gates are recorded in
+[ADR-0002](adr/0002-task-lifetime-families.md); the provisional public contract
+still awaits release acceptance.
 
 Keep the executor itself explicitly rooted through closeAndJoin. A handle owns
 its result/error cell independently of the task record, but does not substitute
@@ -220,9 +221,9 @@ are checked; LDC also checks assertions-on -O3. CI pins DMD 2.111.0 and LDC 1.41
 and runs the same public gate on native ARM64. The gate includes the standalone
 recursive scoped fork-join example at `examples/nested-scopes`.
 
-A stable v0.1.0 release still requires exact-head CI and final
-archive/version/tag/publication checks. The scoped Dell XPS 15 / LDC 1.42
-public-path baseline passed the predeclared 10% bound for the two documented
+The v0.1.0 release passed exact-commit CI and archive/version/tag/publication
+checks. The scoped Dell XPS 15 / LDC 1.42 public-path baseline passed the
+predeclared 10% bound for the two documented
 kernels and 1P/1W plus 4P/4W scenarios; its machine-specific scope and result are
 in [the M0 qualification record](M0-PERFORMANCE-QUALIFICATION.md). That result
 is not a general performance guarantee. MIT and DUB license metadata are

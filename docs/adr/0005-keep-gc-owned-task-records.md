@@ -7,8 +7,9 @@
 ## Decision
 
 **KEEP** one address-stable GC class node per accepted owned or scoped task.
-The executor roots each node until its worker has returned from dispatch, then
-reclaims that root under its bounded retained-record budget.
+The executor roots each node through its worker's return from dispatch. A node
+becomes reclaimable at that point; the retained-record budget triggers sweeps,
+and shutdown clears any remaining roots.
 
 **REJECT for v0.2** stack-resident records in the general owned-task family.
 They cannot outlive submission or a dropped handle and therefore do not match
@@ -47,11 +48,11 @@ Its timed arm includes executor construction, task/result-cell allocation,
 dispatch, completion reads, post-dispatch shutdown, dropping roots and an
 explicit collection. Its retention arm blocks the only worker, drops every
 measured handle, forces collection and samples `GC.stats.usedSize` before and
-after retention while the executor must be the sole root of every queued node
-and graph. It reports
-producer-thread allocation and phase timings separately. GC used-byte deltas
-are observations, not thresholds: the collector may conservatively retain
-stack words, reclaim unrelated unreachable objects and reuse existing pages.
+after retention while the executor holds the required roots for queued nodes
+and graphs independently of the dropped handles. It reports producer-thread
+allocation and phase timings separately. GC used-byte deltas are observations,
+not thresholds: the collector may conservatively retain stack words, reclaim
+unrelated unreachable objects and reuse existing pages.
 
 Correctness gates additionally force collection while owned and scoped graph
 handles are dropped, verify the graph after dispatch, exercise bounded-budget

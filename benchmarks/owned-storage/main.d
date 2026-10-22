@@ -207,8 +207,10 @@ private RetentionSample retainedBytes(J)(size_t count)
         dropped = null;
     }
 
-    // Dropped handles cannot be the roots here: Executor must retain the
-    // queued nodes and every GraphJob's transitive class graph.
+    // Dropped handles cannot provide ownership here: Executor must retain
+    // queued nodes and every GraphJob's transitive class graph. The GC can
+    // also conservatively observe stale stack words, so byte counts alone
+    // are not a proof of unique roots.
     GC.collect();
     const retained = GC.stats().usedSize;
     gate.release();
