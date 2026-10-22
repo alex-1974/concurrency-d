@@ -1,87 +1,29 @@
 # Roadmap
 
-## R0 — Scheduler foundations
+## M0 — Public CPU executor candidate
 
-Research and benchmark the primitive mechanisms before freezing a public API.
+The current draft branch exposes a bounded CPU executor with typed task handles,
+explicit `closeAndJoin`, task-error delivery through handles, and an independent
+CPU/completion consumer. Submission is `@system`; capture lifetime and shared
+state remain the caller's responsibility. The candidate policy aborts on
+uncertain native worker lifetime. See [the API guide](docs/EXECUTOR.md).
 
-### R0.1 Work-stealing deque — qualified
+Release acceptance remains open until the exact-head DMD/LDC/native ARM64 CI
+passes, the lifecycle policy and public contract are accepted, a thermally
+qualified native public-path baseline is recorded, and version/archive/release
+checks are complete. License metadata and the MIT license file are present.
 
-Completed research established the bounded single-owner / multi-thief local
-worker queue contract, batch-steal behavior, overflow separation, safety
-boundary, scheduler-neighborhood performance, and native x86_64/AArch64
-evidence.
+## M1 — Ownership and scheduler research
 
-The reusable primitive is owned by `containers-d`. The selected production
-consumer dependency is:
+Detailed M1 work, including P42.20 and conditional notification experiments, is
+preserved in [concurrency-d-research](https://github.com/alex-1974/concurrency-d-research/tree/894cfe81bcf41ca88e20a418eb90d6f2de7c83f9).
+These results remain research until separately reviewed and accepted. No general
+`TaskScope`, conditional scheduler change, or broad performance claim is part of
+the M0 public candidate.
 
-```d
-containers.WorkStealingDeque!(T, Capacity)
-```
+## Longer-term directions
 
-from `containers-d 0.2.0`.
-
-`concurrency-d` retains scheduler policy, TaskRef/TaskRecord lifetime,
-victim selection, batch-use policy, overflow execution policy, parking/wake,
-and executor coordination.
-
-The original R0.1 implementation and P09-P16 evidence remain retained research
-references; production work must not duplicate the deque mechanics locally.
-
-### R0.2 Task representation
-
-Compare:
-
-- pointer-only task node;
-- pointer + execute-function TaskRef;
-- stack-resident structured tasks;
-- pooled task nodes.
-
-### R0.3 Worker scheduling
-
-Compare:
-
-- sticky/random victim selection;
-- bounded searching-worker counts;
-- continuation/direct-execution fast paths.
-
-### R0.4 Parking and wake-up
-
-Compare:
-
-- condition-variable baseline;
-- two-phase wait protocol;
-- native platform primitives where justified.
-
-Measure both wake latency and idle CPU use.
-
-### R0.5 Allocation
-
-Compare:
-
-- GC allocation;
-- stack-resident tasks;
-- sharded task pools;
-- slab/chunk allocation;
-- GC-aware externally managed storage where required.
-
-## R1 — Minimal execution core
-
-Only after R0 evidence:
-
-- Scheduler;
-- WorkerPool;
-- Task;
-- TaskScope;
-- cancellation;
-- typed result/completion;
-- clean shutdown.
-
-## R2 — Consumers
-
-Validate with independent real consumers before stabilizing the API.
-
-Initial candidate consumer:
-
-- dcanvas.
-
-Other consumers are admitted only when they demonstrate genuine requirements.
+Potential follow-up areas include structured task lifetimes, cancellation,
+execution-context integration, alternative allocation strategies and additional
+consumers. Their scope and priority depend on M0 acceptance and demonstrated
+consumer needs.

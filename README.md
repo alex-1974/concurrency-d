@@ -1,55 +1,47 @@
 # concurrency-d
 
-`concurrency-d` is a high-performance generic concurrency and task-execution
-library for D.
+`concurrency-d` is a D library for CPU task execution. The current branch
+contains a version-zero public executor candidate; it is under review and is not
+a stable release.
 
-The project is currently in the research and architecture phase. A version-zero
-public CPU-executor candidate now exports `Executor`, `TaskHandle` and typed
-executor-use exceptions through `import concurrency`. It is not a stable release.
+The candidate exports `Executor`, typed `TaskHandle` results and executor-use
+exceptions through `import concurrency`. Submission is explicitly `@system`:
+callers must keep captures valid and synchronize shared state. Root the executor
+and call `closeAndJoin` explicitly. Uncertain native worker start/join and
+escaped scheduler failures use a process-fatal policy; the lifecycle contract
+remains under review.
 
-See [the public executor guide](docs/EXECUTOR.md) and the independent
-[CPU/completion example](https://github.com/alex-1974/concurrency-d/blob/feat/m0-public-executor/examples/cpu-executor/source/app.d). Submission is
-explicitly `@system`; callers remain responsible for capture lifetime and
-synchronization. Keep the executor rooted and explicitly `closeAndJoin` it.
-The candidate native-lifetime policy is process-fatal on uncertain start/join.
-
-From a repository checkout:
+See the [public executor guide](docs/EXECUTOR.md) and the
+[independent CPU/completion example](examples/cpu-executor/source/app.d). Run the
+example from the repository root:
 
 ```sh
 dub run --root=examples/cpu-executor --compiler=dmd
 dub run --root=examples/cpu-executor --compiler=ldc2 --build=release
 ```
 
+## Project status
+
+The draft M0 candidate combines the internal CPU executor with a small public
+facade, bounded admission and retained-task limits, explicit shutdown, and a
+public-only consumer example. DMD/LDC and native ARM64 CI gates are configured.
+The exact library CI for the current candidate is still pending. Native
+release-performance qualification, lifecycle-policy acceptance, and final
+release checks remain open. No stable release is available yet.
+
 ## Repository boundary
 
-Detailed research, experimental prototypes, raw measurements and historical
-variants live in [concurrency-d-research](https://github.com/alex-1974/concurrency-d-research).
-Its [provenance](https://github.com/alex-1974/concurrency-d-research/blob/main/PROVENANCE.md)
-records pinned library commits and verified file manifests. The library has no
-build or runtime dependency on the research repository.
+Detailed experiments, raw measurements and historical variants live in
+[concurrency-d-research](https://github.com/alex-1974/concurrency-d-research).
+Its [provenance and manifest](https://github.com/alex-1974/concurrency-d-research/blob/894cfe81bcf41ca88e20a418eb90d6f2de7c83f9/PROVENANCE.md)
+pin their sources and file identities. The library has no build or runtime
+dependency on that repository.
 
-This repository keeps production source, active regression/release gates,
+This repository keeps production source, active regression and release gates,
 maintained qualification benchmarks, examples, user documentation and concise
-architecture decisions. The consumer archive contains only the library and its
-small public documentation set. See the
-[research separation decision](https://github.com/alex-1974/concurrency-d/blob/feat/m0-public-executor/docs/adr/0001-research-repository.md)
-for the migration boundary and preserved history.
-
-Initial research focuses on:
-
-- typed tasks and type-erased scheduling boundaries;
-- structured concurrency and scoped task lifetime;
-- CPU worker pools;
-- work-stealing deques;
-- task allocation and recycling;
-- worker parking and wake-up;
-- cancellation;
-- execution-context abstraction;
-- optional future fiber scheduling.
-
-Performance is a primary design requirement. Mature C++ and Rust runtimes are
-used as independent implementation and benchmark references rather than as APIs
-to translate mechanically into D.
+architecture decisions. The
+[research separation decision](docs/adr/0001-research-repository.md) describes
+the migration boundary and preserved history.
 
 ## License
 

@@ -1,8 +1,10 @@
 # Public CPU executor — version-zero API candidate
 
-This candidate exports a small API through `import concurrency`. It is not a
-published/stable release. It builds on the separately reviewed M0 lifecycle
-boundary; the public release gate, license and package publication remain open.
+This draft candidate exports a small API through `import concurrency`. It is not
+a stable release. It builds on the M0 lifecycle implementation, whose fatal
+native-lifetime policy and public contract still need maintainer acceptance. MIT
+licensing and DUB license metadata are present; final archive and publication
+checks remain open.
 
 ## Quick start
 
@@ -132,11 +134,12 @@ Run `python3 tools/validation/m0_public_api.py dmd` (or `ldc2`). Debug and relea
 are checked; LDC also checks assertions-on -O3. CI pins DMD 2.111.0 and LDC 1.41.0
 and runs the same public gate on native ARM64.
 
-A stable v0.1 release still requires review/acceptance of the lifecycle and public
-contracts, a final public-path end-to-end baseline, license/package metadata,
-version/tag/publication checks and recorded release-gate acceptance. The M1
-Conditional candidate, source-pinned research and proposed TaskScope are not
-silently imported into this API.
+A stable v0.1 release still requires exact-head CI, maintainer review and
+acceptance of the lifecycle and public contracts, a thermally qualified native
+public-path end-to-end baseline, final archive/version/tag/publication checks,
+and recorded release-gate acceptance. MIT and DUB license metadata are already
+present. The M1 Conditional candidate, source-pinned research and proposed
+TaskScope are not silently imported into this API.
 
 For an exploratory matched public/internal LDC release comparison, run
 `python3 tools/validation/m0_public_path.py NEW-RESULT-DIRECTORY`. It records
