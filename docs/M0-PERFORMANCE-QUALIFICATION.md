@@ -1,6 +1,6 @@
 # M0 public-path performance qualification
 
-**Result:** protocol v1.2 passed for the scoped host/compiler/workload claim below. This is not a general performance guarantee and does not authorize a release.
+**Result:** protocol v1.2 passed for the scoped host/compiler/workload claim below. This is not a general performance guarantee; release acceptance remains tied to the exact archive, version and tag checks.
 
 ## Scope and method
 
@@ -26,4 +26,4 @@ Full telemetry and arm-level timings are retained with the execution record. SHA
 - `raw.csv`: `9f52ad61794f7cfe57461a491b4680c0c089a88532c3d628a2ac4899268413a3`
 - `telemetry.jsonl`: `b3792a0ca76f8b6343f7a68bc733f03fb598680ef71e63db60d5a482576ea460`
 
-This performance result does not settle the process-fatal native lifecycle policy or public API contract. Both still require maintainer review. Exact-head DMD/LDC/native ARM64 CI and the final version/archive/tag/publication checks also remain part of release acceptance.
+The maintainer has accepted the process-fatal native lifecycle policy and public API contract. Exact-head DMD/LDC/native ARM64 CI and the final version/archive/tag/publication checks remain part of release acceptance.

@@ -1,15 +1,15 @@
 # concurrency-d
 
 `concurrency-d` is a D library for CPU task execution. The current branch
-contains a version-zero public executor candidate; it is under review and is not
-a stable release.
+contains the maintainer-accepted M0 public executor candidate for version 0.1.0.
+The release archive, tag, and publication have not yet been prepared or approved.
 
 The candidate exports `Executor`, typed `TaskHandle` results and executor-use
 exceptions through `import concurrency`. Submission is explicitly `@system`:
 callers must keep captures valid and synchronize shared state. Root the executor
 and call `closeAndJoin` explicitly. Uncertain native worker start/join and
-escaped scheduler failures use a process-fatal policy; the lifecycle contract
-remains under review.
+escaped scheduler failures use the process-fatal lifecycle policy accepted by
+the maintainer.
 
 See the [public executor guide](docs/EXECUTOR.md) and the
 [independent CPU/completion example](examples/cpu-executor/source/app.d). Run the
@@ -22,15 +22,17 @@ dub run --root=examples/cpu-executor --compiler=ldc2 --build=release
 
 ## Project status
 
-The draft M0 candidate combines the internal CPU executor with a small public
+The M0 candidate combines the internal CPU executor with a small public
 facade, bounded admission and retained-task limits, explicit shutdown, and a
 public-only consumer example. The exact candidate has passed DMD 2.111, LDC 1.41
 and native ARM64 CI. A scoped native performance qualification on the Dell XPS
 15 with LDC 1.42 passed its predeclared 10% bound for the two tested kernels and
 1P/1W plus 4P/4W scenarios; see
 [the result and scope](docs/M0-PERFORMANCE-QUALIFICATION.md). This is not a
-general hardware or workload guarantee. Lifecycle-policy/public-contract review
-and final release checks remain open. No stable release is available yet.
+general hardware or workload guarantee. The maintainer has accepted the
+lifecycle policy and public contract. Exact-head release CI and final
+version/archive/tag/publication checks remain open. No stable release is
+available yet.
 
 ## Repository boundary
 
@@ -55,5 +57,5 @@ MIT. See [LICENSE](LICENSE).
 Assisted by AI.
 
 The library has been developed and reviewed with assistance from multiple AI
-systems and models. API compatibility, source correctness and release decisions
-remain subject to maintainer review and the repository's verification gates.
+systems and models. API compatibility and source correctness remain subject to
+the repository's verification gates; the maintainer makes final release decisions.

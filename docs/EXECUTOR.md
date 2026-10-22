@@ -1,10 +1,10 @@
-# Public CPU executor — version-zero API candidate
+# Public CPU executor — M0 API candidate
 
-This draft candidate exports a small API through `import concurrency`. It is not
-a stable release. It builds on the M0 lifecycle implementation, whose fatal
-native-lifetime policy and public contract still need maintainer acceptance. MIT
-licensing and DUB license metadata are present; final archive and publication
-checks remain open.
+This M0 candidate exports a small API through `import concurrency`. The
+maintainer has accepted its process-fatal native-lifetime policy and public
+contract. It is not a stable release until the versioned archive, tag and
+publication checks are complete. MIT licensing and DUB license metadata are
+present.
 
 ## Quick start
 
@@ -115,11 +115,11 @@ the owner's lock/transition, even if an external thread is already draining.
 If not caught in the callable, it is observed by the external handle's get.
 
 Uncertain native Thread.start/join, escaped scheduler failures and an unproved
-owner shutdown are **process-fatal** under the candidate lifecycle policy. They
+owner shutdown are **process-fatal** under the accepted M0 lifecycle policy. They
 emit a static diagnostic and abort rather than report a fictitious joined state
 or unwind potentially borrowed storage. This tradeoff is separate from ordinary
-task-error delivery and remains part of the draft policy review. Nonreturning
-tasks may make shutdown wait forever. No finalizer silently closes an executor.
+task-error delivery and provides no native OS recovery. Nonreturning tasks may
+make shutdown wait forever. No finalizer silently closes an executor.
 
 ## Validation and remaining release gates
 
@@ -134,8 +134,7 @@ Run `python3 tools/validation/m0_public_api.py dmd` (or `ldc2`). Debug and relea
 are checked; LDC also checks assertions-on -O3. CI pins DMD 2.111.0 and LDC 1.41.0
 and runs the same public gate on native ARM64.
 
-A stable v0.1 release still requires exact-head CI, maintainer review and
-acceptance of the lifecycle and public contracts, and final
+A stable v0.1.0 release still requires exact-head CI and final
 archive/version/tag/publication checks. The scoped Dell XPS 15 / LDC 1.42
 public-path baseline passed the predeclared 10% bound for the two documented
 kernels and 1P/1W plus 4P/4W scenarios; its machine-specific scope and result are

@@ -2,19 +2,19 @@
 
 ## M0 — Public CPU executor candidate
 
-The current draft branch exposes a bounded CPU executor with typed task handles,
+The current M0 candidate exposes a bounded CPU executor with typed task handles,
 explicit `closeAndJoin`, task-error delivery through handles, and an independent
 CPU/completion consumer. Submission is `@system`; capture lifetime and shared
-state remain the caller's responsibility. The candidate policy aborts on
-uncertain native worker lifetime. See [the API guide](docs/EXECUTOR.md).
+state remain the caller's responsibility. The maintainer has accepted the
+process-fatal policy for uncertain native worker lifetime and the public
+contract. See [the API guide](docs/EXECUTOR.md).
 
 The exact-head DMD/LDC/native ARM64 CI passes. The scoped Dell XPS 15 / LDC 1.42
 public-path baseline passed the predeclared 10% bound for its two kernels and
 two producer/worker scenarios; see
-[the qualification record](docs/M0-PERFORMANCE-QUALIFICATION.md). Release
-acceptance remains open until maintainers accept the lifecycle policy and public
-contract and the version/archive/release checks are complete. License metadata
-and the MIT license file are present.
+[the qualification record](docs/M0-PERFORMANCE-QUALIFICATION.md). Exact-head
+release CI and the final version/archive/tag/publication checks remain open.
+License metadata and the MIT license file are present.
 
 ## M1 — Ownership and scheduler research
 
