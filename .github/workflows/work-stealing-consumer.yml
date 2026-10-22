@@ -5,6 +5,9 @@ on:
     branches:
       - develop
     paths:
+      - "research/**"
+      - "docs/research/**"
+      - "tools/research/**"
       - "dub.sdl"
       - ".gitattributes"
       - "LICENSE"
@@ -23,6 +26,9 @@ on:
     branches:
       - develop
     paths:
+      - "research/**"
+      - "docs/research/**"
+      - "tools/research/**"
       - "dub.sdl"
       - ".gitattributes"
       - "LICENSE"

@@ -17,6 +17,9 @@ def main():
     parser.add_argument('--tree', default='HEAD', help='Git tree/commit to export; defaults to HEAD')
     args = parser.parse_args()
     tree = subprocess.check_output(['git', 'rev-parse', args.tree + '^{tree}'], cwd=ROOT, text=True).strip()
+    tracked = subprocess.check_output(['git', 'ls-tree', '-r', '--name-only', tree], cwd=ROOT, text=True).splitlines()
+    leaked = [p for p in tracked if p.startswith(('research/', 'docs/research/', 'tools/research/'))]
+    assert not leaked, 'research belongs in concurrency-d-research: ' + str(leaked)
     archive = subprocess.check_output(['git', 'archive', '--format=tar', tree], cwd=ROOT)
     with tempfile.TemporaryDirectory(prefix='concurrency-package-') as tmp:
         package = Path(tmp) / 'package'

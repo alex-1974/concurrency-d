@@ -20,6 +20,21 @@ dub run --root=examples/cpu-executor --compiler=dmd
 dub run --root=examples/cpu-executor --compiler=ldc2 --build=release
 ```
 
+## Repository boundary
+
+Detailed research, experimental prototypes, raw measurements and historical
+variants live in [concurrency-d-research](https://github.com/alex-1974/concurrency-d-research).
+Its [provenance](https://github.com/alex-1974/concurrency-d-research/blob/main/PROVENANCE.md)
+records pinned library commits and verified file manifests. The library has no
+build or runtime dependency on the research repository.
+
+This repository keeps production source, active regression/release gates,
+maintained qualification benchmarks, examples, user documentation and concise
+architecture decisions. The consumer archive contains only the library and its
+small public documentation set. See the
+[research separation decision](https://github.com/alex-1974/concurrency-d/blob/feat/m0-public-executor/docs/adr/0001-research-repository.md)
+for the migration boundary and preserved history.
+
 Initial research focuses on:
 
 - typed tasks and type-erased scheduling boundaries;
