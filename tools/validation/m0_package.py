@@ -13,9 +13,14 @@ ROOT = Path(__file__).resolve().parents[2]
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('compiler', choices=['dmd', 'ldc2'])
+    parser.add_argument('compiler', help='dmd, ldc2, or a path to either compiler')
     parser.add_argument('--tree', default='HEAD', help='Git tree/commit to export; defaults to HEAD')
     args = parser.parse_args()
+    compiler = Path(args.compiler).name
+    if compiler == 'ldmd2':
+        compiler = 'dmd'
+    if compiler not in ('dmd', 'ldc2'):
+        parser.error('compiler must resolve to dmd or ldc2')
     tree = subprocess.check_output(['git', 'rev-parse', args.tree + '^{tree}'], cwd=ROOT, text=True).strip()
     tracked = subprocess.check_output(['git', 'ls-tree', '-r', '--name-only', tree], cwd=ROOT, text=True).splitlines()
     leaked = [p for p in tracked if p.startswith(('research/', 'docs/research/', 'tools/research/'))]
@@ -37,15 +42,15 @@ def main():
         assert 'MIT License' in (package / 'LICENSE').read_text()
         def run(command, cwd):
             subprocess.run(command, cwd=cwd, check=True, timeout=180)
-        run(['dub', 'build', '--compiler=' + args.compiler, '--build=release'], package)
+        run(['dub', 'build', '--compiler=' + compiler, '--build=release'], package)
         consumer = Path(tmp) / 'consumer'
         (consumer / 'source').mkdir(parents=True)
         (consumer / 'source/app.d').write_bytes((ROOT / 'tests/public_api/main.d').read_bytes())
         (consumer / 'dub.json').write_text(json.dumps({
             'name': 'archive-public-consumer', 'targetType': 'executable',
             'dependencies': {'concurrency-d': {'path': str(package)}}}))
-        run(['dub', 'run', '--compiler=' + args.compiler, '--build=release'], consumer)
-        print(f'PACKAGE_GATE_PASS tree={tree} compiler={args.compiler} files={len(files)}; archive and external consumer only, no registry release claim')
+        run(['dub', 'run', '--compiler=' + compiler, '--build=release'], consumer)
+        print(f'PACKAGE_GATE_PASS tree={tree} compiler={compiler} files={len(files)}; archive and external consumer only, no registry release claim')
 
 
 if __name__ == '__main__':
