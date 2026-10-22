@@ -57,3 +57,19 @@ Do not interpret a lower publish notification count as throughput improvement wi
 ## P42.7 multi-producer correctness gate
 
 The conditional research overlay now runs a bounded native consumer with **four producer threads, four worker threads, 256 distinct tasks per round, eight rounds and inbox capacity eight**. Producers retry full submissions; all producer threads join before close. Each task record remains alive through pool close/join and must execute exactly once; admitted and completed totals must both be 256. This supplements, but does not replace, the observed-wait single-worker test. The process is externally time-limited. **Concurrent producer-vs-close admission is not covered** because close occurs after producer joins; neither unrestricted starvation freedom nor performance is established. The new compiler CI run must pass before qualification.
+
+## Current follow-up — 2026-10-22
+
+P42.19 reproduced the native performance benefit at its declared research
+screening boundary; see [the replication review](p42_19_native_xps_review_2026-10-18.md).
+[P42.20 initial correctness review](p42_20_correctness_review_2026-10-22.md)
+now separates publication progress, last record access and native join,
+with a new minimal-overlay return-boundary consumer. Production qualification
+remains open; the earlier dated sections above are historical evidence.
+
+The P42.20 follow-up now includes controlled publish/park/close/local-handoff
+races with two detected invalid-policy controls, the actual M0 owned executor
+under the minimal conditional pool (GC, typed/void/error, reaping and close),
+and a separate CPU consumer with controller-thread completion application.
+Local DMD 2.111.0 and LDC 1.42.0 debug/-O3 correctness pass; pinned CI remains
+pending. See the P42.20 review for exact scope and exclusions.

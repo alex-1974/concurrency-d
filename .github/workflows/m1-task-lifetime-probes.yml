@@ -62,6 +62,8 @@ on:
       - "tools/research/m1_p41_native_condition.sh"
       - "tools/research/m1_p42_make_conditional_pool.py"
       - "tools/research/m1_p42_conditional_gate.sh"
+      - "tools/research/m1_p42_return_boundary.sh"
+      - "tools/research/m1_p42_20_qualification.py"
       - "tools/research/m1_p42_adversarial_scenarios.py"
       - "tools/research/m1_p42_local_handoff_model.py"
       - "tools/research/m1_p42_ticket_enrollment_model.py"
@@ -144,6 +146,8 @@ on:
       - develop
     paths:
       - "research/m1_task_lifetime/**"
+      - "tools/research/m1_p42_return_boundary.sh"
+      - "tools/research/m1_p42_20_qualification.py"
       - "tools/research/m1_lifetime_compile_probes.sh"
       - "tools/research/m1_scoped_join_prototype.sh"
       - "tools/research/m1_lexical_batch_prototype.sh"
@@ -419,6 +423,14 @@ jobs:
       - name: P42 conditional publish real-pool correctness gate
         shell: bash
         run: bash tools/research/m1_p42_conditional_gate.sh "$DC"
+
+      - name: P42.20 completion versus last record access (minimal overlay)
+        shell: bash
+        run: bash tools/research/m1_p42_return_boundary.sh "$DC"
+
+      - name: P42.20 controlled races, real owned executor and consumer handoff
+        shell: bash
+        run: python3 tools/research/m1_p42_20_qualification.py "$DC"
 
       - name: P42 adversarial scheduling oracle
         shell: bash

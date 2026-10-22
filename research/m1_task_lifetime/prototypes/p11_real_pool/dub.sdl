@@ -317,3 +317,21 @@ configuration "p42-e2e-conditional-medium" {
     mainSourceFile "consumer/p42_benchmark.d"
     versions "P42MediumTask"
 }
+
+// P42.20 uses the historical minimal conditional overlay, not observed pools.
+configuration "p42-return-baseline" {
+    mainSourceFile "consumer/p42_return_boundary.d"
+    versions "P42Baseline"
+}
+configuration "p42-return-conditional" {
+    mainSourceFile "consumer/p42_return_boundary.d"
+}
+configuration "p42-return-baseline-optimized" {
+    mainSourceFile "consumer/p42_return_boundary.d"
+    dflags "-O3"
+    versions "P42Baseline"
+}
+configuration "p42-return-conditional-optimized" {
+    mainSourceFile "consumer/p42_return_boundary.d"
+    dflags "-O3"
+}
