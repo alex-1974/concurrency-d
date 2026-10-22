@@ -1,0 +1,553 @@
+name: M1 task lifetime compile probes
+
+on:
+  push:
+    branches:
+      - research/m1-task-lifetime-boundaries
+    paths:
+      - "research/m1_task_lifetime/**"
+      - "tools/research/m1_lifetime_compile_probes.sh"
+      - "tools/research/m1_scoped_join_prototype.sh"
+      - "tools/research/m1_lexical_batch_prototype.sh"
+      - "tools/research/m1_dynamic_scope_prototype.sh"
+      - "tools/research/m1_value_only_prototype.sh"
+      - "tools/research/m1_worker_lifecycle_probe.sh"
+      - "tools/research/m1_native_lifecycle_failstop.sh"
+      - "tools/research/m1_owned_vs_borrowed_prototype.sh"
+      - "tools/research/m1_inline_transfer_and_uncertain.sh"
+      - "tools/research/m1_typed_transport_prototype.sh"
+      - "tools/research/m1_real_pool_prototype.sh"
+      - "tools/research/m1_p20_owned_fault.sh"
+      - "tools/research/m1_p21_shutdown_contract.sh"
+      - "tools/research/m1_p22_native_supervisor.sh"
+      - "tools/research/m1_p23_make_owned.py"
+      - "tools/research/m1_p23_real_m0_lifecycle.sh"
+      - "tools/research/m1_p24_root_registry.sh"
+      - "tools/research/m1_p25_owner_modes.sh"
+      - "tools/research/m1_p26_token_registry.sh"
+      - "tools/research/m1_p27_registry_transitions.sh"
+      - "tools/research/m1_p28_bounded_orphans.sh"
+      - "tools/research/m1_p29_generational_owner.sh"
+      - "tools/research/m1_p30_benchmark_probe.sh"
+      - "tools/research/m1_p30_analyze.py"
+      - "tools/research/m1_p30_xps.sh"
+      - "tools/research/m1_p31_fixed_scaling.sh"
+      - "tools/research/m1_p31_analyze.py"
+      - "tools/research/m1_p31_xps.sh"
+      - "tools/research/m1_p32_source_audit.py"
+      - "tools/research/m1_p32_classify.py"
+      - "tools/research/m1_p32_probe.sh"
+      - "tools/research/m1_p32_compare.py"
+      - "tools/research/m1_p33_source_audit.py"
+      - "tools/research/m1_p33_make_phase.py"
+      - "tools/research/m1_p33_probe.sh"
+      - "tools/research/m1_p33_analyze.py"
+      - "tools/research/m1_p33_compare.py"
+      - "tools/research/m1_p33_xps.sh"
+      - "tools/research/m1_p34_source_audit.py"
+      - "tools/research/m1_p34_observe.py"
+      - "tools/research/m1_p34_make_wrapper.py"
+      - "tools/research/m1_p34_probe.sh"
+      - "tools/research/m1_p34_compare.py"
+      - "tools/research/m1_p34_xps.sh"
+      - "tools/research/m1_p34_three_arm.py"
+      - "tools/research/m1_p35_source_audit.py"
+      - "tools/research/m1_p35_make_owner.py"
+      - "tools/research/m1_p35_probe.sh"
+      - "tools/research/m1_p35_make_consumer.py"
+      - "tools/research/m1_p35_compile.sh"
+      - "tools/research/m1_p35_compare.py"
+      - "tools/research/m1_p35_xps.sh"
+      - "tools/research/m1_p41_real_pool_close.sh"
+      - "tools/research/m1_p41_native_condition.sh"
+      - "tools/research/m1_p42_make_conditional_pool.py"
+      - "tools/research/m1_p42_conditional_gate.sh"
+      - "tools/research/m1_p42_return_boundary.sh"
+      - "tools/research/m1_p42_20_qualification.py"
+      - "tools/research/m1_p42_adversarial_scenarios.py"
+      - "tools/research/m1_p42_local_handoff_model.py"
+      - "tools/research/m1_p42_ticket_enrollment_model.py"
+      - "tools/research/m1_p42_two_worker_model.py"
+      - "tools/research/m1_p41_protocol_model.py"
+      - "tools/research/m1_p41_ordered_scenarios.py"
+      - "tools/research/m1_p40_make_pool.py"
+      - "tools/research/m1_p40_make_owner.py"
+      - "tools/research/m1_p40_make_consumer.py"
+      - "tools/research/m1_p40_compare.py"
+      - "tools/research/m1_p40_compile.sh"
+      - "tools/research/m1_p40_probe.sh"
+      - "tools/research/m1_p39_make_pool.py"
+      - "tools/research/m1_p39_make_owner.py"
+      - "tools/research/m1_p39_make_consumer.py"
+      - "tools/research/m1_p39_compare.py"
+      - "tools/research/m1_p39_compile.sh"
+      - "tools/research/m1_p39_probe.sh"
+      - "tools/research/m1_p38_source_audit.py"
+      - "tools/research/m1_p38_make_pool.py"
+      - "tools/research/m1_p38_make_owner.py"
+      - "tools/research/m1_p38_make_consumer.py"
+      - "tools/research/m1_p38_compile.sh"
+      - "tools/research/m1_p38_compare.py"
+      - "tools/research/m1_p38_probe.sh"
+      - "tools/research/m1_p37_source_audit.py"
+      - "tools/research/m1_p37_make_pool.py"
+      - "tools/research/m1_p37_make_owner.py"
+      - "tools/research/m1_p37_probe.sh"
+      - "tools/research/m1_p37_make_consumer.py"
+      - "tools/research/m1_p37_compare.py"
+      - "tools/research/m1_p37_compile.sh"
+      - "tools/research/m1_p36_source_audit.py"
+      - "tools/research/m1_p36_make_owner.py"
+      - "tools/research/m1_p36_make_consumer.py"
+      - "tools/research/m1_p36_compare.py"
+      - "tools/research/m1_p36_compile.sh"
+      - "tools/research/m1_p20_make_owned_fault.py"
+      - "tools/research/m1_owned_gc_real_pool.sh"
+      - "tools/research/m1_matched_pool_benchmark.sh"
+      - "tools/research/m1_worker_scaling_probe.sh"
+      - "tools/research/m1_worker_scaling_analyze.py"
+      - "tools/research/m1_worker_scaling_xps.sh"
+      - "tools/research/m1_p14_make_instrumented_pool.py"
+      - "tools/research/m1_p14_make_fixture.py"
+      - "tools/research/m1_p14_compare.py"
+      - "tools/research/m1_p14_scheduler_trace.sh"
+      - "tools/research/m1_p14_xps.sh"
+      - "tools/research/m1_p15_make_mutex_probe.py"
+      - "tools/research/m1_p15_make_fixture.py"
+      - "tools/research/m1_p15_compare.py"
+      - "tools/research/m1_p15_mutex_timing.sh"
+      - "tools/research/m1_p15_xps.sh"
+      - "tools/research/m1_p16_make_sampled_pool.py"
+      - "tools/research/m1_p16_make_fixture.py"
+      - "tools/research/m1_p16_compare.py"
+      - "tools/research/m1_p16_sampling_probe.sh"
+      - "tools/research/m1_p16_xps.sh"
+      - "tools/research/m1_p16_2_make_atomic_completion.py"
+      - "tools/research/m1_p16_2_make_fixture.py"
+      - "tools/research/m1_p16_2_sc_handshake.py"
+      - "tools/research/m1_p16_2_check.py"
+      - "tools/research/m1_p16_2_probe.sh"
+      - "tools/research/m1_p16_2_xps.sh"
+      - "tools/research/m1_p17_make_event_pair.py"
+      - "tools/research/m1_p17_make_fixture.py"
+      - "tools/research/m1_p17_compare.py"
+      - "tools/research/m1_p17_probe.sh"
+      - "tools/research/m1_p17_telemetry.py"
+      - "tools/research/m1_p17_thermal_review.py"
+      - "tools/research/m1_p17_xps.sh"
+      - "tools/research/m1_p18_make_grace_pool.py"
+      - "tools/research/m1_p18_make_fixture.py"
+      - "tools/research/m1_p18_compare.py"
+      - "tools/research/m1_p18_probe.sh"
+      - "tools/research/m1_p18_xps.sh"
+      - ".github/workflows/m1-task-lifetime-probes.yml"
+  pull_request:
+    branches:
+      - develop
+    paths:
+      - "research/m1_task_lifetime/**"
+      - "tools/research/m1_p42_return_boundary.sh"
+      - "tools/research/m1_p42_20_qualification.py"
+      - "tools/research/m1_lifetime_compile_probes.sh"
+      - "tools/research/m1_scoped_join_prototype.sh"
+      - "tools/research/m1_lexical_batch_prototype.sh"
+      - "tools/research/m1_dynamic_scope_prototype.sh"
+      - "tools/research/m1_value_only_prototype.sh"
+      - "tools/research/m1_worker_lifecycle_probe.sh"
+      - "tools/research/m1_native_lifecycle_failstop.sh"
+      - "tools/research/m1_owned_vs_borrowed_prototype.sh"
+      - "tools/research/m1_inline_transfer_and_uncertain.sh"
+      - "tools/research/m1_typed_transport_prototype.sh"
+      - "tools/research/m1_real_pool_prototype.sh"
+      - "tools/research/m1_p20_owned_fault.sh"
+      - "tools/research/m1_p21_shutdown_contract.sh"
+      - "tools/research/m1_p22_native_supervisor.sh"
+      - "tools/research/m1_p23_make_owned.py"
+      - "tools/research/m1_p23_real_m0_lifecycle.sh"
+      - "tools/research/m1_p24_root_registry.sh"
+      - "tools/research/m1_p25_owner_modes.sh"
+      - "tools/research/m1_p26_token_registry.sh"
+      - "tools/research/m1_p27_registry_transitions.sh"
+      - "tools/research/m1_p28_bounded_orphans.sh"
+      - "tools/research/m1_p29_generational_owner.sh"
+      - "tools/research/m1_p30_benchmark_probe.sh"
+      - "tools/research/m1_p30_analyze.py"
+      - "tools/research/m1_p30_xps.sh"
+      - "tools/research/m1_p31_fixed_scaling.sh"
+      - "tools/research/m1_p31_analyze.py"
+      - "tools/research/m1_p31_xps.sh"
+      - "tools/research/m1_p32_source_audit.py"
+      - "tools/research/m1_p32_classify.py"
+      - "tools/research/m1_p32_probe.sh"
+      - "tools/research/m1_p32_compare.py"
+      - "tools/research/m1_p33_source_audit.py"
+      - "tools/research/m1_p33_make_phase.py"
+      - "tools/research/m1_p33_probe.sh"
+      - "tools/research/m1_p33_analyze.py"
+      - "tools/research/m1_p33_compare.py"
+      - "tools/research/m1_p33_xps.sh"
+      - "tools/research/m1_p34_source_audit.py"
+      - "tools/research/m1_p34_observe.py"
+      - "tools/research/m1_p34_make_wrapper.py"
+      - "tools/research/m1_p34_probe.sh"
+      - "tools/research/m1_p34_compare.py"
+      - "tools/research/m1_p34_xps.sh"
+      - "tools/research/m1_p34_three_arm.py"
+      - "tools/research/m1_p35_source_audit.py"
+      - "tools/research/m1_p35_make_owner.py"
+      - "tools/research/m1_p35_probe.sh"
+      - "tools/research/m1_p20_make_owned_fault.py"
+      - "tools/research/m1_owned_gc_real_pool.sh"
+      - "tools/research/m1_matched_pool_benchmark.sh"
+      - "tools/research/m1_worker_scaling_probe.sh"
+      - "tools/research/m1_worker_scaling_analyze.py"
+      - "tools/research/m1_worker_scaling_xps.sh"
+      - "tools/research/m1_p14_make_instrumented_pool.py"
+      - "tools/research/m1_p14_make_fixture.py"
+      - "tools/research/m1_p14_compare.py"
+      - "tools/research/m1_p14_scheduler_trace.sh"
+      - "tools/research/m1_p14_xps.sh"
+      - "tools/research/m1_p15_make_mutex_probe.py"
+      - "tools/research/m1_p15_make_fixture.py"
+      - "tools/research/m1_p15_compare.py"
+      - "tools/research/m1_p15_mutex_timing.sh"
+      - "tools/research/m1_p15_xps.sh"
+      - "tools/research/m1_p16_make_sampled_pool.py"
+      - "tools/research/m1_p16_make_fixture.py"
+      - "tools/research/m1_p16_compare.py"
+      - "tools/research/m1_p16_sampling_probe.sh"
+      - "tools/research/m1_p16_xps.sh"
+      - "tools/research/m1_p16_2_make_atomic_completion.py"
+      - "tools/research/m1_p16_2_make_fixture.py"
+      - "tools/research/m1_p16_2_sc_handshake.py"
+      - "tools/research/m1_p16_2_check.py"
+      - "tools/research/m1_p16_2_probe.sh"
+      - "tools/research/m1_p16_2_xps.sh"
+      - "tools/research/m1_p17_make_event_pair.py"
+      - "tools/research/m1_p17_make_fixture.py"
+      - "tools/research/m1_p17_compare.py"
+      - "tools/research/m1_p17_probe.sh"
+      - "tools/research/m1_p17_telemetry.py"
+      - "tools/research/m1_p17_thermal_review.py"
+      - "tools/research/m1_p17_xps.sh"
+      - "tools/research/m1_p18_make_grace_pool.py"
+      - "tools/research/m1_p18_make_fixture.py"
+      - "tools/research/m1_p18_compare.py"
+      - "tools/research/m1_p18_probe.sh"
+      - "tools/research/m1_p18_xps.sh"
+      - ".github/workflows/m1-task-lifetime-probes.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  lifetime-probes:
+    name: DIP1000 / ${{ matrix.compiler }}
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler:
+          - dmd-2.111.0
+          - ldc-1.41.0
+    steps:
+      - name: Checkout exact branch source
+        uses: actions/checkout@v7
+
+      - name: Install pinned D compiler
+        uses: dlang-community/setup-dlang@v2
+        with:
+          compiler: ${{ matrix.compiler }}
+          dub: 1.40.0
+
+      - name: Language and compile-negative contract gate
+        shell: bash
+        run: bash tools/research/m1_lifetime_compile_probes.sh "$DC"
+
+      - name: P01 scoped join prototype runtime (research only)
+        shell: bash
+        run: bash tools/research/m1_scoped_join_prototype.sh "$DC"
+
+      - name: P02 lexical batch prototype runtime (research only)
+        shell: bash
+        run: bash tools/research/m1_lexical_batch_prototype.sh "$DC"
+
+      - name: P03 bounded dynamic lexical scope (research only)
+        shell: bash
+        run: bash tools/research/m1_dynamic_scope_prototype.sh "$DC"
+
+      - name: P04 @safe scalar-only external consumer (research only)
+        shell: bash
+        run: bash tools/research/m1_value_only_prototype.sh "$DC"
+
+      - name: P06 partial-start and fatal-worker lifecycle (isolated research)
+        shell: bash
+        run: bash tools/research/m1_worker_lifecycle_probe.sh "$DC"
+
+      - name: P07 native exceptional lifecycle fail-stop (isolated research)
+        shell: bash
+        run: bash tools/research/m1_native_lifecycle_failstop.sh "$DC"
+
+      - name: P08 owned versus borrowed failure boundary (research only)
+        shell: bash
+        run: bash tools/research/m1_owned_vs_borrowed_prototype.sh "$DC"
+
+      - name: P09 inline transfer and uncertainty supervisor (research only)
+        shell: bash
+        run: bash tools/research/m1_inline_transfer_and_uncertain.sh "$DC"
+
+      - name: P10 typed inline TaskRef transport (research only)
+        shell: bash
+        run: bash tools/research/m1_typed_transport_prototype.sh "$DC"
+
+      - name: P11 actual M0 work stealing typed task DUB consumer (research only)
+        shell: bash
+        run: bash tools/research/m1_real_pool_prototype.sh "$DC"
+
+      - name: P19 real M0 owned GC graphs and handle independence
+        shell: bash
+        run: bash tools/research/m1_owned_gc_real_pool.sh "$DC"
+
+      - name: P20 actual owned M0 early-stop fault injection (research only)
+        shell: bash
+        run: bash tools/research/m1_p20_owned_fault.sh "$DC"
+
+      - name: P21 shutdown proof and ownership state contract (research only)
+        shell: bash
+        run: bash tools/research/m1_p21_shutdown_contract.sh "$DC"
+
+      - name: P22 real native supervisor and coherent shutdown (research only)
+        shell: bash
+        run: bash tools/research/m1_p22_native_supervisor.sh "$DC"
+
+      - name: P23 source-pinned real M0 deferred startup and uncertain shutdown
+        shell: bash
+        run: bash tools/research/m1_p23_real_m0_lifecycle.sh "$DC"
+
+      - name: P24 explicit GC-root process registry on real M0 (research)
+        shell: bash
+        run: bash tools/research/m1_p24_root_registry.sh "$DC"
+
+      - name: P25 scoped lifetime token vs process registry plus negative gates
+        shell: bash
+        run: bash tools/research/m1_p25_owner_modes.sh "$DC"
+
+      - name: P26 token moves, exceptional unwind, registry release races
+        shell: bash
+        run: bash tools/research/m1_p26_token_registry.sh "$DC"
+
+      - name: P27 real M0 register-start-submit-close-release race and process exit
+        shell: bash
+        run: bash tools/research/m1_p27_registry_transitions.sh "$DC"
+
+      - name: P28 bounded orphan owner and explicit shutdown policy (real M0)
+        shell: bash
+        run: bash tools/research/m1_p28_bounded_orphans.sh "$DC"
+
+      - name: P29 generational owner ABA and quota management (real M0)
+        shell: bash
+        run: bash tools/research/m1_p29_generational_owner.sh "$DC"
+
+      - name: P30 original M0 versus deferred and P29 managed same-work correctness
+        shell: bash
+        run: bash tools/research/m1_p30_benchmark_probe.sh "$DC"
+
+      - name: P31 producer scaling with fixed M0 work, atomic work variants
+        shell: bash
+        run: bash tools/research/m1_p31_fixed_scaling.sh "$DC"
+
+      - name: P32-A pinned M0 source and P31 retry analyzer preflight
+        shell: bash
+        run: |
+          python3 tools/research/m1_p32_source_audit.py --self-test
+          python3 tools/research/m1_p32_classify.py --self-test
+
+      - name: P33 native research script and paired analyzer syntax check
+        shell: bash
+        run: |
+          bash -n tools/research/m1_p33_xps.sh
+          python3 -m py_compile tools/research/m1_p33_compare.py
+
+      - name: P34 native three-arm capture preflight
+        shell: bash
+        run: |
+          bash -n tools/research/m1_p34_xps.sh
+          python3 -m py_compile tools/research/m1_p34_three_arm.py
+
+      - name: P34 pinned owner null and timed wrapper correctness
+        shell: bash
+        run: bash tools/research/m1_p34_probe.sh "$DC"
+
+      - name: P34 observational analyzer syntax
+        shell: bash
+        run: python3 -m py_compile tools/research/m1_p34_observe.py
+
+      - name: P35 source generators Python syntax
+        shell: bash
+        run: |
+          python3 -m py_compile tools/research/m1_p35_make_owner.py tools/research/m1_p35_make_consumer.py tools/research/m1_p35_compare.py
+
+      - name: P35 native XPS capture syntax preflight
+        shell: bash
+        run: bash -n tools/research/m1_p35_xps.sh
+
+      - name: P35 generated real-owner TLS null and timed DUB correctness
+        shell: bash
+        run: bash tools/research/m1_p35_compile.sh "$DC"
+
+      - name: P35 source-pinned owner TLS overlay generation preflight
+        shell: bash
+        run: bash tools/research/m1_p35_probe.sh
+
+      - name: P36 pinned phase null and timed compiler qualification
+        shell: bash
+        run: bash tools/research/m1_p36_compile.sh "$DC"
+
+      - name: P37 paired inbox compiler and task-lifetime gate
+        shell: bash
+        run: bash tools/research/m1_p37_compile.sh "$DC"
+
+      - name: P38 paired worker wake counter compiler gate
+        shell: bash
+        run: bash tools/research/m1_p38_compile.sh "$DC"
+
+      - name: P39 notify-site compiler and runtime gate
+        shell: bash
+        run: bash tools/research/m1_p39_compile.sh "$DC"
+
+      - name: P41 publish after observed real pool wait
+        shell: bash
+        run: bash tools/research/m1_p41_wait_publish.sh "$DC"
+
+      - name: P42 conditional publish real-pool correctness gate
+        shell: bash
+        run: bash tools/research/m1_p42_conditional_gate.sh "$DC"
+
+      - name: P42.20 completion versus last record access (minimal overlay)
+        shell: bash
+        run: bash tools/research/m1_p42_return_boundary.sh "$DC"
+
+      - name: P42.20 controlled races, real owned executor and consumer handoff
+        shell: bash
+        run: python3 tools/research/m1_p42_20_qualification.py "$DC"
+
+      - name: P42 adversarial scheduling oracle
+        shell: bash
+        run: python3 tools/research/m1_p42_adversarial_scenarios.py source/concurrency/internal/submission_pool.d
+
+      - name: P42 local deque handoff and sleeping-thief model
+        shell: bash
+        run: python3 tools/research/m1_p42_local_handoff_model.py source/concurrency/internal/submission_pool.d
+
+      - name: P42 ticket search and wait enrollment model
+        shell: bash
+        run: python3 tools/research/m1_p42_ticket_enrollment_model.py source/concurrency/internal/submission_pool.d
+
+      - name: P42 bounded two-worker notification policy model
+        shell: bash
+        run: python3 tools/research/m1_p42_two_worker_model.py source/concurrency/internal/submission_pool.d
+
+      - name: P41 controlled worker ticket gate
+        shell: bash
+        run: bash tools/research/m1_p41_ticket_barrier.sh "$DC"
+
+      - name: P41 source-pinned real worker pool close gate
+        shell: bash
+        run: bash tools/research/m1_p41_real_pool_close.sh "$DC"
+
+      - name: P41 native D Condition shutdown gate
+        shell: bash
+        run: bash tools/research/m1_p41_native_condition.sh "$DC"
+
+      - name: P41 ordered shutdown and publication scenarios
+        shell: bash
+        run: python3 tools/research/m1_p41_ordered_scenarios.py
+
+      - name: P41 bounded generation and shutdown model
+        shell: bash
+        run: python3 tools/research/m1_p41_protocol_model.py source/concurrency/internal/submission_pool.d
+
+      - name: P40 worker outcome compiler and runtime gate
+        shell: bash
+        run: bash tools/research/m1_p40_compile.sh "$DC"
+
+      - name: P40 post-wait outcome source preflight
+        shell: bash
+        run: bash tools/research/m1_p40_probe.sh
+
+      - name: P39 notification-site source preflight
+        shell: bash
+        run: bash tools/research/m1_p39_probe.sh
+
+      - name: P38 worker-local wake counter preflight
+        shell: bash
+        run: bash tools/research/m1_p38_probe.sh
+
+      - name: P38 pinned wake generation and park ordering
+        shell: bash
+        run: python3 tools/research/m1_p38_source_audit.py
+
+      - name: P37 generated inbox and owner preflight
+        shell: bash
+        run: bash tools/research/m1_p37_probe.sh
+
+      - name: P37 pinned inbox structure and wake predicate
+        shell: bash
+        run: python3 tools/research/m1_p37_source_audit.py
+
+      - name: P36 pinned owned critical-phase and GC-root order
+        shell: bash
+        run: python3 tools/research/m1_p36_source_audit.py
+
+      - name: P35 pinned owner and manager critical-section anatomy
+        shell: bash
+        run: python3 tools/research/m1_p35_source_audit.py
+
+      - name: P34 source-pinned owned admission and manager phase preflight
+        shell: bash
+        run: python3 tools/research/m1_p34_source_audit.py
+
+      - name: P33 source-pinned owner-path phase decomposition correctness
+        shell: bash
+        run: bash tools/research/m1_p33_probe.sh "$DC"
+
+      - name: P33 exact P31 research source boundary audit
+        shell: bash
+        run: python3 tools/research/m1_p33_source_audit.py
+
+      - name: P32-B matched producer M0 control vs pinned timed inbox
+        shell: bash
+        run: bash tools/research/m1_p32_probe.sh "$DC"
+
+      - name: P12 paired matched M0 work-stealing benchmark (CI diagnostic only)
+        shell: bash
+        run: bash tools/research/m1_matched_pool_benchmark.sh "$DC"
+
+      - name: P13 wave-wise real M0 scaling (CI correctness diagnostic only)
+        shell: bash
+        run: bash tools/research/m1_worker_scaling_probe.sh "$DC"
+
+      - name: P14 exact M0 scheduler instrumentation and same-work control
+        shell: bash
+        run: bash tools/research/m1_p14_scheduler_trace.sh "$DC"
+
+      - name: P15 exact M0 mutex acquisition and hold timing (research diagnostic)
+        shell: bash
+        run: bash tools/research/m1_p15_mutex_timing.sh "$DC"
+
+      - name: P16 completion sampling with null-clock and untouched M0 control
+        shell: bash
+        run: bash tools/research/m1_p16_sampling_probe.sh "$DC"
+
+      - name: P16.2 seq-cst completion race and uninstrumented M0 control
+        shell: bash
+        run: bash tools/research/m1_p16_2_probe.sh "$DC"
+
+      - name: P17 original vs atomic scheduler event-path and thermal-monitor preflight
+        shell: bash
+        run: bash tools/research/m1_p17_probe.sh "$DC"
+
+      - name: P18 exact-M0 bounded idle retry, race and same-work checks
+        shell: bash
+        run: bash tools/research/m1_p18_probe.sh "$DC"

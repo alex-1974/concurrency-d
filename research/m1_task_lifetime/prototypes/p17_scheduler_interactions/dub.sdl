@@ -1,0 +1,23 @@
+name "m1-p17-scheduler-interactions"
+description "Research-only P17 original/seq-cst completion with event diagnostics"
+targetType "executable"
+sourcePaths "generated/concurrency"
+mainSourceFile "generated/consumer/main.d"
+dependency "concurrency-d" path="../../../../"
+dflags "-preview=dip1000"
+
+configuration "control" {
+    mainSourceFile "generated/consumer/main.d"
+}
+configuration "atomic" {
+    mainSourceFile "generated/consumer/main.d"
+    versions "P17Atomic"
+}
+configuration "trace-control" {
+    mainSourceFile "generated/consumer/main.d"
+    versions "P17TraceControl"
+}
+configuration "trace-atomic" {
+    mainSourceFile "generated/consumer/main.d"
+    versions "P17TraceAtomic"
+}

@@ -1,0 +1,19 @@
+case,metric,pairs,median_ns,min_ns,max_ns,p80minus20_ns,checksum,note
+workers1-tasks16384,stack,11,4724567,4355196,5307033,497749,-265982699959,CI not used; XPS evidence requires independent noise review
+workers1-tasks16384,heap,11,4844348,4542777,5930748,227887,-265982699959,CI not used; XPS evidence requires independent noise review
+workers1-tasks16384,paired_stack_minus_heap,11,-5877,-623715,330585,504077,-265982699959,positive means heap faster
+workers1-tasks2048,stack,11,724672,675290,809184,77506,-44866959887,CI not used; XPS evidence requires independent noise review
+workers1-tasks2048,heap,11,840601,640553,1397846,200051,-44866959887,CI not used; XPS evidence requires independent noise review
+workers1-tasks2048,paired_stack_minus_heap,11,-67999,-610862,101187,177638,-44866959887,positive means heap faster
+workers2-tasks16384,stack,11,4133774,4001353,4393249,151701,-265982699959,CI not used; XPS evidence requires independent noise review
+workers2-tasks16384,heap,11,4378955,4230507,4696497,284061,-265982699959,CI not used; XPS evidence requires independent noise review
+workers2-tasks16384,paired_stack_minus_heap,11,-291160,-467737,-96733,179400,-265982699959,positive means heap faster
+workers2-tasks2048,stack,11,628422,504858,823225,86851,-44866959887,CI not used; XPS evidence requires independent noise review
+workers2-tasks2048,heap,11,834495,687075,1439169,131211,-44866959887,CI not used; XPS evidence requires independent noise review
+workers2-tasks2048,paired_stack_minus_heap,11,-182217,-815146,-11270,147408,-44866959887,positive means heap faster
+workers4-tasks16384,stack,11,6902690,6478709,7509617,617316,-265982699959,CI not used; XPS evidence requires independent noise review
+workers4-tasks16384,heap,11,7000750,6526540,7841017,303153,-265982699959,CI not used; XPS evidence requires independent noise review
+workers4-tasks16384,paired_stack_minus_heap,11,-382146,-658922,573293,775780,-265982699959,positive means heap faster
+workers4-tasks2048,stack,11,988359,887373,1063497,69468,-44866959887,CI not used; XPS evidence requires independent noise review
+workers4-tasks2048,heap,11,1160285,1094341,1853148,130508,-44866959887,CI not used; XPS evidence requires independent noise review
+workers4-tasks2048,paired_stack_minus_heap,11,-225350,-845640,-104545,114127,-44866959887,positive means heap faster

@@ -1,0 +1,337 @@
+name "m1-p11-real-pool"
+description "Research-only typed M0 work-stealing consumer; not a public package"
+targetType "executable"
+// Research fixture only: preview flags must NOT enter the published package.
+dflags "-preview=dip1000"
+sourcePaths "concurrency"
+// Import only P09’s trait module, not its separate experimental main().
+sourceFiles "../p09_transfer_contract/concurrency/research/m1_inline_transfer.d"
+importPaths "." "../p09_transfer_contract"
+dependency "concurrency-d" path="../../../../"
+
+configuration "positive" {
+    mainSourceFile "consumer/main.d"
+}
+configuration "negative-safe" {
+    mainSourceFile "consumer/negative_safe.d"
+}
+configuration "negative-borrow" {
+    mainSourceFile "consumer/negative_borrow.d"
+}
+configuration "negative-delegate" {
+    mainSourceFile "consumer/negative_delegate.d"
+}
+
+configuration "optimized" {
+    mainSourceFile "consumer/main.d"
+    // Debug build retains assertions; this configuration adds LDC -O3.
+    dflags "-O3"
+}
+
+configuration "owned-graph" {
+    mainSourceFile "consumer/p19_owned_graph.d"
+}
+configuration "owned-graph-optimized" {
+    mainSourceFile "consumer/p19_owned_graph.d"
+    dflags "-O3"
+}
+configuration "owned-negative-safe" {
+    mainSourceFile "consumer/p19_negative_safe.d"
+}
+
+configuration "owned-fault" {
+    mainSourceFile "consumer/p20_fault_consumer.d"
+}
+configuration "owned-fault-optimized" {
+    mainSourceFile "consumer/p20_fault_consumer.d"
+    dflags "-O3"
+}
+
+configuration "p23-lifecycle" {
+    mainSourceFile "consumer/p23_lifecycle.d"
+}
+configuration "p23-lifecycle-optimized" {
+    mainSourceFile "consumer/p23_lifecycle.d"
+    dflags "-O3"
+}
+
+configuration "p24-root-registry" {
+    mainSourceFile "consumer/p24_root_registry.d"
+}
+configuration "p24-root-registry-optimized" {
+    mainSourceFile "consumer/p24_root_registry.d"
+    dflags "-O3"
+}
+
+configuration "p25-owner-modes" {
+    mainSourceFile "consumer/p25_ownership_modes.d"
+}
+configuration "p25-owner-modes-optimized" {
+    mainSourceFile "consumer/p25_ownership_modes.d"
+    dflags "-O3"
+}
+
+configuration "p27-transitions" {
+    mainSourceFile "consumer/p27_registry_transitions.d"
+}
+configuration "p27-transitions-optimized" {
+    mainSourceFile "consumer/p27_registry_transitions.d"
+    dflags "-O3"
+}
+
+configuration "p28-bounded" {
+    mainSourceFile "consumer/p28_bounded_orphans.d"
+}
+configuration "p28-bounded-optimized" {
+    mainSourceFile "consumer/p28_bounded_orphans.d"
+    dflags "-O3"
+}
+
+configuration "p29-generational" {
+    mainSourceFile "consumer/p29_generational_owner.d"
+}
+configuration "p29-generational-optimized" {
+    mainSourceFile "consumer/p29_generational_owner.d"
+    dflags "-O3"
+}
+
+configuration "p33-phases" {
+    mainSourceFile "consumer/p33_generational_owner.d"
+}
+
+configuration "p33-phases-optimized" {
+    mainSourceFile "consumer/p33_generational_owner.d"
+    dflags "-O3"
+}
+
+configuration "p34-null" {
+    mainSourceFile "consumer/p34_generational_owner.d"
+}
+configuration "p34-timed" {
+    mainSourceFile "consumer/p34_generational_owner.d"
+    dflags "-version=P34Timed"
+}
+configuration "p34-null-optimized" {
+    mainSourceFile "consumer/p34_generational_owner.d"
+    dflags "-O3"
+}
+configuration "p34-timed-optimized" {
+    mainSourceFile "consumer/p34_generational_owner.d"
+    dflags "-O3" "-version=P34Timed"
+}
+
+configuration "p35-null" {
+    mainSourceFile "consumer/p35_generational_owner.d"
+}
+configuration "p35-timed" {
+    mainSourceFile "consumer/p35_generational_owner.d"
+    dflags "-version=P35Timed"
+}
+configuration "p35-null-optimized" {
+    mainSourceFile "consumer/p35_generational_owner.d"
+    dflags "-O3"
+}
+configuration "p35-timed-optimized" {
+    mainSourceFile "consumer/p35_generational_owner.d"
+    dflags "-O3" "-version=P35Timed"
+}
+
+configuration "p36-null" {
+    mainSourceFile "consumer/p36_generational_owner.d"
+}
+configuration "p36-timed" {
+    mainSourceFile "consumer/p36_generational_owner.d"
+    dflags "-version=P36Timed"
+}
+
+configuration "p36-null-optimized" {
+    mainSourceFile "consumer/p36_generational_owner.d"
+    dflags "-O3"
+}
+configuration "p36-timed-optimized" {
+    mainSourceFile "consumer/p36_generational_owner.d"
+    dflags "-O3" "-version=P36Timed"
+}
+
+configuration "p37-null" {
+    mainSourceFile "consumer/p37_generational_owner.d"
+}
+configuration "p37-timed" {
+    mainSourceFile "consumer/p37_generational_owner.d"
+    dflags "-version=P37Timed"
+}
+
+configuration "p37-null-optimized" {
+    mainSourceFile "consumer/p37_generational_owner.d"
+    dflags "-O3"
+}
+configuration "p37-timed-optimized" {
+    mainSourceFile "consumer/p37_generational_owner.d"
+    dflags "-O3" "-version=P37Timed"
+}
+
+configuration "p38-null" {
+    mainSourceFile "consumer/p38_generational_owner.d"
+}
+configuration "p38-timed" {
+    mainSourceFile "consumer/p38_generational_owner.d"
+    dflags "-version=P37Timed"
+}
+
+configuration "p38-null-optimized" {
+    mainSourceFile "consumer/p38_generational_owner.d"
+    dflags "-O3"
+}
+configuration "p38-timed-optimized" {
+    mainSourceFile "consumer/p38_generational_owner.d"
+    dflags "-O3" "-version=P37Timed"
+}
+
+configuration "p39-null" {
+    mainSourceFile "consumer/p39_generational_owner.d"
+}
+configuration "p39-timed" {
+    mainSourceFile "consumer/p39_generational_owner.d"
+    dflags "-version=P37Timed"
+}
+
+configuration "p39-null-optimized" {
+    mainSourceFile "consumer/p39_generational_owner.d"
+    dflags "-O3"
+}
+configuration "p39-timed-optimized" {
+    mainSourceFile "consumer/p39_generational_owner.d"
+    dflags "-O3" "-version=P37Timed"
+}
+
+configuration "p40-null" {
+    mainSourceFile "consumer/p40_generational_owner.d"
+}
+configuration "p40-timed" {
+    mainSourceFile "consumer/p40_generational_owner.d"
+    dflags "-version=P37Timed"
+}
+
+configuration "p40-null-optimized" {
+    mainSourceFile "consumer/p40_generational_owner.d"
+    dflags "-O3"
+}
+configuration "p40-timed-optimized" {
+    mainSourceFile "consumer/p40_generational_owner.d"
+    dflags "-O3" "-version=P37Timed"
+}
+
+configuration "p41-real-pool-close" {
+    mainSourceFile "consumer/p41_real_pool_close.d"
+}
+
+configuration "p41-ticket-barrier" {
+    mainSourceFile "consumer/p41_ticket_barrier.d"
+}
+
+configuration "p41-wait-publish" {
+    mainSourceFile "consumer/p41_wait_publish.d"
+}
+
+configuration "p42-wait-publish" {
+    mainSourceFile "consumer/p42_wait_publish.d"
+}
+
+configuration "p42-multi-producer" {
+    mainSourceFile "consumer/p42_multi_producer.d"
+}
+
+configuration "p42-multi-baseline" {
+    mainSourceFile "consumer/p42_multi_producer.d"
+    dflags "-version=P42Baseline"
+}
+
+configuration "p42-close-baseline" {
+    mainSourceFile "consumer/p42_close_race.d"
+    dflags "-version=P42Baseline"
+}
+configuration "p42-close-conditional" {
+    mainSourceFile "consumer/p42_close_race.d"
+}
+
+configuration "p42-bench-baseline" {
+    mainSourceFile "consumer/p42_benchmark.d"
+    dflags "-O3" "-version=P42Baseline"
+}
+configuration "p42-bench-conditional" {
+    mainSourceFile "consumer/p42_benchmark.d"
+    dflags "-O3"
+}
+
+configuration "p42-bench-baseline-medium" {
+    mainSourceFile "consumer/p42_benchmark.d"
+    dflags "-version=P42Baseline" "-version=P42MediumTask"
+}
+configuration "p42-bench-conditional-medium" {
+    mainSourceFile "consumer/p42_benchmark.d"
+    dflags "-version=P42MediumTask"
+}
+
+configuration "p42-idle-baseline" {
+    mainSourceFile "consumer/p42_idle_latency.d"
+    versions "P42Baseline"
+}
+configuration "p42-idle-conditional" {
+    mainSourceFile "consumer/p42_idle_latency.d"
+}
+
+configuration "p42-multi-idle-baseline" {
+    mainSourceFile "consumer/p42_multi_idle.d"
+    versions "P42Baseline"
+}
+configuration "p42-multi-idle-conditional" {
+    mainSourceFile "consumer/p42_multi_idle.d"
+}
+
+# P42.17 diagnostic-only, mutually matched policy arms. Existing P42.16
+# consumer/configurations remain available unchanged.
+configuration "p42-flow-baseline" {
+    mainSourceFile "consumer/p42_multi_idle.d"
+    versions "P42Baseline" "P42Flow"
+}
+configuration "p42-flow-conditional" {
+    mainSourceFile "consumer/p42_multi_idle.d"
+    versions "P42Flow"
+}
+
+# P42.18: same established uninstrumented P42 consumer/workload in both
+# policies. No diagnostic worker/TLS/timestamp/flow overlay. Build=release
+# is supplied identically by the native runner; no per-arm optimization flags.
+configuration "p42-e2e-baseline-light" {
+    mainSourceFile "consumer/p42_benchmark.d"
+    versions "P42Baseline"
+}
+configuration "p42-e2e-conditional-light" {
+    mainSourceFile "consumer/p42_benchmark.d"
+}
+configuration "p42-e2e-baseline-medium" {
+    mainSourceFile "consumer/p42_benchmark.d"
+    versions "P42Baseline" "P42MediumTask"
+}
+configuration "p42-e2e-conditional-medium" {
+    mainSourceFile "consumer/p42_benchmark.d"
+    versions "P42MediumTask"
+}
+
+// P42.20 uses the historical minimal conditional overlay, not observed pools.
+configuration "p42-return-baseline" {
+    mainSourceFile "consumer/p42_return_boundary.d"
+    versions "P42Baseline"
+}
+configuration "p42-return-conditional" {
+    mainSourceFile "consumer/p42_return_boundary.d"
+}
+configuration "p42-return-baseline-optimized" {
+    mainSourceFile "consumer/p42_return_boundary.d"
+    dflags "-O3"
+    versions "P42Baseline"
+}
+configuration "p42-return-conditional-optimized" {
+    mainSourceFile "consumer/p42_return_boundary.d"
+    dflags "-O3"
+}

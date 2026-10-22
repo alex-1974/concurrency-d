@@ -1,0 +1,25 @@
+name "m1-p32-admission-contention"
+description "Research-only matched pinned M0 versus timed M0 producer workload"
+targetType "executable"
+mainSourceFile "consumer/main.d"
+sourcePaths "consumer"
+importPaths "../p15_mutex_timing/generated"
+sourceFiles "../p15_mutex_timing/generated/concurrency/research/m1_p15_pool.d"
+dependency "concurrency-d" path="../../../../"
+dflags "-preview=dip1000"
+
+configuration "control" {
+    mainSourceFile "consumer/main.d"
+}
+configuration "timed" {
+    mainSourceFile "consumer/main.d"
+    dflags "-version=P32Timed" "-version=P15Timed"
+}
+configuration "control-optimized" {
+    mainSourceFile "consumer/main.d"
+    dflags "-O3"
+}
+configuration "timed-optimized" {
+    mainSourceFile "consumer/main.d"
+    dflags "-O3" "-version=P32Timed" "-version=P15Timed"
+}

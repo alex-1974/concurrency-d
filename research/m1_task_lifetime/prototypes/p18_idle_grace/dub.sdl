@@ -1,0 +1,105 @@
+name "m1-p18-idle-grace"
+description "Research-only fixed one-retry worker idle grace vs unmodified M0"
+targetType "executable"
+sourcePaths "generated/concurrency"
+mainSourceFile "generated/consumer/main.d"
+dependency "concurrency-d" path="../../../../"
+dflags "-preview=dip1000"
+
+configuration "control" {
+    mainSourceFile "generated/consumer/main.d"
+}
+configuration "grace" {
+    mainSourceFile "generated/consumer/main.d"
+    versions "P18Grace"
+}
+configuration "control-optimized" {
+    mainSourceFile "generated/consumer/main.d"
+    dflags "-O3"
+}
+configuration "grace-optimized" {
+    mainSourceFile "generated/consumer/main.d"
+    dflags "-O3"
+    versions "P18Grace"
+}
+configuration "idle-control" {
+    mainSourceFile "idle/main.d"
+}
+configuration "idle-grace" {
+    mainSourceFile "idle/main.d"
+    versions "P18Grace"
+}
+configuration "trace-control" {
+    mainSourceFile "generated/trace/consumer/main.d"
+    versions "P18TraceControl"
+}
+configuration "trace-grace" {
+    mainSourceFile "generated/trace/consumer/main.d"
+    versions "P18TraceGrace"
+}
+configuration "pi-control" {
+    mainSourceFile "generated/pi/consumer/main.d"
+    versions "P18TraceControl"
+}
+configuration "pi-grace" {
+    mainSourceFile "generated/pi/consumer/main.d"
+    versions "P18TraceGrace"
+}
+configuration "phase-control" {
+    mainSourceFile "generated/phase/consumer/main.d"
+}
+configuration "phase-grace" {
+    mainSourceFile "generated/phase/consumer/main.d"
+    versions "P18Grace"
+}
+// Source-locked research-only intentional producer admission pacing.
+// The original configurations above remain byte-identical speed baselines.
+configuration "cadence0-control" {
+    mainSourceFile "generated/cadence/consumer/main.d"
+    versions "P18CadenceNone"
+}
+configuration "cadence0-grace" {
+    mainSourceFile "generated/cadence/consumer/main.d"
+    versions "P18CadenceNone" "P18Grace"
+}
+configuration "cadence8-control" {
+    mainSourceFile "generated/cadence/consumer/main.d"
+    versions "P18Cadence8"
+}
+configuration "cadence8-grace" {
+    mainSourceFile "generated/cadence/consumer/main.d"
+    versions "P18Cadence8" "P18Grace"
+}
+configuration "cadence64-control" {
+    mainSourceFile "generated/cadence/consumer/main.d"
+    versions "P18Cadence64"
+}
+configuration "cadence64-grace" {
+    mainSourceFile "generated/cadence/consumer/main.d"
+    versions "P18Cadence64" "P18Grace"
+}
+// Native event-free PARK transition correctness probes, source-pinned
+// clones only. Never include in benchmark or production configurations.
+configuration "park-boundary-control" {
+    mainSourceFile "generated/boundary/main.d"
+}
+configuration "park-boundary-grace" {
+    mainSourceFile "generated/boundary/main.d"
+    versions "P18BoundaryGrace"
+}
+// Actual multi-producer/multi-worker bounded progress correctness probe.
+// No speed or energy claim, no public TaskScope API.
+configuration "fairness-control" {
+    mainSourceFile "fairness/main.d"
+}
+configuration "fairness-grace" {
+    mainSourceFile "fairness/main.d"
+    versions "P18Grace"
+}
+configuration "race-control" {
+    mainSourceFile "generated/race/main.d"
+}
+configuration "race-grace" {
+    mainSourceFile "generated/race/main.d"
+    versions "P18Grace"
+}

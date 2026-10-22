@@ -1,0 +1,31 @@
+name "m1-p16-completion-sampling"
+description "Research-only P16 matched control/null-clock/sampled whole-completion cost"
+targetType "executable"
+mainSourceFile "generated/consumer/main.d"
+sourcePaths "generated"
+dependency "concurrency-d" path="../../../../"
+dflags "-preview=dip1000"
+
+configuration "control" {
+    mainSourceFile "generated/consumer/main.d"
+}
+configuration "null-clock" {
+    mainSourceFile "generated/consumer/main.d"
+    dflags "-version=P16NullProbe"
+}
+configuration "sampled" {
+    mainSourceFile "generated/consumer/main.d"
+    dflags "-version=P16Measured"
+}
+configuration "control-optimized" {
+    mainSourceFile "generated/consumer/main.d"
+    dflags "-O3"
+}
+configuration "null-clock-optimized" {
+    mainSourceFile "generated/consumer/main.d"
+    dflags "-O3" "-version=P16NullProbe"
+}
+configuration "sampled-optimized" {
+    mainSourceFile "generated/consumer/main.d"
+    dflags "-O3" "-version=P16Measured"
+}

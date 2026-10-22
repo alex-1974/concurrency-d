@@ -1,0 +1,30 @@
+name "m1-p16-2-atomic-completion"
+description "Research-only exact M0 vs seq-cst closed/completed handshake"
+targetType "executable"
+sourcePaths "generated/concurrency"
+mainSourceFile "generated/consumer/main.d"
+dependency "concurrency-d" path="../../../../"
+dflags "-preview=dip1000"
+
+configuration "control" {
+    mainSourceFile "generated/consumer/main.d"
+}
+configuration "atomic" {
+    mainSourceFile "generated/consumer/main.d"
+    dflags "-version=P162Atomic"
+}
+configuration "control-optimized" {
+    mainSourceFile "generated/consumer/main.d"
+    dflags "-O3"
+}
+configuration "atomic-optimized" {
+    mainSourceFile "generated/consumer/main.d"
+    dflags "-O3" "-version=P162Atomic"
+}
+configuration "race-control" {
+    mainSourceFile "race/main.d"
+}
+configuration "race-atomic" {
+    mainSourceFile "race/main.d"
+    dflags "-version=P162Atomic"
+}
