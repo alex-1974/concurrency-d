@@ -32,7 +32,8 @@ def main():
         with tarfile.open(fileobj=io.BytesIO(archive)) as tar:
             files = {m.name for m in tar.getmembers() if m.isfile()}
             required = {'README.md', 'LICENSE', 'CHANGELOG.md', 'dub.sdl',
-                        'docs/EXECUTOR.md', 'source/concurrency/package.d'}
+                        'docs/EXECUTOR.md', 'docs/M0-PERFORMANCE-QUALIFICATION.md',
+                        'source/concurrency/package.d'}
             assert required <= files, 'missing archive files: ' + str(required - files)
             unexpected = {f for f in files if f not in required and not (f.startswith('source/') and f.endswith('.d'))}
             assert not unexpected, 'unexpected archive files: ' + str(unexpected)
