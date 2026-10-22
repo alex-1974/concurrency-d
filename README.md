@@ -1,10 +1,11 @@
 # concurrency-d
 
-`concurrency-d` is a D library for CPU task execution. The current branch
-contains the maintainer-accepted M0 public executor candidate for version 0.1.0.
-The release archive, tag, and publication have not yet been prepared or approved.
+`concurrency-d` is a D library for CPU task execution. The first public release,
+version 0.1.0, is available from [DUB](https://code.dlang.org/packages/concurrency-d)
+and the [GitHub release page](https://github.com/alex-1974/concurrency-d/releases/tag/v0.1.0).
+It contains the maintainer-accepted M0 public executor.
 
-The candidate exports `Executor`, typed `TaskHandle` results and executor-use
+The release exports `Executor`, typed `TaskHandle` results and executor-use
 exceptions through `import concurrency`. Submission is explicitly `@system`:
 callers must keep captures valid and synchronize shared state. Root the executor
 and call `closeAndJoin` explicitly. Uncertain native worker start/join and
@@ -22,7 +23,7 @@ dub run --root=examples/cpu-executor --compiler=ldc2 --build=release
 
 ## Project status
 
-The M0 candidate combines the internal CPU executor with a small public
+The M0 release combines the internal CPU executor with a small public
 facade, bounded admission and retained-task limits, explicit shutdown, and a
 public-only consumer example. The exact candidate has passed DMD 2.111, LDC 1.41
 and native ARM64 CI. A scoped native performance qualification on the Dell XPS
@@ -30,9 +31,9 @@ and native ARM64 CI. A scoped native performance qualification on the Dell XPS
 1P/1W plus 4P/4W scenarios; see
 [the result and scope](docs/M0-PERFORMANCE-QUALIFICATION.md). This is not a
 general hardware or workload guarantee. The maintainer has accepted the
-lifecycle policy and public contract. Exact-head release CI and final
-version/archive/tag/publication checks remain open. No stable release is
-available yet.
+lifecycle policy and public contract. The v0.1.0 source archive, signed tag,
+GitHub release, and DUB listing are published. The project remains on the 0.x
+version line; this release does not promise 1.0 compatibility.
 
 ## Repository boundary
 
