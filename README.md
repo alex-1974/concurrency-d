@@ -20,3 +20,15 @@ Initial research focuses on:
 Performance is a primary design requirement. Mature C++ and Rust runtimes are
 used as independent implementation and benchmark references rather than as APIs
 to translate mechanically into D.
+
+## Delivery status
+
+The internal M0 CPU executor supports bounded external submission, typed result
+handles, GC-retained task records, returned-marker reclamation and portable
+parking. The public module is intentionally empty; no stable public executor
+API is exported yet. Newer lifetime and scheduler candidates live on research
+branches and are not automatically part of a release.
+
+See the [M0 release-readiness ledger](docs/research/m0-release-readiness.md) and
+[proposed public executor contract](docs/research/m0-public-executor-contract.md)
+for the next delivery slice, evidence and unresolved native-lifecycle boundary.
