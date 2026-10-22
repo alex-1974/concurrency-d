@@ -25,9 +25,12 @@ dub run --root=examples/cpu-executor --compiler=ldc2 --build=release
 The draft M0 candidate combines the internal CPU executor with a small public
 facade, bounded admission and retained-task limits, explicit shutdown, and a
 public-only consumer example. The exact candidate has passed DMD 2.111, LDC 1.41
-and native ARM64 CI. Native release-performance qualification, lifecycle-policy
-acceptance, and final release checks remain open. No stable release is available
-yet.
+and native ARM64 CI. A scoped native performance qualification on the Dell XPS
+15 with LDC 1.42 passed its predeclared 10% bound for the two tested kernels and
+1P/1W plus 4P/4W scenarios; see
+[the result and scope](docs/M0-PERFORMANCE-QUALIFICATION.md). This is not a
+general hardware or workload guarantee. Lifecycle-policy/public-contract review
+and final release checks remain open. No stable release is available yet.
 
 ## Repository boundary
 

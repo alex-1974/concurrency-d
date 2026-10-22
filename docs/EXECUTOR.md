@@ -135,11 +135,14 @@ are checked; LDC also checks assertions-on -O3. CI pins DMD 2.111.0 and LDC 1.41
 and runs the same public gate on native ARM64.
 
 A stable v0.1 release still requires exact-head CI, maintainer review and
-acceptance of the lifecycle and public contracts, a thermally qualified native
-public-path end-to-end baseline, final archive/version/tag/publication checks,
-and recorded release-gate acceptance. MIT and DUB license metadata are already
-present. The M1 Conditional candidate, source-pinned research and proposed
-TaskScope are not silently imported into this API.
+acceptance of the lifecycle and public contracts, and final
+archive/version/tag/publication checks. The scoped Dell XPS 15 / LDC 1.42
+public-path baseline passed the predeclared 10% bound for the two documented
+kernels and 1P/1W plus 4P/4W scenarios; its machine-specific scope and result are
+in [the M0 qualification record](M0-PERFORMANCE-QUALIFICATION.md). That result
+is not a general performance guarantee. MIT and DUB license metadata are
+already present. The M1 Conditional candidate, source-pinned research and
+proposed TaskScope are not silently imported into this API.
 
 For an exploratory matched public/internal LDC release comparison, run
 `python3 tools/validation/m0_public_path.py NEW-RESULT-DIRECTORY`. Use

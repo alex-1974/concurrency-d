@@ -8,10 +8,13 @@ CPU/completion consumer. Submission is `@system`; capture lifetime and shared
 state remain the caller's responsibility. The candidate policy aborts on
 uncertain native worker lifetime. See [the API guide](docs/EXECUTOR.md).
 
-Release acceptance remains open until the exact-head DMD/LDC/native ARM64 CI
-passes, the lifecycle policy and public contract are accepted, a thermally
-qualified native public-path baseline is recorded, and version/archive/release
-checks are complete. License metadata and the MIT license file are present.
+The exact-head DMD/LDC/native ARM64 CI passes. The scoped Dell XPS 15 / LDC 1.42
+public-path baseline passed the predeclared 10% bound for its two kernels and
+two producer/worker scenarios; see
+[the qualification record](docs/M0-PERFORMANCE-QUALIFICATION.md). Release
+acceptance remains open until maintainers accept the lifecycle policy and public
+contract and the version/archive/release checks are complete. License metadata
+and the MIT license file are present.
 
 ## M1 — Ownership and scheduler research
 
