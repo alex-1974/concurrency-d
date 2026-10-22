@@ -20,3 +20,12 @@ repository structure, or toolchain policy:
 
 Performance is a primary design requirement, but faster code with weaker
 semantics is not an optimization.
+
+## Research repository boundary
+
+Detailed evidence, experimental prototypes and exploratory harnesses belong in
+https://github.com/alex-1974/concurrency-d-research. Do not add research/,
+docs/research/ or tools/research/ here. Keep active regression/release gates,
+maintained qualification benchmarks and compact reviewed decisions in this
+repository. Pin external evidence links to research commit SHAs. The library
+must not acquire a build/runtime dependency on its research companion.

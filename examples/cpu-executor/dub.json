@@ -1,0 +1,6 @@
+{
+  "name": "concurrency-cpu-example",
+  "description": "Standalone public concurrency-d CPU/completion consumer",
+  "targetType": "executable",
+  "dependencies": {"concurrency-d": {"path": "../.."}}
+}

@@ -5,17 +5,43 @@ on:
     branches:
       - develop
     paths:
+      - "research/**"
+      - "docs/research/**"
+      - "tools/research/**"
       - "dub.sdl"
-      - "source/concurrency/internal/**"
+      - ".gitattributes"
+      - "LICENSE"
+      - "tools/validation/m0_package.py"
+      - "source/concurrency/**"
+      - "tests/public_api/**"
+      - "examples/cpu-executor/**"
+      - "tools/validation/m0_public_api.py"
+      - "tools/validation/m0_public_path.py"
+      - "tests/lifecycle/**"
+      - "tools/validation/m0_lifecycle.py"
       - "benchmarks/parking/**"
+      - "benchmarks/executor/**"
       - ".github/workflows/work-stealing-consumer.yml"
   push:
     branches:
       - develop
     paths:
+      - "research/**"
+      - "docs/research/**"
+      - "tools/research/**"
       - "dub.sdl"
-      - "source/concurrency/internal/**"
+      - ".gitattributes"
+      - "LICENSE"
+      - "tools/validation/m0_package.py"
+      - "source/concurrency/**"
+      - "tests/public_api/**"
+      - "examples/cpu-executor/**"
+      - "tools/validation/m0_public_api.py"
+      - "tools/validation/m0_public_path.py"
+      - "tests/lifecycle/**"
+      - "tools/validation/m0_lifecycle.py"
       - "benchmarks/parking/**"
+      - "benchmarks/executor/**"
       - ".github/workflows/work-stealing-consumer.yml"
   workflow_dispatch:
 
@@ -54,13 +80,37 @@ jobs:
         shell: bash
         run: dub test --compiler="$DC" --force
 
+      - name: M0 lifecycle and isolated native-failure boundary
+        shell: bash
+        run: python3 tools/validation/m0_lifecycle.py "$DC"
+
+      - name: Public executor consumers and compile-negative contract
+        shell: bash
+        run: python3 tools/validation/m0_public_api.py "$DC"
+
+      - name: Exported package consumer
+        run: python3 tools/validation/m0_package.py "$DC"
+
       - name: Release build
         shell: bash
         run: dub build --build=release --compiler="$DC" --force
 
+      - name: Public Ddoc generation
+        shell: bash
+        run: dub build --build=docs --compiler="$DC" --force
+
+      - name: Same-work public/internal executor smoke (no timing threshold)
+        shell: bash
+        run: |
+          dub build --root=benchmarks/executor --build=release --compiler="$DC" --force
+          ./benchmarks/executor/concurrency-executor-benchmark internal 4 4 1024
+          ./benchmarks/executor/concurrency-executor-benchmark public 4 4 1024
+          ./benchmarks/executor/concurrency-executor-benchmark internal 4 4 64 2048
+          ./benchmarks/executor/concurrency-executor-benchmark public 4 4 64 2048
+
       - name: Portable parking smoke and metrics (not a fixed performance gate)
         shell: bash
-        run: dub run --config=parking-benchmark --build=release --compiler="$DC" --force -- 2 64
+        run: dub run --root=benchmarks/parking --build=release --compiler="$DC" --force -- 2 64
 
   native-arm64:
     name: Consumer / native ARM64 / LDC 1.41
@@ -89,10 +139,34 @@ jobs:
         shell: bash
         run: dub test --compiler="$DC" --force
 
+      - name: M0 lifecycle and isolated native-failure boundary
+        shell: bash
+        run: python3 tools/validation/m0_lifecycle.py "$DC"
+
+      - name: Public executor consumers and compile-negative contract
+        shell: bash
+        run: python3 tools/validation/m0_public_api.py "$DC"
+
+      - name: Exported package consumer
+        run: python3 tools/validation/m0_package.py "$DC"
+
       - name: Release build
         shell: bash
         run: dub build --build=release --compiler="$DC" --force
 
+      - name: Public Ddoc generation
+        shell: bash
+        run: dub build --build=docs --compiler="$DC" --force
+
+      - name: Same-work public/internal executor smoke (no timing threshold)
+        shell: bash
+        run: |
+          dub build --root=benchmarks/executor --build=release --compiler="$DC" --force
+          ./benchmarks/executor/concurrency-executor-benchmark internal 4 4 1024
+          ./benchmarks/executor/concurrency-executor-benchmark public 4 4 1024
+          ./benchmarks/executor/concurrency-executor-benchmark internal 4 4 64 2048
+          ./benchmarks/executor/concurrency-executor-benchmark public 4 4 64 2048
+
       - name: Portable parking smoke and metrics (not a fixed performance gate)
         shell: bash
-        run: dub run --config=parking-benchmark --build=release --compiler="$DC" --force -- 2 64
+        run: dub run --root=benchmarks/parking --build=release --compiler="$DC" --force -- 2 64

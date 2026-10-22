@@ -15,3 +15,5 @@ concurrency-d-test-*
 *.exe
 
 .workspace/
+
+/concurrency-executor-benchmark

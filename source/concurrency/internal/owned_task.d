@@ -1,11 +1,11 @@
 /**
  * Experimental M0 owned-callable submission layer.
  *
- * Each accepted work node is strongly retained by the executor until the
- * executor has joined. A separate typed result cell allows the caller to
+ * Each accepted work node is strongly retained until its post-dispatch return
+ * marker permits reclamation or the executor has joined. A separate typed result cell allows the caller to
  * wait before shutdown or drop the result handle entirely. This first design
- * intentionally caps the number of retained nodes; reclamation/recycling
- * before join is a later performance/lifetime decision.
+ * intentionally caps retained nodes and reclaims completed records using
+ * their release/acquire returned markers.
  *
  * The submission methods are @system: an arbitrary D callable may contain
  * borrowed references that are NOT safe to ship to another thread. This
@@ -35,108 +35,12 @@ import core.sync.mutex :
 import core.thread :
     Thread;
 
+import concurrency.internal.lifecycle : LifecycleFailure, lifecycleFailStop;
+import concurrency.task : ResultCell, TaskHandle;
+import concurrency.errors : ExecutorClosedException;
+
 import std.traits :
     ReturnType;
-
-/** A single-result completion cell, independent of executor shutdown. */
-private final class ResultCell(R)
-{
-    private Mutex _mutex;
-    private Condition _changed;
-    private bool _done;
-    private Throwable _error;
-
-    static if (!is(R == void))
-        private R _value;
-
-    this()
-    {
-        _mutex = new Mutex();
-        _changed = new Condition(_mutex);
-    }
-
-    static if (is(R == void))
-    {
-        void succeed()
-        {
-            synchronized (_mutex)
-            {
-                assert(!_done);
-                _done = true;
-                _changed.notifyAll();
-            }
-        }
-    }
-    else
-    {
-        void succeed(R value)
-        {
-            synchronized (_mutex)
-            {
-                assert(!_done);
-                _value = value;
-                _done = true;
-                _changed.notifyAll();
-            }
-        }
-    }
-
-    void fail(Throwable failure)
-    {
-        synchronized (_mutex)
-        {
-            assert(!_done);
-            _error = failure;
-            _done = true;
-            _changed.notifyAll();
-        }
-    }
-
-    bool isComplete()
-    {
-        synchronized (_mutex)
-            return _done;
-    }
-
-    auto get()
-    {
-        synchronized (_mutex)
-        {
-            while (!_done)
-                _changed.wait();
-
-            if (_error !is null)
-                throw _error;
-
-            static if (!is(R == void))
-                return _value;
-        }
-    }
-}
-
-/**
- * A typed result handle. Dropping it never cancels accepted work.
- * The executor owns the task record, not the TaskHandle.
- */
-package(concurrency) final class TaskHandle(R)
-{
-    private ResultCell!R _cell;
-
-    this(ResultCell!R cell)
-    {
-        _cell = cell;
-    }
-
-    bool isComplete()
-    {
-        return _cell.isComplete();
-    }
-
-    auto get()
-    {
-        return _cell.get();
-    }
-}
 
 /**
  * Common leading record layout for the owned-executor completion callback.
@@ -226,8 +130,9 @@ private final class OwnedNode(F, R)
             }
             catch (Throwable)
             {
-                // Fatal synchronization failure is outside the ordinary
-                // recoverable-exception guarantee.
+                // Failure to publish the outcome must not be swallowed:
+                // a handle could otherwise wait forever for an unreported task.
+                lifecycleFailStop(LifecycleFailure.worker);
             }
         }
     }
@@ -239,8 +144,8 @@ private final class OwnedNode(F, R)
  * Records are retained in a bounded executor-owned Object[] so that GC
  * cannot collect a task merely because its TaskHandle has been dropped.
  * Admission and close are serialized under the same lock. The cost of
- * retaining all accepted nodes until join is deliberate and explicitly
- * bounded; a future pool should reclaim completed nodes incrementally.
+ * retaining unreturned nodes is deliberately bounded; returned-marker
+ * reclamation permits reuse of that budget before executor shutdown.
  */
 package(concurrency) final class OwnedTaskExecutor
 {
@@ -260,19 +165,20 @@ package(concurrency) final class OwnedTaskExecutor
     // _mutex serializes admission against shutdown. Exactly one caller
     // performs the worker join; other closers wait for the same outcome.
     private Lifecycle _lifecycle;
-    private Throwable _shutdownFailure;
 
     this(size_t workers, size_t ingressCapacity, size_t maxRetained = 4096)
     {
         if (maxRetained == 0)
             throw new Exception("maxRetained must be positive");
 
-        _pool = new SubmissionWorkerPool(
-            workers, ingressCapacity, &markReturned);
+        // Finish all owner allocations before any native worker can start.
+        // A setup failure may then unwind without leaking a live idle pool.
         _mutex = new Mutex();
         _lifecycleChanged = new Condition(_mutex);
         _lifecycle = Lifecycle.running;
         _maxRetained = maxRetained;
+        _pool = new SubmissionWorkerPool(
+            workers, ingressCapacity, &markReturned);
     }
 
     /**
@@ -293,7 +199,7 @@ package(concurrency) final class OwnedTaskExecutor
         synchronized (_mutex)
         {
             if (_lifecycle != Lifecycle.running)
-                throw new Exception("executor is closed");
+                throw new ExecutorClosedException();
 
             if (_retained.length >= _maxRetained)
             {
@@ -327,7 +233,7 @@ package(concurrency) final class OwnedTaskExecutor
                 _retained.length = _retained.length - 1;
 
                 if (status == SubmissionResult.closed)
-                    throw new Exception("executor is closed");
+                    throw new ExecutorClosedException();
 
                 assert(status == SubmissionResult.full);
                 return typeof(handle).init;
@@ -399,14 +305,18 @@ package(concurrency) final class OwnedTaskExecutor
      * Idempotent, thread-safe draining shutdown for external controller
      * threads. The first caller linearizes RUNNING -> DRAINING against task
      * admission and performs the only Thread.join sequence. Other callers
-     * wait for STOPPED and observe the same shutdown outcome.
+     * wait for STOPPED, which is published only after successful native join.
+     * Uncertain native lifetime is process-fatal, not a recoverable STOPPED.
      *
-     * A task running on this executor must not call closeAndJoin(): joining
-     * its own worker would deadlock. Do not race destruction/GC collection
+     * A task running on this executor receives WorkerSelfJoinException before
+     * the lifecycle lock/state transition. Do not race destruction/GC collection
      * of this executor with active methods.
      */
     void closeAndJoin()
     {
+        // Reject a worker even when another controller is already draining:
+        // waiting on that controller here would deadlock its native join.
+        _pool.requireExternalController();
         synchronized (_mutex)
         {
             final switch (_lifecycle)
@@ -418,48 +328,36 @@ package(concurrency) final class OwnedTaskExecutor
                 case Lifecycle.draining:
                     while (_lifecycle != Lifecycle.stopped)
                         _lifecycleChanged.wait();
-
-                    if (_shutdownFailure !is null)
-                        throw _shutdownFailure;
                     return;
 
                 case Lifecycle.stopped:
-                    if (_shutdownFailure !is null)
-                        throw _shutdownFailure;
                     return;
             }
         }
 
         // Joining with _mutex held would block other controller threads
         // (and any final admission already linearized before shutdown).
-        Throwable failure;
         try
         {
             _pool.closeAndJoin();
         }
-        catch (Throwable error)
+        catch (Throwable)
         {
-            failure = error;
+            // Defensive boundary: a pool shutdown failure is not proof of
+            // quiescence. Never publish stopped or allow owner-stack unwind.
+            lifecycleFailStop(LifecycleFailure.owner);
         }
 
         synchronized (_mutex)
         {
-            if (failure is null)
-            {
-                // All worker callbacks have returned by now. Clearing
-                // these references cannot invalidate a queued record.
-                foreach (ref entry; _retained)
-                    entry = RetainedTask.init;
-                _retained.length = 0;
-            }
+            // Every worker has positively joined; final callbacks returned.
+            foreach (ref entry; _retained)
+                entry = RetainedTask.init;
+            _retained.length = 0;
 
-            _shutdownFailure = failure;
             _lifecycle = Lifecycle.stopped;
             _lifecycleChanged.notifyAll();
         }
-
-        if (failure !is null)
-            throw failure;
     }
 
     /** Diagnostic for lifecycle tests, not yet part of the public API. */

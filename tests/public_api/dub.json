@@ -1,0 +1,12 @@
+{
+  "name": "concurrency-public-api-consumer",
+  "description": "External module using only the public concurrency API",
+  "targetType": "executable",
+  "sourcePaths": [],
+  "mainSourceFile": "main.d",
+  "dependencies": {"concurrency-d": {"path": "../.."}},
+  "configurations": [
+    {"name": "normal"},
+    {"name": "optimized", "dflags": ["-O3"]}
+  ]
+}

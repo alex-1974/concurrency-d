@@ -1,0 +1,8 @@
+{
+  "name": "m0-lifecycle-consumer",
+  "description": "Internal M0 lifecycle regression consumer; not public API",
+  "targetType": "executable",
+  "sourcePaths": [],
+  "mainSourceFile": "main.d",
+  "dependencies": {"concurrency-d": {"path": "../.."}}
+}

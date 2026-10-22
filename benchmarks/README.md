@@ -16,3 +16,10 @@ Performance qualification will include, where applicable:
 - context switches.
 
 Reference comparisons must perform materially equivalent work.
+
+Current repository commands (benchmarks are excluded from the library archive):
+
+```sh
+dub run --root=benchmarks/parking --compiler=ldc2 --build=release -- 2 64
+dub run --root=benchmarks/executor --compiler=ldc2 --build=release -- public 4 4 1024
+```
