@@ -1,5 +1,22 @@
 # Roadmap
 
+## Delivery milestones
+
+- **M0 / v0.1:** small usable CPU executor with a documented public API,
+  bounded owned-task admission, typed results, explicit shutdown/error policy,
+  independent public consumer and recorded release evidence. Internal execution
+  exists; the public contract and native-failure boundary remain open.
+- **M1 / v0.2:** structured task groups, explicit ownership/lifetime families,
+  cooperative cancellation and qualified fork/join. No general safe TaskScope
+  is currently accepted.
+- **M2 / v0.3:** independent CPU/event-loop consumers and fair end-to-end
+  comparisons with Phobos, Taskflow, Rayon and oneTBB.
+
+Current acceptance and order of work are tracked in the
+[M0 readiness ledger](docs/research/m0-release-readiness.md). The R0–R2 sections
+below retain the original mechanism-oriented research plan; they are not a
+current release-completion checklist.
+
 ## R0 — Scheduler foundations
 
 Research and benchmark the primitive mechanisms before freezing a public API.
