@@ -1,6 +1,6 @@
 # ADR-0004 — Defer a general Sender/Receiver layer
 
-- **Status:** Proposed for v0.2; composition boundary selected locally
+- **Status:** Accepted for the v0.2.0 candidate; release qualification pending
 - **Issue:** [#22 — task composition and Sender/Receiver interoperability](https://github.com/alex-1974/concurrency-d/issues/22)
 - **Reference inspected:** [Symmetry Investments concurrency](https://github.com/symmetryinvestments/concurrency/tree/5a3613b9ad239579c7460c779540ffa9645e7cfd)
 
