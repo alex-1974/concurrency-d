@@ -1,6 +1,6 @@
 # ADR-0003 — Coalesce publish notifications without changing parking
 
-- **Status:** Proposed for v0.2; implementation qualified locally
+- **Status:** Accepted for the v0.2.0 candidate; release qualification pending
 - **Issue:** [#21 — worker parking and wake policy](https://github.com/alex-1974/concurrency-d/issues/21)
 - **Research basis:** [P42 conditional-notification study](https://github.com/alex-1974/concurrency-d-research/tree/894cfe81bcf41ca88e20a418eb90d6f2de7c83f9/research/m1_task_lifetime/prototypes/p42_notification_coalescing)
 

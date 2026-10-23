@@ -1,9 +1,9 @@
 # Changelog
 
-## Unreleased
+## [0.2.0] - release candidate
 
-- Prototype bounded lexical `TaskScope` groups, cooperative cancellation, and
-  a typed two-way `Executor.join` for the planned v0.2.0 API.
+- Add bounded lexical `TaskScope` groups, cooperative cancellation, and
+  a typed two-way `Executor.join` to the v0.2.0 candidate API.
 - Define cancellation as an idempotent shared request that never replaces the
   callable's single result, including completion and shutdown races.
 - Keep owned and scoped callable submission `@system` based on external

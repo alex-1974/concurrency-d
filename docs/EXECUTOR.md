@@ -1,8 +1,9 @@
 # Public CPU executor and M1 scope prototype
 
-The v0.1.0 release exports the M0 API through `import concurrency`. The current
-development branch also contains a provisional M1 lexical-scope prototype;
-that addition is not part of the v0.1.0 archive and is not yet a stable API.
+The v0.1.0 release exports the M0 API through `import concurrency`. The v0.2.0
+candidate on `develop` adds a lexical scope and typed two-way join. Those
+additions are not part of the published v0.1.0 archive and await exact-candidate
+qualification before release.
 
 ## Quick start
 
@@ -227,10 +228,10 @@ predeclared 10% bound for the two documented
 kernels and 1P/1W plus 4P/4W scenarios; its machine-specific scope and result are
 in [the M0 qualification record](M0-PERFORMANCE-QUALIFICATION.md). That result
 is not a general performance guarantee. MIT and DUB license metadata are
-already present. The M1 branch now applies the narrowly selected conditional
+already present. The v0.2.0 candidate applies the narrowly selected conditional
 publish-notification policy from
 [ADR-0003](adr/0003-coalesce-idle-publish-notifications.md); it and the
-provisional TaskScope implementation remain separate from the released v0.1.0
+candidate TaskScope implementation remain separate from the released v0.1.0
 API.
 
 For an exploratory matched public/internal LDC release comparison, run

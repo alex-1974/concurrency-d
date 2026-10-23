@@ -1,6 +1,6 @@
 # ADR-0002 — Separate owned tasks from scope-bounded tasks
 
-- **Status:** Proposed for v0.2; safety boundary selected, release acceptance pending
+- **Status:** Accepted for the v0.2.0 candidate; release qualification pending
 - **Issue:** [#17 — task lifetimes and storage boundaries](https://github.com/alex-1974/concurrency-d/issues/17)
 - **Research basis:** [pinned M1 lifetime corpus](https://github.com/alex-1974/concurrency-d-research/tree/894cfe81bcf41ca88e20a418eb90d6f2de7c83f9/research/m1_task_lifetime)
 

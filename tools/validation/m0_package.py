@@ -4,6 +4,7 @@ import argparse
 import io
 import json
 from pathlib import Path
+import re
 import subprocess
 import tarfile
 import tempfile
@@ -15,6 +16,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('compiler', help='dmd, ldc2, or a path to either compiler')
     parser.add_argument('--tree', default='HEAD', help='Git tree/commit to export; defaults to HEAD')
+    parser.add_argument('--expect-version', help='Require this version in the exported dub.sdl')
     args = parser.parse_args()
     compiler = Path(args.compiler).name
     if compiler == 'ldmd2':
@@ -41,6 +43,11 @@ def main():
             tar.extractall(package, filter='data')
         manifest = (package / 'dub.sdl').read_text()
         assert 'license "MIT"' in manifest and 'benchmark' not in manifest
+        version = re.search(r'^version "([^"]+)"$', manifest, re.MULTILINE)
+        assert version, 'exported manifest has no version'
+        if args.expect_version:
+            assert version.group(1) == args.expect_version, (
+                f'exported version {version.group(1)} != {args.expect_version}')
         assert 'MIT License' in (package / 'LICENSE').read_text()
         def run(command, cwd):
             subprocess.run(command, cwd=cwd, check=True, timeout=180)
@@ -52,7 +59,7 @@ def main():
             'name': 'archive-public-consumer', 'targetType': 'executable',
             'dependencies': {'concurrency-d': {'path': str(package)}}}))
         run(['dub', 'run', '--compiler=' + compiler, '--build=release'], consumer)
-        print(f'PACKAGE_GATE_PASS tree={tree} compiler={compiler} files={len(files)}; archive and external consumer only, no registry release claim')
+        print(f'PACKAGE_GATE_PASS tree={tree} version={version.group(1)} compiler={compiler} files={len(files)}; archive and external consumer only, no registry release claim')
 
 
 if __name__ == '__main__':

@@ -5,9 +5,9 @@ published on [DUB](https://code.dlang.org/packages/concurrency-d) and
 [GitHub](https://github.com/alex-1974/concurrency-d/releases/tag/v0.1.0).
 That release contains the maintainer-accepted M0 executor API.
 
-The `m1/task-lifetimes` development branch prototypes a bounded lexical task
+The v0.2.0 candidate on `develop` adds a bounded lexical task
 scope through `Executor.withScope`. This API is `@system`, experimental, and
-not part of the v0.1.0 archive. It drains accepted children through their
+not part of the published v0.1.0 archive. It drains accepted children through their
 post-dispatch return before scope exit; same-pool workers help available queued
 work while admitting or joining nested scoped tasks. `Executor.join(left,
 right)` adds a typed two-way path that schedules one branch and runs the other
@@ -51,8 +51,8 @@ kernels and 1P/1W plus 4P/4W scenarios; see
 general hardware or workload guarantee. The project remains on the 0.x version
 line; v0.1.0 does not promise 1.0 compatibility.
 
-The M1 direction is structured tasks, practical lifetime control, cooperative
-cancellation and evidence-based runtime choices. The branch also prototypes
+The M1 candidate adds structured tasks, practical lifetime control, cooperative
+cancellation and evidence-based runtime choices. It also applies
 the narrow conditional publish-notification policy selected in
 [ADR-0003](docs/adr/0003-coalesce-idle-publish-notifications.md). Detailed
 prototypes and measurements live in

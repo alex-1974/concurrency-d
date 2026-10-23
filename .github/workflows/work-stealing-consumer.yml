@@ -99,7 +99,7 @@ jobs:
         run: python3 tools/validation/m0_public_api.py "$DC"
 
       - name: Exported package consumer
-        run: python3 tools/validation/m0_package.py "$DC"
+        run: python3 tools/validation/m0_package.py "$DC" --expect-version 0.2.0
 
       - name: Release build
         shell: bash
@@ -174,7 +174,7 @@ jobs:
         run: python3 tools/validation/m0_public_api.py "$DC"
 
       - name: Exported package consumer
-        run: python3 tools/validation/m0_package.py "$DC"
+        run: python3 tools/validation/m0_package.py "$DC" --expect-version 0.2.0
 
       - name: Release build
         shell: bash
