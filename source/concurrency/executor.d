@@ -3,11 +3,15 @@
  *
  * This is a version-zero API candidate. Submission is @system: the caller must
  * guarantee referent lifetimes and race-free cross-thread access. There is no
- * detach, cancellation, destructor join, work helping or general TaskScope.
+ * detach, independent-task cancellation or destructor join. Worker helping is
+ * limited to scoped admission and joins; TaskHandle.get() is an ordinary wait.
+ * TaskScope exposes only cooperative cancellation for its lexical children.
  */
 module concurrency.executor;
 
 private import concurrency.internal.owned_task : OwnedTaskExecutor;
+private import concurrency.taskscope : TaskScope, TaskScopeState;
+private import concurrency.task : TaskHandle;
 private import std.traits : ReturnType;
 
 // Match the actual storage operations: default storage, copy construction and
@@ -37,13 +41,24 @@ private template supportedTask(F)
 }
 
 /**
+ * Results from Executor.join. Fields for void-returning callables are omitted.
+ */
+struct JoinResult(L, R)
+{
+    static if (!is(L == void)) L left;
+    static if (!is(R == void)) R right;
+}
+
+/**
  * CPU executor with bounded ingress and retained-record capacity.
  *
  * Safely publish the executor to producer threads; keep it explicitly rooted
  * until closeAndJoin succeeds. Multiple external producers and close callers
  * are supported. No finalizer or destructor silently joins on the caller's
- * behalf. User callbacks, copies and destructors must not invalidate published
- * storage or reenter executor operations under their admission lock.
+ * behalf. Scoped joins may help execute work on this executor from a worker;
+ * a TaskHandle.get() wait does not. User callbacks, copies and destructors
+ * must not invalidate published storage or reenter executor operations under
+ * their admission lock.
  *
  * Native start/join uncertainty and escaped scheduler failures are process-fatal
  * (abort). This preserves the internal lifecycle boundary; it does not provide
@@ -82,8 +97,10 @@ final class Executor
 
     /**
      * Retry capacity rejection until admitted or closed. May wait indefinitely
-     * if accepted tasks never return. No fairness, timeout or worker helping is
-     * promised. Do not use blocking capacity retry from an exhausted own pool.
+     * if retained/inbox capacity is held by work that cannot make progress.
+     * When a worker retries admission, it runs available same-pool work to
+     * make capacity progress. No fairness or timeout is promised; blocked
+     * callbacks or a retained budget too small for active parents can exhaust it.
      */
     auto submit(F)(auto ref F callable) @system
         if (supportedTask!F)
@@ -101,5 +118,84 @@ final class Executor
     void closeAndJoin()
     {
         _impl.closeAndJoin();
+    }
+
+    package(concurrency) void reclaimCompletedTasks()
+    {
+        _impl.reclaimCompleted();
+    }
+
+    package(concurrency) void waitForScopeTask(R)(TaskHandle!R handle) @system
+    {
+        _impl.waitForScopeTask(handle);
+    }
+
+    /**
+     * Run a bounded lexical task group. Every accepted child is joined after
+     * its worker has returned from dispatch, even if `body` throws. Task
+     * failures are rethrown after all children return. The scope is @system:
+     * callers must keep borrowed captures valid and synchronize shared state.
+     *
+     * maxTasks is the maximum number of children submitted during this call.
+     * Submission can wait indefinitely for executor capacity. A same-pool
+     * worker can open a nested scope; its join helps run queued executor work
+     * rather than blocking all workers. Detach is not provided.
+     */
+    void withScope(
+        size_t maxTasks,
+        scope void delegate(ref TaskScope) body) @system
+    {
+        if (body is null)
+            throw new Exception("scope body must not be null");
+
+        auto state = new TaskScopeState(this, maxTasks);
+        TaskScope taskScope = TaskScope(state);
+        try
+        {
+            body(taskScope);
+        }
+        catch (Throwable failure)
+        {
+            // Drain only; preserve the body's exception as the visible error.
+            state.drain();
+            throw failure;
+        }
+
+        state.join();
+    }
+
+    /**
+     * Fork `left` as one scoped child and run `right` inline on the caller.
+     * Both sides complete before this returns; non-void results are returned
+     * in JoinResult. If either side fails, the other side is still drained
+     * before the exception escapes. This is a small fork-join primitive, not
+     * a load-balancing policy; callers choose which side to schedule.
+     *
+     * This operation is @system for the same capture-lifetime reasons as
+     * submit and withScope. It may wait for bounded executor admission and
+     * can help available work when called from one of this executor's workers.
+     */
+    auto join(F1, F2)(auto ref F1 left, auto ref F2 right) @system
+        if (supportedTask!F1 && supportedTask!F2)
+    {
+        alias L = ReturnType!F1;
+        alias R = ReturnType!F2;
+        TaskHandle!L leftHandle;
+        JoinResult!(L, R) result;
+
+        withScope(1, (ref tasks) {
+            leftHandle = tasks.spawn(left);
+            static if (is(R == void))
+                right();
+            else
+                result.right = right();
+        });
+
+        static if (is(L == void))
+            leftHandle.get();
+        else
+            result.left = leftHandle.get();
+
+        return result;
     }
 }

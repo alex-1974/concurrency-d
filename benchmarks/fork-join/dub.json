@@ -1,0 +1,12 @@
+{
+  "name": "concurrency-fork-join-benchmark",
+  "targetType": "executable",
+  "sourcePaths": [],
+  "mainSourceFile": "main.d",
+  "targetName": "concurrency-fork-join-benchmark",
+  "dependencies": {
+    "concurrency-d": {
+      "path": "../.."
+    }
+  }
+}

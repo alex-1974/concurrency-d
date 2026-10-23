@@ -1,0 +1,10 @@
+{
+  "name": "concurrency-owned-storage-benchmark",
+  "description": "Public Executor task-node allocation and retention diagnostic",
+  "targetType": "executable",
+  "targetName": "concurrency-owned-storage-benchmark",
+  "sourcePaths": ["."],
+  "dependencies": {
+    "concurrency-d": { "path": "../.." }
+  }
+}
