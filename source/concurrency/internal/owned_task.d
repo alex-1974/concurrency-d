@@ -51,13 +51,16 @@ private struct CompletionPrefix
 {
     TaskHeader header;
     shared uint returned;
+    void function(TaskRef) nothrow afterExecution;
 }
 
 private void markReturned(TaskRef task)
     @trusted nothrow
 {
     auto prefix = cast(shared(CompletionPrefix)*) task.ptr;
-    atomicStore!(MemoryOrder.rel)(prefix.returned, 1u);
+    const callback = (cast(CompletionPrefix*) prefix).afterExecution;
+    assert(callback !is null);
+    callback(task);
 }
 
 private struct RetainedTask
@@ -88,6 +91,7 @@ private final class OwnedNode(F, R)
         _record.callable = callable;
         _record.cell = cell;
         _record.prefix.header.execute = &execute;
+        _record.prefix.afterExecution = &publishReturned;
         atomicStore!(MemoryOrder.raw)(_record.prefix.returned, 0u);
     }
 
@@ -135,6 +139,17 @@ private final class OwnedNode(F, R)
                 lifecycleFailStop(LifecycleFailure.worker);
             }
         }
+    }
+
+    private static void publishReturned(TaskRef task)
+        @trusted nothrow
+    {
+        // Keep the result cell in a local before the returned marker. The
+        // release marker is the worker's final access to this task record.
+        auto record = cast(Record*) task.ptr;
+        auto cell = record.cell;
+        atomicStore!(MemoryOrder.rel)(record.prefix.returned, 1u);
+        cell.markReturned();
     }
 }
 
@@ -280,6 +295,19 @@ package(concurrency) final class OwnedTaskExecutor
         }
     }
 
+    /** Wait for scope quiescence, helping this executor when called by a worker. */
+    void waitForScopeTask(R)(TaskHandle!R handle) @system
+    {
+        if (_pool.isCurrentWorker())
+        {
+            _pool.helpUntil(
+                () => handle.hasReturned(),
+                () => handle.waitUntilReturned());
+        }
+        else
+            handle.waitUntilReturned();
+    }
+
     /** Test/diagnostic observation; excludes rejected ephemeral nodes. */
     size_t retainedCount()
     {
@@ -296,6 +324,9 @@ package(concurrency) final class OwnedTaskExecutor
 
             if (handle !is null)
                 return handle;
+
+            if (_pool.isCurrentWorker() && _pool.helpCurrentWorkerOnce())
+                continue;
 
             Thread.yield();
         }
@@ -382,6 +413,12 @@ package(concurrency) final class OwnedTaskExecutor
     size_t completedCount()
     {
         return _pool.completedCount();
+    }
+
+    /** Reject scope joins initiated by a worker of this same pool. */
+    void requireExternalController()
+    {
+        _pool.requireExternalController();
     }
 }
 
