@@ -202,6 +202,14 @@ fixed claims sometimes led. Use adaptive claims when a small lower bound is
 useful across uncertain costs; use fixed claims when costs cluster or a hard
 per-claim upper bound matters. Benchmark both methods for peak performance.
 
+A four-session grain screen on the XPS 15 and Neoverse-N2 found that adaptive
+minimum grain 64 improved the four-worker median for a known short, uniform
+workload by 25% and 18%, respectively, compared with minimum grain 1. It also
+raised p95 by 38% and 12% for a heavy-suffix workload, and by 12% and 23% for
+long uniform work. Keep 1 as the general starting point; test 64 only when
+items are known to be short and uniform, and check tail latency across the
+whole workload mix. [Raw results and protocol](https://github.com/alex-1974/concurrency-d-research/tree/98cacfa/research/m3_fine_adaptive_profile/results/grain_screen).
+
 The caller may also pass `WorkSize.large` to `submit`, `trySubmit`,
 `TaskScope.spawn` or `join` when a callable is expected to run substantially
 longer than ordinary work. Workers
