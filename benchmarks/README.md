@@ -99,8 +99,11 @@ The run also attempts separate short- and heavy-callback `perf` call-graph
 captures for the v0.3.0 adaptive and fixed arms. It uses the user-space
 `cpu-clock` event, and records profiler availability/permission details in the
 artifact. These profiles show sampled on-CPU cost; they do not measure time
-spent blocked in joins. The run does not change the library source or select a
-release candidate.
+spent blocked in joins. If a hosted virtual ARM64 runner exposes no sampling
+PMU, the workflow falls back to process-scoped task time, context switches,
+migrations, and page faults and labels the call graph unavailable in metadata.
+Counter-only output is not treated as a profile. The run does not change the
+library source or select a release candidate.
 
 For repeated sessions, add a `session` column to each run before concatenating
 the CSVs. Compare adaptive and fixed arms at the same grain to see the value of

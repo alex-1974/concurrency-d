@@ -72,7 +72,7 @@ for divisor in (8, 4, 16):
 
 expected_rows = 6 * len(WORKERS.split(",")) * len(GRAINS.split(",")) * (SAMPLES + WARMUPS) * 2
 meta = {
-    "status": "INCOMPLETE", "baseline_tag": "v0.3.0",
+    "status": "TIMING_MATRIX_IN_PROGRESS", "baseline_tag": "v0.3.0",
     "baseline_commit": subprocess.check_output(["git", "rev-parse", "v0.3.0"], cwd=ROOT, text=True).strip(),
     "variants": {str(d): hashlib.sha256(p.read_bytes()).hexdigest() for d, p in variants.items()},
     "protocol": f"{SESSIONS} sessions; {SAMPLES} measured and {WARMUPS} warmup samples per setting; 6 workloads x workers={WORKERS} x grains={GRAINS}; fixed/adaptive pairs; alternating variant order",
@@ -173,8 +173,25 @@ for profile_name, repeats in (("short", 3000), ("heavy", 300)):
                 record_log += "\nPERF_RETRY\n" + recorded.stdout
         log.write_text(record_log)
         if recorded.returncode != 0 or not data.exists() or data.stat().st_size == 0:
-            meta["profiles"].append({"name": profile_name, "mode": mode,
-                                      "status": "record-failed", "log": log.name})
+            # Some virtual ARM64 runners expose no sampling PMU at all. Try
+            # process-scoped software counters as a fallback. These counts
+            # can diagnose scheduling overhead but are not a call graph.
+            stat_path = profile_dir / f"{profile_name}-{mode}-stat.txt"
+            stat_log = subprocess.run(
+                [perf, "stat", "-x,", "-e", "task-clock,context-switches,cpu-migrations,page-faults",
+                 "--", str(binary), mode, str(repeats)],
+                cwd=variants[8].parents[2], text=True,
+                stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            stat_path.write_text(
+                "PROGRAM_OUTPUT\n" + stat_log.stdout + "\nPERF_STAT\n" + stat_log.stderr)
+            if stat_log.returncode == 0:
+                meta["profiles"].append({"name": profile_name, "mode": mode,
+                                          "status": "sampling-unavailable-stat-complete",
+                                          "stat": stat_path.name, "log": log.name})
+            else:
+                meta["profiles"].append({"name": profile_name, "mode": mode,
+                                          "status": "record-and-stat-failed",
+                                          "stat": stat_path.name, "log": log.name})
             continue
         report = subprocess.run(
             [perf, "report", "--stdio", "--no-children", "-i", str(data),
@@ -187,7 +204,16 @@ for profile_name, repeats in (("short", 3000), ("heavy", 300)):
                                   "repeats": repeats, "data": data.name,
                                   "report": report_path.name, "log": log.name})
 
-meta["status"] = "COMPLETE"
+matrix_complete = len(meta["sessions"]) == SESSIONS
+profiles_complete = bool(meta.get("profiles")) and all(
+    entry["status"] == "complete" for entry in meta["profiles"])
+meta["timing_matrix_status"] = "COMPLETE" if matrix_complete else "INCOMPLETE"
+meta["profile_status"] = (
+    "CALLGRAPHS_COMPLETE" if profiles_complete else
+    "SAMPLELESS_COUNTERS_ONLY" if any(entry["status"] == "sampling-unavailable-stat-complete"
+                                      for entry in meta.get("profiles", [])) else
+    "UNAVAILABLE")
+meta["status"] = "COMPLETE" if matrix_complete else "INCOMPLETE"
 meta["ended_utc"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
 (OUT / "metadata.json").write_text(json.dumps(meta, indent=2) + "\n")
 print(f"ARM64_CAPTURE_COMPLETE output={OUT}", flush=True)
