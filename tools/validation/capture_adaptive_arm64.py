@@ -116,6 +116,47 @@ for session in range(1, SESSIONS + 1):
         print(f"ARM64_PROGRESS session={session}/{SESSIONS} divisor={divisor} rows={len(rows)}", flush=True)
     meta["sessions"].append(session_meta)
     (OUT / "metadata.json").write_text(json.dumps(meta, indent=2) + "\n")
+
+# Measure range modes and TaskScope submit/post-body intervals separately from
+# perf sampling. This works on hosted ARM VMs whose PMU rejects call graphs.
+diagnostic_dir = work / "divisor8/benchmarks/adaptive-ranges/diagnostics"
+diagnostic_dir.mkdir(parents=True, exist_ok=True)
+for filename in ("main.d", "dub.json"):
+    shutil.copy2(ROOT / "benchmarks/adaptive-ranges/diagnostics" / filename,
+                 diagnostic_dir / filename)
+diagnostic_build = subprocess.run(
+    ["dub", "build", f"--root={diagnostic_dir}", f"--compiler={DC}",
+     "--build=release", "--force"],
+    cwd=work / "divisor8", text=True, stdout=subprocess.PIPE,
+    stderr=subprocess.STDOUT)
+if diagnostic_build.returncode:
+    raise RuntimeError(f"phase diagnostic build failed:\n{diagnostic_build.stdout}")
+diagnostic_binary = diagnostic_dir / "concurrency-adaptive-phase-diagnostic"
+diagnostic_csv = OUT / "phase-diagnostic.csv"
+diagnostic_capture = subprocess.run(
+    ["python3", str(ROOT / "tools/validation/capture_adaptive_phase_diagnostic.py"),
+     str(diagnostic_binary), str(diagnostic_csv)],
+    cwd=ROOT, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+if diagnostic_capture.returncode:
+    raise RuntimeError(f"phase diagnostic capture failed:\n{diagnostic_capture.stdout}")
+print(diagnostic_capture.stdout, flush=True)
+diagnostic_summary = OUT / "phase-diagnostic-summary.csv"
+summary_run = subprocess.run(
+    ["python3", str(ROOT / "tools/validation/summarize_adaptive_phase_diagnostic.py"),
+     str(diagnostic_csv), str(diagnostic_summary)],
+    cwd=ROOT, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+if summary_run.returncode:
+    raise RuntimeError(f"phase diagnostic summary failed:\n{summary_run.stdout}")
+print(summary_run.stdout, flush=True)
+meta["phase_diagnostic"] = {
+    "status": "complete", "csv": diagnostic_csv.name,
+    "summary": diagnostic_summary.name,
+    "metadata": diagnostic_csv.with_suffix(".metadata.json").name,
+    "sessions": SESSIONS, "measured_samples": SAMPLES,
+    "warmups": WARMUPS, "rows": 3 * 3 * (SAMPLES + WARMUPS) * SESSIONS * 2,
+    "methods": ["serial_vs_parallel_noop_short_heavy",
+                "task_scope_submit_body_vs_post_body"]}
+(OUT / "metadata.json").write_text(json.dumps(meta, indent=2) + "\n")
 # Capture process-scoped CPU-clock call graphs for short and heavy callbacks.
 # Some hosted kernels restrict perf_event access; preserve the diagnostic status
 # and logs in the artifact instead of discarding the completed timing matrix.

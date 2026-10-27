@@ -105,6 +105,27 @@ migrations, and page faults and labels the call graph unavailable in metadata.
 Counter-only output is not treated as a profile. The run does not change the
 library source or select a release candidate.
 
+For a first-order phase diagnostic, build `benchmarks/adaptive-ranges/diagnostics`
+and run `concurrency-adaptive-phase-diagnostic SAMPLES WARMUPS`. It emits
+checksum-checked `serial`, fixed-grain, and adaptive runs for no-op, short
+(16-step), and heavy (1024-step) callbacks. Each sample repeats work enough
+times to keep the no-op serial timing above clock resolution. It also measures
+`TaskScope` batches of 4, 16, and 64 tasks, reporting time spent submitting
+inside the scope body and time from body exit until `withScope` returns.
+That post-body interval includes drain/join and scope cleanup; it is not a pure
+join primitive measurement. Differences between callback scenarios are useful
+diagnostics, not exact additive decompositions, because callback work changes
+parallel scheduling and contention. The benchmark does not instrument the
+production scheduler or alter the public API.
+
+To capture the predeclared four-session protocol, build the diagnostic and run
+`python3 tools/validation/capture_adaptive_phase_diagnostic.py BINARY OUTPUT.csv`
+(defaults: four sessions, 20 measured samples, five warmups; override with
+`SESSIONS`, `SAMPLES`, and `WARMUPS`). Then run
+`python3 tools/validation/summarize_adaptive_phase_diagnostic.py OUTPUT.csv SUMMARY.csv`
+for per-session and pooled p50/p95/p99 values. The ARM64 qualification workflow
+uploads both files with its raw benchmark artifact.
+
 For repeated sessions, add a `session` column to each run before concatenating
 the CSVs. Compare adaptive and fixed arms at the same grain to see the value of
 adaptation, and compare each arm's best grain to understand the result after
