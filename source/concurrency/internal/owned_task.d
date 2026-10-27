@@ -19,7 +19,8 @@ import concurrency.internal.submission_pool :
 
 import concurrency.internal.task_record :
     TaskHeader,
-    TaskRef;
+    TaskRef,
+    TaskBatchHint;
 
 import core.sync.condition :
     Condition;
@@ -36,7 +37,8 @@ import core.thread :
     Thread;
 
 import concurrency.internal.lifecycle : LifecycleFailure, lifecycleFailStop;
-import concurrency.task : ResultCell, TaskHandle;
+import concurrency.task : ResultCell, ResultNotifier, TaskHandle;
+import concurrency.work_size : WorkSize;
 import concurrency.errors : ExecutorClosedException;
 
 import std.traits :
@@ -86,11 +88,13 @@ private final class OwnedNode(F, R)
 
     private Record _record;
 
-    this(F callable, ResultCell!R cell)
+    this(F callable, ResultCell!R cell, WorkSize workSize)
     {
         _record.callable = callable;
         _record.cell = cell;
         _record.prefix.header.execute = &execute;
+        _record.prefix.header.batchHint = workSize == WorkSize.large
+            ? TaskBatchHint.oneAtATime : TaskBatchHint.normal;
         _record.prefix.afterExecution = &publishReturned;
         atomicStore!(MemoryOrder.raw)(_record.prefix.returned, 0u);
     }
@@ -172,6 +176,7 @@ package(concurrency) final class OwnedTaskExecutor
     }
 
     private SubmissionWorkerPool _pool;
+    private ResultNotifier _resultNotifier;
     private Mutex _mutex;
     private Condition _lifecycleChanged;
     private RetainedTask[] _retained;
@@ -190,6 +195,7 @@ package(concurrency) final class OwnedTaskExecutor
         // A setup failure may then unwind without leaking a live idle pool.
         _mutex = new Mutex();
         _lifecycleChanged = new Condition(_mutex);
+        _resultNotifier = new ResultNotifier();
         _lifecycle = Lifecycle.running;
         _maxRetained = maxRetained;
         _pool = new SubmissionWorkerPool(
@@ -206,7 +212,8 @@ package(concurrency) final class OwnedTaskExecutor
      * Successful admission keeps both record and result cell alive until
      * all accepted tasks have completed.
      */
-    auto trySubmit(F)(F callable) @system
+    auto trySubmit(F)(F callable,
+        WorkSize workSize = WorkSize.small) @system
     {
         alias R = ReturnType!F;
         TaskHandle!R handle;
@@ -233,9 +240,9 @@ package(concurrency) final class OwnedTaskExecutor
             if (!_pool.hasIngressCapacity())
                 return TaskHandle!R.init;
 
-            auto cell = new ResultCell!R();
+            auto cell = new ResultCell!R(_resultNotifier);
             handle = new TaskHandle!R(cell);
-            auto node = new OwnedNode!(F, R)(callable, cell);
+            auto node = new OwnedNode!(F, R)(callable, cell, workSize);
 
             // Install the strong GC root before any worker can claim the
             // record. If admission fails, clear the tail GC slot too.
@@ -316,11 +323,12 @@ package(concurrency) final class OwnedTaskExecutor
     }
 
     /** Retry while ingress or the in-flight record budget is full. */
-    auto submit(F)(F callable) @system
+    auto submit(F)(F callable,
+        WorkSize workSize = WorkSize.small) @system
     {
         for (;;)
         {
-            auto handle = trySubmit(callable);
+            auto handle = trySubmit(callable, workSize);
 
             if (handle !is null)
                 return handle;

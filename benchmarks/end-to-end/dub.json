@@ -1,0 +1,9 @@
+{
+  "name": "concurrency-end-to-end-benchmark",
+  "description": "Matched end-to-end CPU workload diagnostic for concurrency-d and Phobos",
+  "targetType": "executable",
+  "sourcePaths": [],
+  "mainSourceFile": "main.d",
+  "targetName": "concurrency-end-to-end-benchmark",
+  "dependencies": {"concurrency-d": {"path": "../.."}}
+}

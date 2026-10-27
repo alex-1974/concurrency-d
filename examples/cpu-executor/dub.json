@@ -1,6 +1,6 @@
 {
   "name": "concurrency-cpu-example",
-  "description": "Standalone public concurrency-d CPU/completion consumer",
+  "description": "Standalone public CPU, completion and range-scheduling consumer",
   "targetType": "executable",
   "dependencies": {"concurrency-d": {"path": "../.."}}
 }

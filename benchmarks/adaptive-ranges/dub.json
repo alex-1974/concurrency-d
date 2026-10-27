@@ -1,0 +1,9 @@
+{
+  "name": "concurrency-adaptive-ranges-benchmark",
+  "description": "Focused fixed versus adaptive indexed range benchmark",
+  "targetType": "executable",
+  "sourcePaths": [],
+  "mainSourceFile": "main.d",
+  "targetName": "concurrency-adaptive-ranges-benchmark",
+  "dependencies": {"concurrency-d": {"path": "../.."}}
+}

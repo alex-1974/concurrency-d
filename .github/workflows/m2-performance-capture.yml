@@ -1,0 +1,91 @@
+name: M2 native ARM64 performance capture
+
+on:
+  pull_request:
+    branches:
+      - develop
+      - main
+    paths:
+      - "benchmarks/end-to-end/**"
+      - "benchmarks/cross-language/**"
+      - "tools/validation/capture_m2_benchmark.py"
+      - ".github/workflows/m2-performance-capture.yml"
+  workflow_dispatch:
+    inputs:
+      workers:
+        description: Maximum execution participants
+        required: true
+        default: "4"
+        type: string
+      samples:
+        description: Measured samples per arm and session
+        required: true
+        default: "20"
+        type: string
+      warmups:
+        description: Warmup samples per arm and session
+        required: true
+        default: "5"
+        type: string
+      base_iterations:
+        description: Base iterations per logical item
+        required: true
+        default: "1024"
+        type: string
+      sessions:
+        description: Independent process sessions
+        required: true
+        default: "4"
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  capture:
+    name: Native ARM64 / LDC optimized capture
+    runs-on: ubuntu-24.04-arm
+    env:
+      WORKERS: ${{ inputs.workers || '4' }}
+      SAMPLES: ${{ inputs.samples || '7' }}
+      WARMUPS: ${{ inputs.warmups || '2' }}
+      BASE_ITERATIONS: ${{ inputs.base_iterations || '512' }}
+      SESSIONS: ${{ inputs.sessions || '4' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Install LDC
+        uses: dlang-community/setup-dlang@v2
+        with:
+          compiler: ldc-1.41.0
+
+      - name: Verify platform and compiler
+        run: |
+          test "$(uname -m)" = "aarch64"
+          uname -a
+          lscpu
+          "$DC" --version
+          dub --version
+
+      - name: Build optimized benchmark
+        run: dub build --root=benchmarks/end-to-end --compiler="$DC" --build=release --force
+
+      - name: Capture independent sessions
+        run: |
+          python3 tools/validation/capture_m2_benchmark.py \
+            benchmarks/end-to-end/concurrency-end-to-end-benchmark \
+            /tmp/m2-arm64-capture \
+            --workers "$WORKERS" \
+            --samples "$SAMPLES" \
+            --warmups "$WARMUPS" \
+            --base-iterations "$BASE_ITERATIONS" \
+            --sessions "$SESSIONS"
+
+      - name: Upload raw capture and host metadata
+        uses: actions/upload-artifact@v4
+        with:
+          name: m2-arm64-performance-${{ github.sha }}
+          path: /tmp/m2-arm64-capture/
+          if-no-files-found: error
+          retention-days: 90

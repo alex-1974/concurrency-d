@@ -9,3 +9,4 @@ repository.
 - [0003 — Coalesce publish notifications without changing parking](0003-coalesce-idle-publish-notifications.md) — accepted in v0.2.0
 - [0004 — Defer a general Sender/Receiver layer](0004-defer-sender-receiver-layer.md) — accepted in v0.2.0; revisit for a concrete consumer
 - [0005 — Keep GC-owned task records](0005-keep-gc-owned-task-records.md) — accepted in v0.2.0
+- [0006 — Keep indexed range execution narrow](0006-indexed-range-convenience.md) — ADAPT for the v0.3 candidate; repeated cross-language evidence recorded

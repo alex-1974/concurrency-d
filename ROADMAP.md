@@ -41,11 +41,23 @@ layer is deferred until a real consumer demonstrates a need for scheduler
 handoff or asynchronous operation graphs and can qualify their additional
 lifetime and cancellation semantics.
 
-## M2 — Consumer and performance qualification (planned v0.3.0)
+## M2 — Consumer and performance qualification (release candidate, target v0.3.0)
 
-Validate independent CPU-heavy and event-loop-style consumers, including
-completion handoff to a consumer-controlled thread. Compare optimized end-to-end
-performance against semantically comparable alternatives. Parallel range
-helpers remain an evidence- and consumer-driven research question. Fibers, an
-I/O reactor, NUMA policy, and a universal sender/receiver API are not core
-release prerequisites.
+The current unreleased work adds independent CPU-heavy and event-loop-style
+consumer examples, including completion handoff to a consumer-controlled
+thread. `Executor.parallelFor` provides fixed-maximum dynamic ranges;
+`parallelForAdaptive` provides guided ranges for callers who prefer a minimum
+grain and accept larger early claims. `WorkSize` lets callers identify
+substantially longer submitted callables without implying automatic splitting
+or runtime prediction. End-to-end and bounded-streaming diagnostics compare
+these paths with checksummed alternatives. The executor guide records practical
+batching, worker-count, grain and work-size tuning advice.
+
+The implementation is merged to `develop`; the v0.3.0 release candidate is being validated on a branch targeting `main`.
+Local DMD 2.111 and LDC 1.42 unit, lifecycle, public-consumer, worktree-package,
+event-loop and benchmark smoke checks pass. Optimized measurements are retained
+with host and workload limits; streaming comparisons fence Phobos producers
+from executing their own queued tasks so both arms use the stated worker budget.
+Remaining work is the final full-diff review and pinned CI matrix, including
+native ARM64 on LDC 1.41. Fibers, an I/O reactor, NUMA policy, and a universal
+sender/receiver API remain outside the M2 release prerequisites.

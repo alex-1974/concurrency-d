@@ -60,11 +60,24 @@ void main()
         }
         Thread.yield();
     }
+
+    // Range API: each callback handles one indexed chunk; grainSize groups up
+    // to four chunk indices per dynamic claim. Distinct indices write distinct
+    // array slots, so the reduction stays on the controller thread.
+    auto rangeResults = new ulong[count];
+    executor.parallelFor(count, 4, (size_t i) {
+        rangeResults[i] = reference(cast(uint)i * 2048, 2048);
+    });
+    ulong rangeAggregate;
+    foreach (value; rangeResults)
+        rangeAggregate += value;
+    enforce(rangeAggregate == aggregate, "parallelFor aggregate mismatch");
+
     executor.closeAndJoin();
     GC.collect();
     enforce(aggregate == reference(0, count * 2048), "aggregate mismatch");
     foreach (i; 0 .. count)
         enforce(handles[i].get().sum == reference(cast(uint)i * 2048, 2048),
             "result did not survive shutdown");
-    writeln("PUBLIC_CPU_PASS chunks=48 controller_affinity=true repeated_get=true");
+    writeln("PUBLIC_CPU_PASS chunks=48 controller_affinity=true repeated_get=true parallel_for=true");
 }

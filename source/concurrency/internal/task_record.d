@@ -22,6 +22,14 @@ package(concurrency) struct TaskHeader
         @safe nothrow;
 
     ExecuteFn execute;
+    // Zero preserves the existing inbox batching policy.
+    TaskBatchHint batchHint;
+}
+
+package(concurrency) enum TaskBatchHint : ubyte
+{
+    normal,
+    oneAtATime
 }
 
 /** Non-owning one-word handle for queues and worker handoff. */
@@ -32,7 +40,7 @@ package(concurrency) struct TaskRef
 
 static assert(size_t.sizeof == 8,
     "The qualified work-stealing transport currently requires 64-bit targets.");
-static assert(TaskHeader.sizeof == 8);
+static assert(TaskHeader.sizeof == 16);
 static assert(TaskRef.sizeof == 8);
 
 /**
