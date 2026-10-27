@@ -41,7 +41,7 @@ layer is deferred until a real consumer demonstrates a need for scheduler
 handoff or asynchronous operation graphs and can qualify their additional
 lifetime and cancellation semantics.
 
-## M2 — Consumer and performance qualification (release candidate, target v0.3.0)
+## M2 — Consumer and performance qualification (v0.3.0, released)
 
 The current unreleased work adds independent CPU-heavy and event-loop-style
 consumer examples, including completion handoff to a consumer-controlled
@@ -53,11 +53,28 @@ or runtime prediction. End-to-end and bounded-streaming diagnostics compare
 these paths with checksummed alternatives. The executor guide records practical
 batching, worker-count, grain and work-size tuning advice.
 
-The implementation is merged to `develop`; the v0.3.0 release candidate is being validated on a branch targeting `main`.
-Local DMD 2.111 and LDC 1.42 unit, lifecycle, public-consumer, worktree-package,
-event-loop and benchmark smoke checks pass. Optimized measurements are retained
-with host and workload limits; streaming comparisons fence Phobos producers
-from executing their own queued tasks so both arms use the stated worker budget.
-Remaining work is the final full-diff review and pinned CI matrix, including
-native ARM64 on LDC 1.41. Fibers, an I/O reactor, NUMA policy, and a universal
-sender/receiver API remain outside the M2 release prerequisites.
+Version 0.3.0 shipped on 2026-10-27. The exact release tree passed DMD/LDC,
+public package consumers, cross-language checksum validation and native
+ARM64/LDC correctness and performance workflows. See the
+[release qualification](docs/V0.3-RELEASE-QUALIFICATION.md) and the pinned
+[performance evidence](https://github.com/alex-1974/concurrency-d-research/tree/fb32f4455b223206f017959d54c140aa1f0a8d7b/research/m2_end_to_end_qualification).
+The range helpers serve consumer-controlled scheduling; no universal speedup
+over Phobos is claimed. Fibers, an I/O reactor, NUMA policy, and a general
+Sender/Receiver framework remain outside the shipped scope.
+
+## M3 — Measured performance improvements (proposed; release target TBD)
+
+Use the exact v0.3.0 release as the baseline before selecting an optimization.
+The first diagnostic is profiling fine adaptive range work: the ARM64 capture
+shows a repeatable, roughly 3% median gap to Phobos, while the XPS tail varies
+substantially between sessions. This does not yet justify a scheduler change
+or a v0.4.0 release target. The
+[v0.4 performance baseline](docs/V0.4-PERFORMANCE-BASELINE.md) records the
+reproduction protocol and evidence.
+
+Do not add public scheduling or composition APIs as part of this work unless a
+real consumer demonstrates a gap. Keep GC-owned task records and the current
+portable parking policy unless new, semantically fair measurements identify
+them as the limiting factor. Assign a v0.4.0 release target only after a
+candidate produces a repeatable improvement with no material regression in
+the rest of the baseline matrix.
