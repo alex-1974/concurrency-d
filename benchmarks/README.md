@@ -90,6 +90,24 @@ dub build --root=benchmarks/adaptive-ranges --build=release --compiler=ldc2
 python3 tools/validation/summarize_m2_benchmark.py adaptive-ranges.csv
 ```
 
+The `Split-on-steal native ARM64 qualification` workflow compares the checked
+out scheduler against the pinned v0.3.0 source using the same checksum-checked
+benchmark. It focuses on four participants, fine adaptive work (`minGrainSize`
+1), 1,024 and 16,384 items, uniform and clustered-cost callbacks, and eight
+reused waves. Four sessions alternate baseline/candidate process order; the
+artifact contains raw CSV, host/compiler metadata, and per-workload p50/p95
+ratios. The 10% p95 flag is a review screen, not a CI pass/fail threshold.
+Locally, build and smoke-test the harness with:
+
+```sh
+dub build --root=benchmarks/split-on-steal --compiler=ldc2 --build=release
+./benchmarks/split-on-steal/concurrency-split-on-steal-benchmark 12 3 > split-on-steal.csv
+```
+
+The harness is only a measurement tool. It does not by itself qualify the
+scheduler for release; interpret the ARM64 captures alongside x86_64 paired
+measurements and the correctness gates.
+
 For repeated sessions, add a `session` column to each run before concatenating
 the CSVs. Compare adaptive and fixed arms at the same grain to see the value of
 adaptation, and compare each arm's best grain to understand the result after

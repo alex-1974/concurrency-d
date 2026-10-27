@@ -1,0 +1,10 @@
+{
+  "name": "concurrency-split-on-steal-benchmark",
+  "targetType": "executable",
+  "targetName": "concurrency-split-on-steal-benchmark",
+  "sourcePaths": ["."],
+  "mainSourceFile": "main.d",
+  "dependencies": {
+    "concurrency-d": { "path": "../.." }
+  }
+}

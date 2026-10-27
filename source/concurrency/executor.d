@@ -57,6 +57,14 @@ private bool canUseFetchAdd(size_t itemCount, size_t grainSize,
         workerCount + 1 <= (size_t.max - itemCount) / grainSize;
 }
 
+private void blockBounds(size_t itemCount, size_t blockSize, size_t block,
+    out size_t first, out size_t last) @safe pure nothrow
+{
+    first = block * blockSize;
+    const remaining = itemCount - first;
+    last = first + (remaining < blockSize ? remaining : blockSize);
+}
+
 private struct RangeWorker(F)
 {
     F _body;
@@ -141,6 +149,131 @@ private struct RangeWorker(F)
     {
         foreach (index; first .. last)
             _body(index);
+    }
+}
+
+/** Cyclically distributed blocks with a participant-local atomic queue cursor. */
+private struct SplitRangeState
+{
+    shared size_t[] _nextBlock;
+    size_t[] _blocksPerLane;
+    size_t _itemCount;
+    size_t _blockSize;
+    size_t _laneCount;
+
+    this(size_t maxLanes, size_t itemCount, size_t minGrainSize)
+    {
+        _itemCount = itemCount;
+        // Use more blocks for larger domains to keep their tails divisible.
+        const blocksPerLane = itemCount <= 4096 ? 8 : 16;
+        const denominator = maxLanes <= size_t.max / blocksPerLane
+            ? maxLanes * blocksPerLane : size_t.max;
+        _blockSize = itemCount / denominator;
+        if (_blockSize < minGrainSize)
+            _blockSize = minGrainSize;
+        // Keep tiny domains from creating one queue entry per individual item.
+        if (_blockSize < 4)
+            _blockSize = 4;
+
+        const blockCount = itemCount / _blockSize +
+            (itemCount % _blockSize != 0 ? 1 : 0);
+        _laneCount = blockCount < maxLanes ? blockCount : maxLanes;
+        _nextBlock = new shared size_t[_laneCount];
+        _blocksPerLane = new size_t[_laneCount];
+        foreach (lane; 0 .. _laneCount)
+        {
+            _blocksPerLane[lane] = lane < blockCount
+                ? (blockCount - 1 - lane) / _laneCount + 1 : 0;
+        }
+    }
+
+    bool take(size_t lane, out size_t first, out size_t last) @system
+    {
+        first = atomicLoad!(MemoryOrder.raw)(_nextBlock[lane]);
+        while (first < _blocksPerLane[lane])
+        {
+            const remaining = _blocksPerLane[lane] - first;
+            const claimSize = remaining / 4 > 0 ? remaining / 4 : 1;
+            last = first + (remaining < claimSize ? remaining : claimSize);
+            if (cas!(MemoryOrder.raw, MemoryOrder.raw)(
+                _nextBlock.ptr + lane, first, last))
+                return true;
+            first = atomicLoad!(MemoryOrder.raw)(_nextBlock[lane]);
+        }
+        return false;
+    }
+
+    bool steal(size_t thief, out size_t victim,
+        out size_t first, out size_t last) @system
+    {
+        foreach (offset; 1 .. _laneCount)
+        {
+            victim = (thief + offset) % _laneCount;
+            if (take(victim, first, last))
+                return true;
+        }
+        return false;
+    }
+
+    bool empty() @system
+    {
+        foreach (lane; 0 .. _laneCount)
+        {
+            if (atomicLoad!(MemoryOrder.raw)(_nextBlock[lane]) <
+                _blocksPerLane[lane])
+                return false;
+        }
+        return true;
+    }
+
+    void run(F)(size_t lane, size_t first, size_t last,
+        ref F body) @system
+    {
+        foreach (ordinal; first .. last)
+        {
+            const block = lane + ordinal * _laneCount;
+            size_t begin;
+            size_t end;
+            blockBounds(_itemCount, _blockSize, block, begin, end);
+            foreach (index; begin .. end)
+                body(index);
+        }
+    }
+}
+
+private struct SplitRangeWorker(F)
+{
+    F _body;
+    SplitRangeState _ranges;
+    size_t _lane;
+
+    this(F body, SplitRangeState ranges, size_t lane)
+    {
+        _body = body;
+        _ranges = ranges;
+        _lane = lane;
+    }
+
+    void opCall() @system
+    {
+        while (true)
+        {
+            size_t first;
+            size_t last;
+            if (_ranges.take(_lane, first, last))
+            {
+                _ranges.run(_lane, first, last, _body);
+                continue;
+            }
+            size_t victim;
+            if (_ranges.steal(_lane, victim, first, last))
+            {
+                _ranges.run(victim, first, last, _body);
+                continue;
+            }
+            if (_ranges.empty())
+                return;
+        }
     }
 }
 
@@ -332,8 +465,10 @@ final class Executor
 
     /**
      * Apply `body` to every index from zero up to, but not including,
-     * `itemCount`, using guided dynamic
-     * ranges. Claims are at least `minGrainSize` while enough work remains;
+     * `itemCount`, using guided dynamic ranges. For `minGrainSize == 1`, work
+     * is divided into cyclic blocks that idle participants can steal. Other
+     * minimum grain sizes use dynamically claimed ranges. Claims are at least
+     * `minGrainSize` while enough work remains;
      * the final partial claim may be smaller. Earlier claims may be larger
      * while much work remains, then shrink near the tail. The caller
      * participates alongside at most `_workerCount - 1` workers. The scope
@@ -370,6 +505,27 @@ final class Executor
             return;
         }
 
+        // Fine adaptive work uses cyclic blocks to distribute clustered work
+        // across participants while retaining per-lane atomic claim cursors.
+        if (guided && grainSize == 1)
+        {
+            auto ranges = SplitRangeState(workerCount, itemCount, grainSize);
+            if (ranges._laneCount == 1)
+            {
+                auto workerBody = body;
+                foreach (index; 0 .. itemCount)
+                    workerBody(index);
+                return;
+            }
+            withScope(ranges._laneCount - 1, (ref tasks) {
+                foreach (lane; 1 .. ranges._laneCount)
+                    tasks.spawn(SplitRangeWorker!F(body, ranges, lane),
+                        WorkSize.large);
+                SplitRangeWorker!F(body, ranges, 0)();
+            });
+            return;
+        }
+
         shared size_t nextIndex;
         auto runRanges = RangeWorker!F(body, &nextIndex, itemCount, grainSize,
             fetchAddSafe, guided, workerCount);
@@ -386,4 +542,10 @@ unittest
     assert(canUseFetchAdd(size_t.max - 64, 8, 4));
     assert(!canUseFetchAdd(size_t.max - 39, 8, 4));
     assert(!canUseFetchAdd(size_t.max - 64, 8, size_t.max));
+
+    size_t first;
+    size_t last;
+    const block = (size_t.max - 1) / 8;
+    blockBounds(size_t.max, 8, block, first, last);
+    assert(last == size_t.max);
 }
