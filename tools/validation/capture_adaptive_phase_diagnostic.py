@@ -80,11 +80,18 @@ if cpuinfo.exists():
                     break
         if cpu_model != "unknown":
             break
+if cpu_model == "unknown" and shutil.which("lscpu"):
+    lscpu = subprocess.run(["lscpu"], text=True, stdout=subprocess.PIPE,
+                           stderr=subprocess.DEVNULL)
+    for line in lscpu.stdout.splitlines():
+        if line.lower().startswith("model name:"):
+            cpu_model = line.split(":", 1)[1].strip()
+            break
 source_commit = subprocess.run(
     ["git", "rev-parse", "HEAD"], text=True, stdout=subprocess.PIPE,
     stderr=subprocess.DEVNULL)
 baseline_commit = subprocess.run(
-    ["git", "rev-parse", "v0.3.0"], text=True, stdout=subprocess.PIPE,
+    ["git", "rev-parse", "v0.3.0^{commit}"], text=True, stdout=subprocess.PIPE,
     stderr=subprocess.DEVNULL)
 metadata = {
     "status": "complete", "baseline_tag": "v0.3.0",

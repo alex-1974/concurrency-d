@@ -73,7 +73,7 @@ for divisor in (8, 4, 16):
 expected_rows = 6 * len(WORKERS.split(",")) * len(GRAINS.split(",")) * (SAMPLES + WARMUPS) * 2
 meta = {
     "status": "TIMING_MATRIX_IN_PROGRESS", "baseline_tag": "v0.3.0",
-    "baseline_commit": subprocess.check_output(["git", "rev-parse", "v0.3.0"], cwd=ROOT, text=True).strip(),
+    "baseline_commit": subprocess.check_output(["git", "rev-parse", "v0.3.0^{commit}"], cwd=ROOT, text=True).strip(),
     "variants": {str(d): hashlib.sha256(p.read_bytes()).hexdigest() for d, p in variants.items()},
     "protocol": f"{SESSIONS} sessions; {SAMPLES} measured and {WARMUPS} warmup samples per setting; 6 workloads x workers={WORKERS} x grains={GRAINS}; fixed/adaptive pairs; alternating variant order",
     "machine": platform.uname()._asdict(),
