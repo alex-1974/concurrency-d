@@ -49,7 +49,7 @@ These are executable integration examples, not latency claims.
 | `executor.trySubmit(callable, workSize = WorkSize.small)` | One attempt: typed handle on success, null on bounded capacity, ExecutorClosedException after close |
 | `executor.submit(callable, workSize = WorkSize.small)` | Retry capacity rejection until admitted or closed; may wait indefinitely |
 | `executor.parallelFor(itemCount, grainSize, body)` | Run `body(index)` over `[0, itemCount)`; workers dynamically claim contiguous ranges of up to `grainSize`, and all workers are joined before returning |
-| `executor.parallelForAdaptive(itemCount, minGrainSize, body)` | Run indexed work with guided claims that begin larger and shrink toward `minGrainSize`; all workers are joined before returning |
+| `executor.parallelForAdaptive(itemCount, minGrainSize, body)` | Run indexed work with adaptive claims; `minGrainSize == 1` uses cyclic blocks that idle participants can steal, while other minimums use guided ranges; all workers are joined before returning |
 | `executor.withScope(maxTasks, body)` | Provisional M1 API: run a bounded lexical child group, drain on body unwind, then propagate child errors |
 | `executor.join(left, right, leftWorkSize = WorkSize.small)` | Provisional M1 API: schedule `left` as one scoped child, execute `right` inline, join both, and return typed non-void fields |
 | `TaskScope.spawn(callable, workSize = WorkSize.small)` | Submit a child and keep its post-dispatch join obligation in the scope |
@@ -184,23 +184,25 @@ grain sizes. `grainSize` is the maximum number of indices claimed at once, not
 the worker count or a time estimate. For opaque tasks or custom dependencies,
 use `submit` and choose the task grouping explicitly.
 
-`parallelForAdaptive` is an opt-in alternative for workloads with many cheap,
-uniform items. Its `minGrainSize` guides claim sizes: early claims may be
-larger, and the final partial claim may be smaller. This reduces claim
-coordination when much of the domain remains while keeping smaller claims near
-the end. If the minimum is at least `itemCount`, the whole domain is one claim
-and runs on the calling thread. It can worsen load balance when item costs
-vary; use the fixed-maximum `parallelFor` when a
-strict upper bound per claim matters. A focused local sweep found that minimum
-1 greatly reduced median time over fixed grain 1 at two and four workers,
-including short and variable-cost items. A follow-up found that a cluster of
-expensive items at the start can make guided claims slower, so item-cost
-distribution matters as well as its range. After tuning both methods
-independently, their best medians were
-usually within about 5% on the tested scattered and uniform workloads, and
-fixed claims sometimes led. Use adaptive claims when a small lower bound is
-useful across uncertain costs; use fixed claims when costs cluster or a hard
-per-claim upper bound matters. Benchmark both methods for peak performance.
+`parallelForAdaptive` is an opt-in alternative for workloads with uneven or
+uncertain item costs. For `minGrainSize == 1`, the scheduler divides the domain
+into cyclic blocks and gives each participant its own atomic claim cursor.
+Participants can claim remaining blocks from another lane after exhausting
+their own. This spreads clustered expensive items across the participant
+queues. Larger minimum grains retain guided dynamic ranges, which begin larger
+and shrink toward the requested minimum. If the minimum is at least
+`itemCount`, the whole domain is one claim and runs on the calling thread.
+
+The cyclic-block path showed lower times for fine adaptive work in paired XPS
+and native ARM64 runs, especially at 1,024 items. At 16,384 items, short work
+improved while medium and clustered work stayed near parity in the ARM64
+qualification. The latest capture used 240 samples per workload and arm; no
+p95 regression exceeded 10%, though a smaller first run did show a tail outlier
+that disappeared in the larger sample. These results describe one XPS and one
+hosted ARM64 runner. Use `minGrainSize == 1` as a starting point for fine or
+irregular work, then benchmark against fixed `parallelFor` using the actual
+task costs and batch sizes. Use fixed claims when a strict upper bound per
+claim matters.
 
 The caller may also pass `WorkSize.large` to `submit`, `trySubmit`,
 `TaskScope.spawn` or `join` when a callable is expected to run substantially
@@ -224,7 +226,7 @@ by backpressure. Improving one can worsen another.
 | `workers` | Begin near the CPU capacity available to this process. Sweep around that point, including fewer workers when producers, callbacks, or other application threads also need CPU. | Throughput and tail latency; extra workers can add scheduling and cache contention. |
 | Batch size | For many tiny independent items, sweep roughly 1, 4, 16, 64, 128 and 256 logical items per submitted callable. Keep enough batches to occupy all workers; use smaller batches when items vary greatly in cost or low latency matters. | Task-record/admission overhead versus idle workers and time spent waiting for the slowest item in a batch. |
 | `grainSize` | With `parallelFor`, start at 1 and compare 4, 16, 64, 128 and 256 against real work. Tiny or uneven items often benefit from small claims; larger claims reduce counter traffic for very cheap, uniform items. | Atomic claim overhead versus load balance and the final slow range. |
-| `minGrainSize` | With `parallelForAdaptive`, start at 1 for many uniform items, then compare against fixed-grain `parallelFor`. | Fewer claim operations versus tail latency and imbalance when item costs vary. |
+| `minGrainSize` | With `parallelForAdaptive`, start at 1 for fine or uneven work, then compare against fixed-grain `parallelFor` and larger minimums. | Cyclic block balancing versus claim overhead; assess tail latency for the real cost distribution. |
 | `WorkSize` | Use `large` only when the callable is expected to run materially longer than ordinary work; otherwise keep the default `small`. | Long-task distribution versus inbox lock amortization. The hint is an estimate, not a measured duration or an automatic split policy. |
 | `ingressCapacity` | Start with a few queued tasks per worker, then test a small range such as 1x, 2x, 4x and 8x the worker count. | Rejection/retry or producer blocking, queueing latency and memory. A larger inbox absorbs bursts; it does not by itself increase steady-state processing capacity. |
 | `maxRetained` | Keep the default unless the application's retained-task pattern gives a reason to change it. Size for accepted records that may not yet have returned, including active scoped parents and children. | `trySubmit` rejection under load and retained memory. This is a record-count bound, not a byte limit or a count of all tasks over the executor's lifetime. |

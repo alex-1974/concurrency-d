@@ -62,19 +62,28 @@ The range helpers serve consumer-controlled scheduling; no universal speedup
 over Phobos is claimed. Fibers, an I/O reactor, NUMA policy, and a general
 Sender/Receiver framework remain outside the shipped scope.
 
-## M3 — Measured performance improvements (proposed; release target TBD)
+## M3 — Measured performance improvements (active; release target TBD)
 
-Use the exact v0.3.0 release as the baseline before selecting an optimization.
-The first diagnostic is profiling fine adaptive range work: the ARM64 capture
-shows a repeatable, roughly 3% median gap to Phobos, while the XPS tail varies
-substantially between sessions. This does not yet justify a scheduler change
-or a v0.4.0 release target. The
-[v0.4 performance baseline](docs/V0.4-PERFORMANCE-BASELINE.md) records the
-reproduction protocol and evidence.
+The v0.3.0 release remains the performance baseline. PR #56 integrated cyclic
+block work-stealing for fine `parallelForAdaptive` calls with
+`minGrainSize == 1`; fixed `parallelFor` and larger adaptive minimums retain
+their prior scheduling paths. On the XPS and a native ARM64 runner, paired
+captures showed improved fine-work medians. An extended ARM64 run with 240
+samples per workload and arm found no p95 regression above 10%; details and
+limits are recorded in the
+[v0.4 performance baseline](docs/V0.4-PERFORMANCE-BASELINE.md), [PR #56](https://github.com/alex-1974/concurrency-d/pull/56), and [raw ARM64 capture](https://github.com/alex-1974/concurrency-d/actions/runs/40561700792).
 
-Do not add public scheduling or composition APIs as part of this work unless a
-real consumer demonstrates a gap. Keep GC-owned task records and the current
-portable parking policy unless new, semantically fair measurements identify
-them as the limiting factor. Assign a v0.4.0 release target only after a
-candidate produces a repeatable improvement with no material regression in
-the rest of the baseline matrix.
+PR #57 adds matched grain/batch sweeps for fixed concurrency, adaptive
+concurrency and Phobos on x86_64 and native ARM64. Larger 16,384-item workloads
+are within roughly 4–40% of tuned Phobos medians; 1,024-item workloads remain
+about 6–112% slower, with short uniform tasks the largest gap. Grain winners
+vary by host and distribution. See the [direct comparison and limits](docs/V0.4-PERFORMANCE-BASELINE.md#tuned-direct-comparison-with-phobos),
+[PR #57](https://github.com/alex-1974/concurrency-d/pull/57), and
+[240-sample ARM64 run](https://github.com/alex-1974/concurrency-d/actions/runs/40566914191).
+
+The next optimization is to profile the short-task path and separate executor
+startup/scope cost, range-claim synchronization and callback time. Change only
+a measured bottleneck, then repeat both architecture matrices. Keep v0.4.0's
+release target unset until the performance work and exact release-candidate
+gates pass. Do not add public scheduling APIs or change task-record/parking
+policies without a measured need.
