@@ -38,7 +38,7 @@ jobs:
       SAMPLES: ${{ inputs.samples || '20' }}
       WARMUPS: ${{ inputs.warmups || '5' }}
       WORKERS: "1,4"
-      GRAINS: "1,64"
+      GRAINS: "1,4,16,64"
     steps:
       - name: Checkout
         uses: actions/checkout@v7

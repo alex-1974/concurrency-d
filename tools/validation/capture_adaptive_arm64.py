@@ -71,6 +71,9 @@ for divisor in (8, 4, 16):
     variants[divisor] = binary
 
 expected_rows = 6 * len(WORKERS.split(",")) * len(GRAINS.split(",")) * (SAMPLES + WARMUPS) * 2
+grain_values = GRAINS.split(",")
+if len(set(grain_values)) != len(grain_values):
+    raise SystemExit("GRAINS contains duplicates")
 meta = {
     "status": "TIMING_MATRIX_IN_PROGRESS", "baseline_tag": "v0.3.0",
     "baseline_commit": subprocess.check_output(["git", "rev-parse", "v0.3.0^{commit}"], cwd=ROOT, text=True).strip(),
@@ -86,9 +89,12 @@ meta = {
 
 for session in range(1, SESSIONS + 1):
     order = [8, 4, 16] if session % 2 else [16, 4, 8]
-    session_meta = {"session": session, "order": order, "variants": []}
+    grain_order = grain_values if session % 2 else list(reversed(grain_values))
+    session_meta = {"session": session, "order": order,
+                    "grain_order": grain_order, "variants": []}
     for divisor in order:
-        proc = subprocess.run([str(variants[divisor]), str(SAMPLES), str(WARMUPS), WORKERS, GRAINS],
+        proc = subprocess.run([str(variants[divisor]), str(SAMPLES), str(WARMUPS),
+                               WORKERS, ",".join(grain_order)],
                               text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         if proc.returncode:
             raise RuntimeError(f"divisor {divisor} session {session} failed:\n{proc.stdout[-4000:]}")
