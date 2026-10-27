@@ -6,6 +6,7 @@ import core.time : MonoTime;
 import std.conv : to;
 import std.exception : enforce;
 import std.stdio : writeln;
+import std.string : split;
 
 private enum waves = 8;
 private enum CostPattern { uniform, scatteredHotspots, heavyPrefix, heavySuffix }
@@ -57,6 +58,19 @@ private struct Job
     }
 }
 
+private size_t[] parseSizes(string value)
+{
+    size_t[] result;
+    foreach (part; value.split(","))
+    {
+        const parsed = to!size_t(part);
+        enforce(parsed > 0, "workers and grains must be positive");
+        result ~= parsed;
+    }
+    enforce(result.length > 0, "workers and grains cannot be empty");
+    return result;
+}
+
 private ulong checksum(Workload workload)
 {
     ulong result;
@@ -92,7 +106,8 @@ private ulong run(Workload workload, size_t workers, size_t grainSize,
 
 void main(string[] args)
 {
-    enforce(args.length == 3, "usage: adaptive-ranges SAMPLES WARMUPS");
+    enforce(args.length == 3 || args.length == 5,
+        "usage: adaptive-ranges SAMPLES WARMUPS [WORKERS_CSV GRAINS_CSV]");
     const samples = to!size_t(args[1]);
     const warmups = to!size_t(args[2]);
     enforce(samples > 0 && samples <= 1000 && warmups <= 1000,
@@ -107,8 +122,18 @@ void main(string[] args)
         Workload("heavy_prefix", 1024, 128, 896, CostPattern.heavyPrefix),
         Workload("heavy_suffix", 1024, 128, 896, CostPattern.heavySuffix),
     ];
-    immutable workerCounts = [1UL, 2UL, 4UL];
-    immutable grains = [1UL, 4UL, 16UL, 64UL, 256UL, 512UL];
+    size_t[] workerCounts;
+    size_t[] grains;
+    if (args.length == 5)
+    {
+        workerCounts = parseSizes(args[3]);
+        grains = parseSizes(args[4]);
+    }
+    else
+    {
+        workerCounts = [1UL, 2UL, 4UL];
+        grains = [1UL, 4UL, 16UL, 64UL, 256UL, 512UL];
+    }
     immutable arms = ["parallelForReused", "parallelForAdaptiveReused"];
     writeln("phase,sample,order,workload,arm,workers,batch_size,submitted_tasks,chunks,min_iterations_per_chunk,elapsed_ns,ns_per_chunk,chunks_per_second,checksum");
 
