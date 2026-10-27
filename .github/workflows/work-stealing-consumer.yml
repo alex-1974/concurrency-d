@@ -137,7 +137,7 @@ jobs:
         run: dub run --root=examples/event-loop-consumer --compiler="$DC" --build=release --force
 
       - name: Exported package consumer
-        run: python3 tools/validation/m0_package.py "$DC" --expect-version 0.2.0
+        run: python3 tools/validation/m0_package.py "$DC"
 
       - name: Release build
         shell: bash
@@ -275,7 +275,7 @@ jobs:
         run: dub run --root=examples/event-loop-consumer --compiler="$DC" --build=release --force
 
       - name: Exported package consumer
-        run: python3 tools/validation/m0_package.py "$DC" --expect-version 0.2.0
+        run: python3 tools/validation/m0_package.py "$DC"
 
       - name: Release build
         shell: bash

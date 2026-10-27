@@ -1,5 +1,5 @@
 name "concurrency-d"
-version "0.2.0"
+version "0.3.0"
 description "High-performance generic concurrency and task execution primitives for D"
 targetType "library"
 sourcePaths "source"

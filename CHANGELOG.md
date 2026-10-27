@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## [0.3.0] - 2026-10-27
 
 - Add fixed and guided adaptive `Executor.parallelFor` range scheduling and a
   `WorkSize` hint for submitted callables that are expected to run longer.
@@ -9,10 +9,10 @@
 - Document workload-specific tuning for workers, batching, range grains and
   work-size hints; no universal performance improvement is claimed.
 
-## [0.2.0] - release candidate
+## [0.2.0] - 2026-10-23
 
 - Add bounded lexical `TaskScope` groups, cooperative cancellation, and
-  a typed two-way `Executor.join` to the v0.2.0 candidate API.
+  a typed two-way `Executor.join` to the public API.
 - Define cancellation as an idempotent shared request that never replaces the
   callable's single result, including completion and shutdown races.
 - Keep owned and scoped callable submission `@system` based on external

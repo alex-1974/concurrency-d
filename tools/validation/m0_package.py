@@ -25,10 +25,19 @@ def main():
         compiler = 'dmd'
     if compiler not in ('dmd', 'ldc2'):
         parser.error('compiler must resolve to dmd or ldc2')
+    if args.worktree:
+        version_manifest = (ROOT / 'dub.sdl').read_text()
+    else:
+        version_manifest = subprocess.check_output(
+            ['git', 'show', f'{args.tree}:dub.sdl'], cwd=ROOT, text=True)
+    source_version = re.search(r'^version \"([^\"]+)\"$', version_manifest, re.MULTILINE)
+    assert source_version, 'source package manifest has no version'
+    expected_version = args.expect_version or source_version.group(1)
     required = {'README.md', 'LICENSE', 'CHANGELOG.md', 'dub.sdl',
                 'docs/EXECUTOR.md', 'docs/M0-PERFORMANCE-QUALIFICATION.md',
                 'docs/V0.2-RELEASE-QUALIFICATION.md',
                 'docs/V0.3-RELEASE-QUALIFICATION.md',
+                'docs/V0.4-PERFORMANCE-BASELINE.md',
                 'source/concurrency/package.d'}
     if args.worktree:
         if args.tree != 'HEAD':
@@ -67,9 +76,8 @@ def main():
         assert 'license "MIT"' in manifest and 'benchmark' not in manifest
         version = re.search(r'^version "([^"]+)"$', manifest, re.MULTILINE)
         assert version, 'exported manifest has no version'
-        if args.expect_version:
-            assert version.group(1) == args.expect_version, (
-                f'exported version {version.group(1)} != {args.expect_version}')
+        assert version.group(1) == expected_version, (
+            f'exported version {version.group(1)} != expected {expected_version}')
         assert 'MIT License' in (package / 'LICENSE').read_text()
         def run(command, cwd):
             subprocess.run(command, cwd=cwd, check=True, timeout=180)

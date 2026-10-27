@@ -1,6 +1,6 @@
 # ADR-0002 — Separate owned tasks from scope-bounded tasks
 
-- **Status:** Accepted for the v0.2.0 candidate; release qualification pending
+- **Status:** Accepted in v0.2.0
 - **Issue:** [#17 — task lifetimes and storage boundaries](https://github.com/alex-1974/concurrency-d/issues/17)
 - **Research basis:** [pinned M1 lifetime corpus](https://github.com/alex-1974/concurrency-d-research/tree/894cfe81bcf41ca88e20a418eb90d6f2de7c83f9/research/m1_task_lifetime)
 
@@ -193,6 +193,6 @@ Current gate disposition:
    explicitly not part of the API; reclamation removes strong roots only after
    worker quiescence.
 
-The local technical gates are satisfied for the provisional API. Native CI and
-maintainer release acceptance remain part of Issue #23 rather than grounds for
-claiming this proposal is already a released contract.
+The maintainer accepted this API boundary for v0.2.0. Pinned DMD/LDC and native
+ARM64 CI passed on the versioned candidate; the `@system` contract and raw-pointer
+limitation remain as documented above.
