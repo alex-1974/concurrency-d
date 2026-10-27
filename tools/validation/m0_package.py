@@ -37,6 +37,7 @@ def main():
                 'docs/EXECUTOR.md', 'docs/M0-PERFORMANCE-QUALIFICATION.md',
                 'docs/V0.2-RELEASE-QUALIFICATION.md',
                 'docs/V0.3-RELEASE-QUALIFICATION.md',
+                'docs/V0.4-PERFORMANCE-BASELINE.md',
                 'source/concurrency/package.d'}
     if args.worktree:
         if args.tree != 'HEAD':
