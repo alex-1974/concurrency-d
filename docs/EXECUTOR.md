@@ -1,9 +1,7 @@
-# Public CPU executor and M1 scope prototype
+# Public CPU executor and structured task scopes
 
-The v0.1.0 release exports the M0 API through `import concurrency`. The v0.2.0
-candidate on `develop` adds a lexical scope and typed two-way join. Those
-additions are not part of the published v0.1.0 archive and await exact-candidate
-qualification before release.
+The v0.2.0 release exports the M0 executor plus lexical task scopes, typed
+two-way join and cooperative cancellation through `import concurrency`.
 
 ## Quick start
 
@@ -84,7 +82,7 @@ The executor retains accepted GC-backed task records and their reachable GC
 graphs. A copied pointer, delegate, slice or class reference is **not** a deep copy
 or a race-freedom guarantee. Keep all external/borrowed referents alive until
 successful closeAndJoin and synchronize shared mutable state yourself. No general
-@safe capture contract is claimed. The provisional TaskScope API is also
+@safe capture contract is claimed. The TaskScope API is also
 `@system`; its body and child callables must not outlive the call to
 `withScope`.
 
@@ -144,19 +142,17 @@ if the inline branch succeeds and the forked child fails, the child exception
 is rethrown. The caller chooses which branch runs inline, so this helper makes
 no balancing or speedup promise.
 
-This small fork-join helper and lexical scopes are the provisional v0.2
+This small fork-join helper and lexical scopes are the v0.2
 composition surface. [ADR-0004](adr/0004-defer-sender-receiver-layer.md)
 defers a general lazy Sender/Receiver adapter until a concrete consumer needs
 execution-context handoff or asynchronous operation graphs. `TaskHandle`
 readiness is not silently presented as structural completion, and cooperative
 cancellation is not converted into a separate cancelled outcome.
 
-This is an initial bounded API candidate. It does not make arbitrary captures
-safe, does not prevent a caller from deliberately escaping borrowed pointers
-through `@system`, and has no v0.1.0 compatibility promise. Its compiler and
-runtime gates are recorded in
-[ADR-0002](adr/0002-task-lifetime-families.md); the provisional public contract
-still awaits release acceptance.
+This bounded API does not make arbitrary captures safe and does not prevent a
+caller from deliberately escaping borrowed pointers through `@system`. Its
+compiler and runtime evidence is recorded in
+[ADR-0002](adr/0002-task-lifetime-families.md).
 
 Keep the executor itself explicitly rooted through closeAndJoin. A handle owns
 its result/error cell independently of the task record, but does not substitute
@@ -303,16 +299,16 @@ and runs the same public gate on native ARM64. The gate includes the standalone
 recursive scoped fork-join example at `examples/nested-scopes`.
 
 The v0.1.0 release passed exact-commit CI and archive/version/tag/publication
-checks. The scoped Dell XPS 15 / LDC 1.42 public-path baseline passed the
+checks. The v0.2.0 candidate passed DMD, LDC, native ARM64, public API,
+lifecycle, Ddoc and archive-consumer CI. The scoped Dell XPS 15 / LDC 1.42 public-path baseline passed the
 predeclared 10% bound for the two documented
 kernels and 1P/1W plus 4P/4W scenarios; its machine-specific scope and result are
 in [the M0 qualification record](M0-PERFORMANCE-QUALIFICATION.md). That result
 is not a general performance guarantee. MIT and DUB license metadata are
-already present. The v0.2.0 candidate applies the narrowly selected conditional
+already present. The v0.2.0 release applies the narrowly selected conditional
 publish-notification policy from
-[ADR-0003](adr/0003-coalesce-idle-publish-notifications.md); it and the
-candidate TaskScope implementation remain separate from the released v0.1.0
-API.
+[ADR-0003](adr/0003-coalesce-idle-publish-notifications.md); TaskScope and
+cooperative cancellation are part of the v0.2.0 API.
 
 For an exploratory matched public/internal LDC release comparison, run
 `python3 tools/validation/m0_public_path.py NEW-RESULT-DIRECTORY`. Use

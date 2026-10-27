@@ -13,12 +13,11 @@ The release passed the pinned DMD/LDC/native ARM64 CI and the scoped Dell XPS 15
 [the qualification record](docs/M0-PERFORMANCE-QUALIFICATION.md). This evidence
 is limited to the recorded machines, kernels, and scenarios.
 
-## M1 — Structured tasks and practical lifetime control (v0.2.0 candidate)
+## M1 — Structured tasks and practical lifetime control (v0.2.0, released)
 
-The next design step is to separate independently owned tasks from
-scope-bounded tasks. [ADR-0002](docs/adr/0002-task-lifetime-families.md) records
-the accepted candidate lifetime contract and the gates before release.
-The candidate includes structured task groups / `TaskScope`, a
+M1 separates independently owned tasks from scope-bounded tasks.
+[ADR-0002](docs/adr/0002-task-lifetime-families.md) records the accepted
+lifetime contract. Version 0.2.0 includes structured task groups / `TaskScope`, a
 typed two-way `join`, a cooperative cancellation token, and an evidence-based
 choice of task storage while preserving a small D-native API.
 
@@ -28,8 +27,7 @@ They do not authorize a general `@safe` capture contract or platform-general
 performance claim. [ADR-0003](docs/adr/0003-coalesce-idle-publish-notifications.md)
 selects their narrowly qualified conditional publish-notification policy while
 retaining portable condition parking and all other wake sites. The published
-v0.1.0 public API remains unchanged; M1 requires exact versioned-candidate
-qualification before release.
+v0.1.0 public API remains available; M1 additions are included in v0.2.0.
 
 The current compiler evidence selects `@system` for owned submission and scoped
 borrows: DIP1000 rejects ordinary safe calls and scope-value copies, but cannot

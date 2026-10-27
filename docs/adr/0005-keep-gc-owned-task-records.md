@@ -1,6 +1,6 @@
 # ADR-0005 — Keep GC-owned task records for v0.2
 
-- **Status:** Accepted for the v0.2.0 candidate; release qualification pending
+- **Status:** Accepted in v0.2.0
 - **Issue:** [#20 — task-record allocation and recycling](https://github.com/alex-1974/concurrency-d/issues/20)
 - **Related:** [ADR-0002](0002-task-lifetime-families.md)
 
