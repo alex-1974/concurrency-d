@@ -65,10 +65,15 @@ Sender/Receiver framework remain outside the shipped scope.
 ## M3 — Measured performance improvements (proposed; release target TBD)
 
 Use the exact v0.3.0 release as the baseline before selecting an optimization.
-The first diagnostic is profiling fine adaptive range work: the ARM64 capture
-shows a repeatable, roughly 3% median gap to Phobos, while the XPS tail varies
-substantially between sessions. This does not yet justify a scheduler change
-or a v0.4.0 release target. The
+Issue [#49](https://github.com/alex-1974/concurrency-d/issues/49) completed its
+fine-range investigation. XPS call-graph samples show range-worker overhead is
+prominent for short callbacks, while callback work dominates heavy callbacks.
+The hosted ARM64 runner provides timing data but cannot sample call graphs;
+the maintainer accepted proceeding without that profile. Grain 64 improved the
+short-uniform median on both tested hosts but failed tail-latency guardrails.
+A separate XPS claim-divisor candidate regressed the predeclared primary
+median by 2.9%, with regressions in all four session medians. No scheduler
+change is selected, and the grain-1 default remains. The
 [v0.4 performance baseline](docs/V0.4-PERFORMANCE-BASELINE.md) records the
 reproduction protocol and evidence.
 
@@ -77,4 +82,5 @@ real consumer demonstrates a gap. Keep GC-owned task records and the current
 portable parking policy unless new, semantically fair measurements identify
 them as the limiting factor. Assign a v0.4.0 release target only after a
 candidate produces a repeatable improvement with no material regression in
-the rest of the baseline matrix.
+the rest of the baseline matrix. Until then, v0.4.0 has no release target;
+v0.3.0 remains the latest performance-qualified release.
