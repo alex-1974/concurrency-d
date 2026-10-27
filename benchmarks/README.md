@@ -96,7 +96,8 @@ workflow runs this reduced matrix on GitHub's native ARM64 runner, builds the
 pinned v0.3.0 baseline plus temporary guided divisors 4 and 16, and uploads
 four alternating sessions of checksum-validated raw CSV and host metadata.
 The current sweep includes grain/minimum-grain sizes 1, 4, 16, and 64 to expose
-short-task improvements alongside coarse and irregular-cost regressions.
+short-task improvements alongside coarse and irregular-cost regressions; grain
+order alternates across sessions to reduce ordering bias.
 The run also attempts separate short- and heavy-callback `perf` call-graph
 captures for the v0.3.0 adaptive and fixed arms. It uses the user-space
 `cpu-clock` event, and records profiler availability/permission details in the
