@@ -4,6 +4,7 @@ on:
   pull_request:
     branches:
       - develop
+      - main
     paths:
       - "research/**"
       - "docs/research/**"
@@ -11,11 +12,27 @@ on:
       - "dub.sdl"
       - ".gitattributes"
       - "LICENSE"
+      - "README.md"
+      - "CHANGELOG.md"
+      - "ROADMAP.md"
       - "tools/validation/m0_package.py"
       - "source/concurrency/**"
       - "tests/public_api/**"
       - "examples/cpu-executor/**"
+      - "examples/event-loop-consumer/**"
       - "examples/nested-scopes/**"
+      - "docs/EXECUTOR.md"
+      - "docs/adr/**"
+      - "docs/V0.3-RELEASE-QUALIFICATION.md"
+      - "benchmarks/end-to-end/**"
+      - "benchmarks/adaptive-ranges/**"
+      - "benchmarks/streaming/**"
+      - "benchmarks/cross-language/**"
+      - "benchmarks/README.md"
+      - "tools/validation/summarize_m2_benchmark.py"
+      - "tools/validation/summarize_streaming_benchmark.py"
+      - "tools/validation/capture_m2_benchmark.py"
+      - ".github/workflows/m2-performance-capture.yml"
       - "tools/validation/m0_public_api.py"
       - "tools/validation/m0_public_path.py"
       - "tests/lifecycle/**"
@@ -30,6 +47,7 @@ on:
   push:
     branches:
       - develop
+      - main
     paths:
       - "research/**"
       - "docs/research/**"
@@ -37,11 +55,27 @@ on:
       - "dub.sdl"
       - ".gitattributes"
       - "LICENSE"
+      - "README.md"
+      - "CHANGELOG.md"
+      - "ROADMAP.md"
       - "tools/validation/m0_package.py"
       - "source/concurrency/**"
       - "tests/public_api/**"
       - "examples/cpu-executor/**"
+      - "examples/event-loop-consumer/**"
       - "examples/nested-scopes/**"
+      - "docs/EXECUTOR.md"
+      - "docs/adr/**"
+      - "docs/V0.3-RELEASE-QUALIFICATION.md"
+      - "benchmarks/end-to-end/**"
+      - "benchmarks/adaptive-ranges/**"
+      - "benchmarks/streaming/**"
+      - "benchmarks/cross-language/**"
+      - "benchmarks/README.md"
+      - "tools/validation/summarize_m2_benchmark.py"
+      - "tools/validation/summarize_streaming_benchmark.py"
+      - "tools/validation/capture_m2_benchmark.py"
+      - ".github/workflows/m2-performance-capture.yml"
       - "tools/validation/m0_public_api.py"
       - "tools/validation/m0_public_path.py"
       - "tests/lifecycle/**"
@@ -98,6 +132,10 @@ jobs:
         shell: bash
         run: python3 tools/validation/m0_public_api.py "$DC"
 
+      - name: Event-loop consumer handoff smoke
+        shell: bash
+        run: dub run --root=examples/event-loop-consumer --compiler="$DC" --build=release --force
+
       - name: Exported package consumer
         run: python3 tools/validation/m0_package.py "$DC" --expect-version 0.2.0
 
@@ -134,9 +172,68 @@ jobs:
         shell: bash
         run: dub run --root=benchmarks/fork-join --build=release --compiler="$DC" --force -- 16 2 32 2 1
 
+      - name: End-to-end scheduler comparison smoke (no timing threshold)
+        shell: bash
+        run: |
+          dub build --root=benchmarks/end-to-end --build=release --compiler="$DC" --force
+          ./benchmarks/end-to-end/concurrency-end-to-end-benchmark 4 2 1 128 > /tmp/end-to-end.csv
+          python3 tools/validation/summarize_m2_benchmark.py /tmp/end-to-end.csv > /dev/null
+
+      - name: Adaptive range scheduling smoke (no timing threshold)
+        shell: bash
+        run: |
+          dub build --root=benchmarks/adaptive-ranges --build=release --compiler="$DC" --force
+          ./benchmarks/adaptive-ranges/concurrency-adaptive-ranges-benchmark 1 0 > /dev/null
+
+      - name: Bounded streaming comparison smoke (no timing threshold)
+        shell: bash
+        run: |
+          dub build --root=benchmarks/streaming --build=release --compiler="$DC" --force
+          ./benchmarks/streaming/concurrency-streaming-benchmark 4 2 8 128 64 1 1 0 > /tmp/streaming.csv
+          python3 tools/validation/summarize_streaming_benchmark.py /tmp/streaming.csv > /dev/null
+
       - name: Portable parking smoke and metrics (not a fixed performance gate)
         shell: bash
         run: dub run --root=benchmarks/parking --build=release --compiler="$DC" --force -- 2 64
+
+  cross-language-reference:
+    name: Cross-language benchmark references (checksum smoke)
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Verify toolchains
+        run: |
+          cmake --version
+          c++ --version
+          rustc --version
+          cargo --version
+
+      - name: Build pinned Taskflow and oneTBB adapters
+        run: |
+          cmake -S benchmarks/cross-language -B /tmp/cross-language-build \
+            -DCMAKE_BUILD_TYPE=Release -DTF_BUILD_TESTS=OFF \
+            -DTF_BUILD_EXAMPLES=OFF -DTBB_TEST=OFF
+          cmake --build /tmp/cross-language-build \
+            --target taskflow_reference onetbb_reference --parallel 2
+
+      - name: Build pinned Rayon adapter
+        run: cargo build --locked --manifest-path benchmarks/cross-language/rayon/Cargo.toml --release
+
+      - name: Run checksum-verified multi-wave reference smoke
+        run: |
+          /tmp/cross-language-build/taskflow_reference 4 2 1 2 8 > /tmp/taskflow-reference.csv
+          /tmp/cross-language-build/onetbb_reference 4 2 1 2 8 > /tmp/onetbb-reference.csv
+          benchmarks/cross-language/rayon/target/release/rayon-reference 4 2 1 2 8 > /tmp/rayon-reference.csv
+          python3 - <<'PY'
+          import csv
+          for path in ("/tmp/taskflow-reference.csv", "/tmp/onetbb-reference.csv", "/tmp/rayon-reference.csv"):
+              with open(path, newline="") as stream:
+                  rows = list(csv.DictReader(stream))
+              assert rows and all(row["checksum"] for row in rows), path
+          PY
 
   native-arm64:
     name: Consumer / native ARM64 / LDC 1.41
@@ -173,6 +270,10 @@ jobs:
         shell: bash
         run: python3 tools/validation/m0_public_api.py "$DC"
 
+      - name: Event-loop consumer handoff smoke
+        shell: bash
+        run: dub run --root=examples/event-loop-consumer --compiler="$DC" --build=release --force
+
       - name: Exported package consumer
         run: python3 tools/validation/m0_package.py "$DC" --expect-version 0.2.0
 
@@ -200,6 +301,26 @@ jobs:
       - name: Public owned-storage and GC retention smoke (no timing threshold)
         shell: bash
         run: dub run --root=benchmarks/owned-storage --build=release --compiler="$DC" --force -- 64 2 1
+
+      - name: End-to-end scheduler comparison smoke (no timing threshold)
+        shell: bash
+        run: |
+          dub build --root=benchmarks/end-to-end --build=release --compiler="$DC" --force
+          ./benchmarks/end-to-end/concurrency-end-to-end-benchmark 4 2 1 128 > /tmp/end-to-end.csv
+          python3 tools/validation/summarize_m2_benchmark.py /tmp/end-to-end.csv > /dev/null
+
+      - name: Adaptive range scheduling smoke (no timing threshold)
+        shell: bash
+        run: |
+          dub build --root=benchmarks/adaptive-ranges --build=release --compiler="$DC" --force
+          ./benchmarks/adaptive-ranges/concurrency-adaptive-ranges-benchmark 1 0 > /dev/null
+
+      - name: Bounded streaming comparison smoke (no timing threshold)
+        shell: bash
+        run: |
+          dub build --root=benchmarks/streaming --build=release --compiler="$DC" --force
+          ./benchmarks/streaming/concurrency-streaming-benchmark 4 2 8 128 64 1 1 0 > /tmp/streaming.csv
+          python3 tools/validation/summarize_streaming_benchmark.py /tmp/streaming.csv > /dev/null
 
       - name: Portable parking smoke and metrics (not a fixed performance gate)
         shell: bash

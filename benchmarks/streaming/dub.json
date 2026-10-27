@@ -1,0 +1,9 @@
+{
+  "name": "concurrency-streaming-benchmark",
+  "description": "Bounded sustained multi-producer task stream comparison",
+  "targetType": "executable",
+  "sourcePaths": [],
+  "mainSourceFile": "main.d",
+  "targetName": "concurrency-streaming-benchmark",
+  "dependencies": {"concurrency-d": {"path": "../.."}}
+}

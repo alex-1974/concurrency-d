@@ -1,0 +1,6 @@
+{
+  "name": "concurrency-event-loop-example",
+  "description": "Standalone event-loop-style public concurrency-d consumer",
+  "targetType": "executable",
+  "dependencies": {"concurrency-d": {"path": "../.."}}
+}

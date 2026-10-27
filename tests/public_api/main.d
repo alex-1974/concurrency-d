@@ -1,7 +1,7 @@
 // Deliberately outside package concurrency: no internal imports or access.
 module public_api_consumer;
 
-import concurrency : CancellationToken, Executor, TaskHandle, ExecutorClosedException, WorkerSelfJoinException;
+import concurrency : CancellationToken, Executor, TaskHandle, WorkSize, ExecutorClosedException, WorkerSelfJoinException;
 import core.atomic : atomicLoad, atomicStore, atomicFetchAdd, MemoryOrder;
 import core.thread : Thread;
 import core.time : MonoTime, dur;
@@ -170,6 +170,18 @@ private void resultsAndSelfClose()
     misuse.executor = executor;
     auto self = executor.submit(misuse);
     enforce(answer.get() == 42 && answer.isComplete(), "typed result mismatch");
+    enforce(executor.submit(&functionResult, WorkSize.large).get() == 42,
+        "large-work size changed task result");
+    enforce(executor.trySubmit(&functionResult, WorkSize.small).get() == 42,
+        "small-work size changed task result");
+    executor.withScope(1, (ref tasks) {
+        enforce(tasks.spawn(&functionResult, WorkSize.large).get() == 42,
+            "scoped large-work size changed task result");
+    });
+    auto hintedJoin = executor.join(&functionResult, &functionResult,
+        WorkSize.large);
+    enforce(hintedJoin.left == 42 && hintedJoin.right == 42,
+        "join large-work size changed results");
     enforce(executor.submit(&functionResult).get() == 42, "function pointer submission failed");
     auto closure = () { return value.value * 3; };
     // Caller keeps captured value alive through the explicit join below.
@@ -198,6 +210,102 @@ private void resultsAndSelfClose()
     try { executor.submit(value); }
     catch (ExecutorClosedException) { caught = true; }
     enforce(caught, "closed submit did not terminate");
+}
+
+private void parallelForRanges()
+{
+    auto executor = new Executor(2, 4, 16);
+    scope(exit) executor.closeAndJoin();
+    auto values = new size_t[10];
+    shared uint[10] visits;
+    executor.parallelFor(values.length, 3, (size_t index) {
+        values[index] = index + 1;
+        atomicFetchAdd!(MemoryOrder.rel)(visits[index], 1u);
+    });
+    size_t total;
+    foreach (value; values) total += value;
+    enforce(total == 55, "parallelFor must visit each index exactly once");
+    foreach (count; visits)
+        enforce(atomicLoad!(MemoryOrder.acq)(count) == 1,
+            "parallelFor must not duplicate index visits");
+    executor.parallelFor(0, 3, (size_t index) {});
+
+    auto adaptiveValues = new size_t[37];
+    shared uint[37] adaptiveVisits;
+    executor.parallelForAdaptive(adaptiveValues.length, 1, (size_t index) {
+        adaptiveValues[index] = index + 1;
+        atomicFetchAdd!(MemoryOrder.rel)(adaptiveVisits[index], 1u);
+    });
+    size_t adaptiveTotal;
+    foreach (value; adaptiveValues) adaptiveTotal += value;
+    enforce(adaptiveTotal == 703,
+        "adaptive parallelFor must visit every index exactly once");
+    foreach (count; adaptiveVisits)
+        enforce(atomicLoad!(MemoryOrder.acq)(count) == 1,
+            "adaptive parallelFor must not duplicate index visits");
+
+    shared uint oneItemVisits;
+    executor.parallelForAdaptive(1, 64, (size_t index) {
+        enforce(index == 0, "adaptive parallelFor one-item index must be zero");
+        atomicFetchAdd!(MemoryOrder.rel)(oneItemVisits, 1u);
+    });
+    enforce(atomicLoad!(MemoryOrder.acq)(oneItemVisits) == 1,
+        "adaptive parallelFor must handle minGrainSize larger than itemCount");
+
+    bool rejected;
+    try { executor.parallelFor(1, 0, (size_t index) {}); }
+    catch (Exception error)
+        rejected = error.msg == "parallelFor grainSize must be positive";
+    enforce(rejected, "parallelFor must reject zero grainSize");
+    rejected = false;
+    try { executor.parallelForAdaptive(1, 0, (size_t index) {}); }
+    catch (Exception error)
+        rejected = error.msg == "parallelForAdaptive minGrainSize must be positive";
+    enforce(rejected, "adaptive parallelFor must reject zero minGrainSize");
+
+    bool failed;
+    try
+        executor.parallelFor(8, 1, (size_t index) {
+            if (index == 2) throw new Exception("parallelFor callback failure");
+        });
+    catch (Exception error)
+        failed = error.msg == "parallelFor callback failure";
+    enforce(failed, "parallelFor must propagate callback failures after draining");
+    enforce(executor.submit(&functionResult).get() == 42,
+        "executor must remain usable after a parallelFor callback failure");
+
+    bool adaptiveFailed;
+    try
+        executor.parallelForAdaptive(64, 1, (size_t index) {
+            if (index == 2) throw new Exception("adaptive callback failure");
+        });
+    catch (Exception error)
+        adaptiveFailed = error.msg == "adaptive callback failure";
+    enforce(adaptiveFailed,
+        "adaptive parallelFor must drain workers and propagate callback failures");
+    enforce(executor.submit(&functionResult).get() == 42,
+        "executor must remain usable after an adaptive callback failure");
+
+    auto singleWorker = new Executor(1, 1, 8);
+    scope(exit) singleWorker.closeAndJoin();
+    size_t singleTotal;
+    singleWorker.parallelFor(7, 2, (size_t index) { singleTotal += index; });
+    enforce(singleTotal == 21, "single-worker parallelFor must visit every index");
+    singleWorker.parallelForAdaptive(7, 2,
+        (size_t index) { singleTotal += index; });
+    enforce(singleTotal == 42,
+        "single-worker adaptive parallelFor must visit every index");
+    bool singleFailed;
+    try
+        singleWorker.parallelFor(4, 1, (size_t index) {
+            if (index == 1) throw new Exception("single-worker callback failure");
+        });
+    catch (Exception error)
+        singleFailed = error.msg == "single-worker callback failure";
+    enforce(singleFailed, "single-worker parallelFor must propagate callback failures");
+    singleTotal = 0;
+    singleWorker.parallelFor(2, 1, (size_t index) { singleTotal += index; });
+    enforce(singleTotal == 1, "single-worker executor must remain usable after failure");
 }
 
 private void backpressure()
@@ -237,6 +345,52 @@ private void backpressure()
     // get may precede returned-marker reclamation; submit retries that boundary.
     enforce(limited.submit(queued).get() == 42, "record budget was not reclaimed");
     limited.closeAndJoin();
+}
+
+private void multipleResultWaiters()
+{
+    auto executor = new Executor(1, 2, 4);
+    auto gate = new Gate;
+    scope(exit) { gate.release(); executor.closeAndJoin(); }
+
+    Block block;
+    block.gate = gate;
+    auto blocker = executor.submit(block);
+    gate.untilEntered();
+
+    Value value;
+    value.value = 14;
+    auto result = executor.submit(value);
+    shared uint ready;
+    int[2] observed;
+    auto first = new Thread({
+        atomicFetchAdd!(MemoryOrder.rel)(ready, 1u);
+        observed[0] = result.get();
+    });
+    auto second = new Thread({
+        atomicFetchAdd!(MemoryOrder.rel)(ready, 1u);
+        observed[1] = result.get();
+    });
+    first.start();
+    second.start();
+
+    const end = MonoTime.currTime + dur!"seconds"(5);
+    while (atomicLoad!(MemoryOrder.acq)(ready) != 2u)
+    {
+        enforce(MonoTime.currTime < end,
+            "multiple TaskHandle.get waiters did not start");
+        Thread.yield();
+    }
+    // Both waiters announce immediately before entering get(). Keep the task
+    // blocked briefly so they can reach its condition wait before completion.
+    Thread.sleep(dur!"msecs"(25));
+    gate.release();
+    first.join();
+    second.join();
+    blocker.get();
+    enforce(observed[0] == 42 && observed[1] == 42,
+        "result completion did not release every handle waiter");
+    executor.closeAndJoin();
 }
 
 private void scopedTasksAndUnwind()
@@ -691,7 +845,9 @@ private void concurrentClose()
 void main()
 {
     resultsAndSelfClose();
+    parallelForRanges();
     backpressure();
+    multipleResultWaiters();
     scopedTasksAndUnwind();
     cooperativeCancellation();
     cancellationDuringShutdown();
@@ -711,5 +867,5 @@ void main()
         catch (Exception) { rejected = true; }
         enforce(rejected, "invalid limits accepted");
     }
-    writeln("PUBLIC_API_PASS typed_void_error=true backpressure=ingress,records scopes=borrow,unwind,errors,capacity,nested,recursion,moved_view,gc_graph fork_join=typed,void,inline_failure_drain worker_help=admission,join cancellation=running,prepublish,queued,complete_race64,shutdown16 gc_graphs=owned8,scoped1 close_races=8 budget_reuse=256");
+    writeln("PUBLIC_API_PASS typed_void_error=true result_waiters=2 backpressure=ingress,records scopes=borrow,unwind,errors,capacity,nested,recursion,moved_view,gc_graph fork_join=typed,void,inline_failure_drain parallel_for=dynamic_ranges,empty,zero_grain,callback_failure,reuse worker_help=admission,join cancellation=running,prepublish,queued,complete_race64,shutdown16 gc_graphs=owned8,scoped1 close_races=8 budget_reuse=256");
 }

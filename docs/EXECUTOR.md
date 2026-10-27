@@ -22,27 +22,39 @@ void main()
 }
 ```
 
-Run the checked-in independent CPU/completion example from the repository root:
+Run the checked-in independent CPU and event-loop-style consumers from the
+repository root:
 
 ```sh
 dub run --root=examples/cpu-executor --compiler=dmd
 dub run --root=examples/cpu-executor --compiler=ldc2 --build=release
+dub run --root=examples/event-loop-consumer --compiler=dmd
+dub run --root=examples/event-loop-consumer --compiler=ldc2 --build=release
 ```
 
-The example imports only the public module. Workers compute 48 chunks; the
-consumer polls readiness and applies results only on its controlling thread.
-This is an event-loop-style handoff example, not a GUI adapter or latency claim.
+Both examples import only the public module. The CPU example computes and
+validates 48 independent chunks through both typed handles and `parallelFor`;
+the range callback writes to per-index slots and the controller reduces them
+after the implicit join. The event-loop example has workers post
+completed values into a synchronized queue owned by the consumer; its
+controller thread alone updates application state. It also exercises
+cooperative cancellation, lexical draining, result retrieval after shutdown,
+and controller/worker thread affinity. The queue is the intended adapter seam
+for a future GUI dispatcher: the library does not own or call a UI framework.
+These are executable integration examples, not latency claims.
 
 ## Surface
 
 | Symbol | Behavior |
 |---|---|
 | `Executor(workers, ingressCapacity, maxRetained = 4096)` | Explicit positive limits; setup completes before native worker startup |
-| `executor.trySubmit(callable)` | One attempt: typed handle on success, null on bounded capacity, ExecutorClosedException after close |
-| `executor.submit(callable)` | Retry capacity rejection until admitted or closed; may wait indefinitely |
+| `executor.trySubmit(callable, workSize = WorkSize.small)` | One attempt: typed handle on success, null on bounded capacity, ExecutorClosedException after close |
+| `executor.submit(callable, workSize = WorkSize.small)` | Retry capacity rejection until admitted or closed; may wait indefinitely |
+| `executor.parallelFor(itemCount, grainSize, body)` | Run `body(index)` over `[0, itemCount)`; workers dynamically claim contiguous ranges of up to `grainSize`, and all workers are joined before returning |
+| `executor.parallelForAdaptive(itemCount, minGrainSize, body)` | Run indexed work with guided claims that begin larger and shrink toward `minGrainSize`; all workers are joined before returning |
 | `executor.withScope(maxTasks, body)` | Provisional M1 API: run a bounded lexical child group, drain on body unwind, then propagate child errors |
-| `executor.join(left, right)` | Provisional M1 API: schedule `left` as one scoped child, execute `right` inline, join both, and return typed non-void fields |
-| `TaskScope.spawn(callable)` | Submit a child and keep its post-dispatch join obligation in the scope |
+| `executor.join(left, right, leftWorkSize = WorkSize.small)` | Provisional M1 API: schedule `left` as one scoped child, execute `right` inline, join both, and return typed non-void fields |
+| `TaskScope.spawn(callable, workSize = WorkSize.small)` | Submit a child and keep its post-dispatch join obligation in the scope |
 | `TaskScope.cancellationToken()` / `requestCancellation()` | Cooperative request signal; tasks poll the token, and the scope still joins every child |
 | `TaskScope.join()` | Wait for every child to stop accessing its record, then rethrow the first child failure |
 | `executor.closeAndJoin()` | Stop admission, drain, join; repeated/concurrent external calls coordinate |
@@ -164,6 +176,74 @@ bounds record count, not heap bytes, handle count or total tasks over the
 executor's life. The two distinct limits can both cause trySubmit to return null.
 Known rejection occurs before allocating the task's node/result graph; arbitrary
 user callable-copy operations may themselves allocate or throw.
+
+For workloads made of many independent indexed items, use
+`parallelFor(itemCount, grainSize, body)`. The calling thread participates,
+alongside up to `workerCount - 1` executor tasks, which claim contiguous ranges
+as work becomes available. This amortizes task admission while redistributing
+uneven work. Small grains improve balancing but increase atomic claims; large
+grains reduce claims but can leave a long tail. The matching
+sweep in [the end-to-end benchmark](../benchmarks/README.md) compares several
+grain sizes. `grainSize` is the maximum number of indices claimed at once, not
+the worker count or a time estimate. For opaque tasks or custom dependencies,
+use `submit` and choose the task grouping explicitly.
+
+`parallelForAdaptive` is an opt-in alternative for workloads with many cheap,
+uniform items. Its `minGrainSize` guides claim sizes: early claims may be
+larger, and the final partial claim may be smaller. This reduces claim
+coordination when much of the domain remains while keeping smaller claims near
+the end. If the minimum is at least `itemCount`, the whole domain is one claim
+and runs on the calling thread. It can worsen load balance when item costs
+vary; use the fixed-maximum `parallelFor` when a
+strict upper bound per claim matters. A focused local sweep found that minimum
+1 greatly reduced median time over fixed grain 1 at two and four workers,
+including short and variable-cost items. A follow-up found that a cluster of
+expensive items at the start can make guided claims slower, so item-cost
+distribution matters as well as its range. After tuning both methods
+independently, their best medians were
+usually within about 5% on the tested scattered and uniform workloads, and
+fixed claims sometimes led. Use adaptive claims when a small lower bound is
+useful across uncertain costs; use fixed claims when costs cluster or a hard
+per-claim upper bound matters. Benchmark both methods for peak performance.
+
+The caller may also pass `WorkSize.large` to `submit`, `trySubmit`,
+`TaskScope.spawn` or `join` when a callable is expected to run substantially
+longer than ordinary work. Workers
+then claim that task alone from shared ingress rather than prefetching it with
+the next tasks, leaving more queued long tasks visible to other workers. The
+default `WorkSize.small` preserves the existing bounded inbox batch policy.
+This hint does not split a callable, change its priority, predict its runtime,
+or promise that all workers will be busy; use application-level batching for
+many tiny independent items. The streaming benchmark can compare both hints.
+
+## Performance tuning
+
+Treat these values as workload-specific starting points, not promises or
+universal defaults. Tune against the application path and the metric that
+matters: throughput, completion latency, tail latency, or producer time blocked
+by backpressure. Improving one can worsen another.
+
+| Parameter | Starting approach | What to watch |
+|---|---|---|
+| `workers` | Begin near the CPU capacity available to this process. Sweep around that point, including fewer workers when producers, callbacks, or other application threads also need CPU. | Throughput and tail latency; extra workers can add scheduling and cache contention. |
+| Batch size | For many tiny independent items, sweep roughly 1, 4, 16, 64, 128 and 256 logical items per submitted callable. Keep enough batches to occupy all workers; use smaller batches when items vary greatly in cost or low latency matters. | Task-record/admission overhead versus idle workers and time spent waiting for the slowest item in a batch. |
+| `grainSize` | With `parallelFor`, start at 1 and compare 4, 16, 64, 128 and 256 against real work. Tiny or uneven items often benefit from small claims; larger claims reduce counter traffic for very cheap, uniform items. | Atomic claim overhead versus load balance and the final slow range. |
+| `minGrainSize` | With `parallelForAdaptive`, start at 1 for many uniform items, then compare against fixed-grain `parallelFor`. | Fewer claim operations versus tail latency and imbalance when item costs vary. |
+| `WorkSize` | Use `large` only when the callable is expected to run materially longer than ordinary work; otherwise keep the default `small`. | Long-task distribution versus inbox lock amortization. The hint is an estimate, not a measured duration or an automatic split policy. |
+| `ingressCapacity` | Start with a few queued tasks per worker, then test a small range such as 1x, 2x, 4x and 8x the worker count. | Rejection/retry or producer blocking, queueing latency and memory. A larger inbox absorbs bursts; it does not by itself increase steady-state processing capacity. |
+| `maxRetained` | Keep the default unless the application's retained-task pattern gives a reason to change it. Size for accepted records that may not yet have returned, including active scoped parents and children. | `trySubmit` rejection under load and retained memory. This is a record-count bound, not a byte limit or a count of all tasks over the executor's lifetime. |
+| Producers | Start with the application's natural number of submitting threads; for a benchmark, compare one producer with a few concurrent producers. | Admission contention and producer wait time. More producers do not create more worker capacity. |
+
+Change one parameter at a time, then check promising combinations. Keep the
+logical work and validation identical between runs, warm up the executable,
+collect repeated samples, and use an optimized build. Record compiler/version,
+worker and producer counts, both capacity limits, batch size, CPU and power
+profile. The [benchmark guide](../benchmarks/README.md) has reproducible
+commands for the repository's grain-size and bounded-streaming sweeps. Those
+microbenchmarks help explain costs; choose final settings using representative
+application tasks. Large batches and queues can improve throughput while
+raising latency, so prefer the smallest values that meet the application's
+throughput target without violating its latency needs.
 
 The executor reclaims returned records as its bounded retention budget fills.
 An application does not need a public sweep call to keep submitting work. A
