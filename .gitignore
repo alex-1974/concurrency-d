@@ -17,3 +17,4 @@ concurrency-d-test-*
 .workspace/
 
 /concurrency-executor-benchmark
+/benchmarks/split-on-steal/concurrency-split-on-steal-benchmark

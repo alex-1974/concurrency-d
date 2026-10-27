@@ -1,0 +1,66 @@
+name: Split-on-steal native ARM64 qualification
+
+on:
+  pull_request:
+    branches: [develop, main]
+    paths:
+      - "source/concurrency/executor.d"
+      - "benchmarks/split-on-steal/**"
+      - "tools/validation/capture_split_on_steal_arm64.py"
+      - ".github/workflows/split-on-steal-arm64.yml"
+  workflow_dispatch:
+    inputs:
+      sessions:
+        description: Independent process sessions
+        required: true
+        default: "4"
+        type: string
+      samples:
+        description: Measured samples per workload and variant
+        required: true
+        default: "12"
+        type: string
+      warmups:
+        description: Warmup samples per workload and variant
+        required: true
+        default: "3"
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  qualification:
+    name: Native ARM64 baseline versus candidate
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 90
+    env:
+      SESSIONS: ${{ inputs.sessions || '4' }}
+      SAMPLES: ${{ inputs.samples || '12' }}
+      WARMUPS: ${{ inputs.warmups || '3' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Install LDC
+        uses: dlang-community/setup-dlang@v2
+        with:
+          compiler: ldc-1.41.0
+      - name: Verify native ARM64 and baseline
+        run: |
+          test "$(uname -m)" = "aarch64"
+          uname -a
+          lscpu
+          "$DC" --version
+          dub --version
+          git fetch --force origin tag v0.3.0
+      - name: Build, capture, and summarize
+        run: python3 tools/validation/capture_split_on_steal_arm64.py
+      - name: Upload raw runs and host metadata
+        uses: actions/upload-artifact@v4
+        with:
+          name: split-on-steal-arm64-${{ github.sha }}
+          path: /tmp/split-on-steal-arm64/
+          if-no-files-found: error
+          retention-days: 90

@@ -244,6 +244,14 @@ private void parallelForRanges()
         enforce(atomicLoad!(MemoryOrder.acq)(count) == 1,
             "adaptive parallelFor must not duplicate index visits");
 
+    shared uint[2] tinyAdaptiveVisits;
+    executor.parallelForAdaptive(2, 1, (size_t index) {
+        atomicFetchAdd!(MemoryOrder.rel)(tinyAdaptiveVisits[index], 1u);
+    });
+    foreach (count; tinyAdaptiveVisits)
+        enforce(atomicLoad!(MemoryOrder.acq)(count) == 1,
+            "adaptive parallelFor must handle fewer blocks than workers");
+
     shared uint oneItemVisits;
     executor.parallelForAdaptive(1, 64, (size_t index) {
         enforce(index == 0, "adaptive parallelFor one-item index must be zero");
