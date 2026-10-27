@@ -90,6 +90,13 @@ dub build --root=benchmarks/adaptive-ranges --build=release --compiler=ldc2
 python3 tools/validation/summarize_m2_benchmark.py adaptive-ranges.csv
 ```
 
+The benchmark also accepts optional comma-separated worker and grain sweeps,
+for example `20 5 1,4 1,64`. The `Fine adaptive ranges ARM64 qualification`
+workflow runs this reduced matrix on GitHub's native ARM64 runner, builds the
+pinned v0.3.0 baseline plus temporary guided divisors 4 and 16, and uploads
+four alternating sessions of checksum-validated raw CSV and host metadata.
+The run does not change the library source or select a release candidate.
+
 For repeated sessions, add a `session` column to each run before concatenating
 the CSVs. Compare adaptive and fixed arms at the same grain to see the value of
 adaptation, and compare each arm's best grain to understand the result after

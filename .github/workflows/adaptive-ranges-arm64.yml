@@ -1,0 +1,67 @@
+name: Fine adaptive ranges ARM64 qualification
+
+on:
+  pull_request:
+    branches: [develop, main]
+    paths:
+      - "benchmarks/adaptive-ranges/**"
+      - "tools/validation/capture_adaptive_arm64.py"
+      - ".github/workflows/adaptive-ranges-arm64.yml"
+  workflow_dispatch:
+    inputs:
+      sessions:
+        description: Independent process sessions
+        required: true
+        default: "4"
+        type: string
+      samples:
+        description: Measured samples per setting
+        required: true
+        default: "20"
+        type: string
+      warmups:
+        description: Warmup samples per setting
+        required: true
+        default: "5"
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  qualification:
+    name: Native ARM64 divisor 4/8/16 qualification
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 360
+    env:
+      SESSIONS: ${{ inputs.sessions || '4' }}
+      SAMPLES: ${{ inputs.samples || '20' }}
+      WARMUPS: ${{ inputs.warmups || '5' }}
+      WORKERS: "1,4"
+      GRAINS: "1,64"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Install LDC
+        uses: dlang-community/setup-dlang@v2
+        with:
+          compiler: ldc-1.41.0
+      - name: Verify native architecture
+        run: |
+          test "$(uname -m)" = "aarch64"
+          uname -a
+          lscpu
+          "$DC" --version
+          dub --version
+          git fetch --force origin tag v0.3.0
+      - name: Build, capture, and validate checksums
+        run: python3 tools/validation/capture_adaptive_arm64.py
+      - name: Upload raw benchmark and host metadata
+        uses: actions/upload-artifact@v4
+        with:
+          name: fine-adaptive-arm64-${{ github.sha }}
+          path: /tmp/adaptive-arm64-capture/
+          if-no-files-found: error
+          retention-days: 90
