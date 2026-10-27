@@ -4,6 +4,9 @@ import concurrency : Executor;
 import core.time : MonoTime;
 import std.conv : to;
 import std.exception : enforce;
+import std.string : indexOf, startsWith;
+import std.parallelism : TaskPool;
+import std.range : iota;
 import std.stdio : writeln;
 
 private enum waves = 8;
@@ -63,24 +66,46 @@ private ulong checksum(Workload workload)
     return result;
 }
 
-private ulong run(Workload workload, size_t workers, bool adaptive)
+private ulong runPhobos(Workload workload, size_t workers, size_t batchSize)
 {
-    auto executor = new Executor(workers, 64, workload.items + 1);
-    scope (exit) executor.closeAndJoin();
+	auto pool = new TaskPool(workers - 1);
+	scope (exit) pool.finish(true);
+	auto values = new ulong[workload.items];
+	ulong result;
+	foreach (_; 0 .. waves)
+	{
+		foreach (index; pool.parallel(iota(0, workload.items), batchSize))
+			values[index] = Job(index, workload)();
+		foreach (value; values)
+			result += value;
+	}
+	return result;
+}
+
+private ulong run(Workload workload, size_t workers, string arm)
+{
+    if (arm.startsWith("phobos_"))
+        return runPhobos(workload, workers, to!size_t(arm[7 .. $]));
+
+    const separator = arm.indexOf('_');
+    const grain = to!size_t(arm[separator + 1 .. $]);
+    const adaptive = arm.startsWith("adaptive_");
     auto values = new ulong[workload.items];
     ulong result;
+    auto executor = new Executor(workers, 64, 64);
+    scope (exit) executor.closeAndJoin();
     foreach (_; 0 .. waves)
     {
         if (adaptive)
-            executor.parallelForAdaptive(workload.items, 1, (size_t index) {
+            executor.parallelForAdaptive(workload.items, grain, (size_t index) {
                 values[index] = Job(index, workload)();
             });
         else
-            executor.parallelFor(workload.items, 1, (size_t index) {
+            executor.parallelFor(workload.items, grain, (size_t index) {
                 values[index] = Job(index, workload)();
             });
-        foreach (value; values)
-            result += value;
+		foreach (value; values)
+			result += value;
     }
     return result;
 }
@@ -104,24 +129,27 @@ void main(string[] args)
         Workload("heavy_prefix_16384", 16384, 128, 896, Pattern.prefix),
         Workload("heavy_suffix_16384", 16384, 128, 896, Pattern.suffix),
     ];
-    writeln("phase,sample,workload,arm,workers,item_count,elapsed_ns,checksum");
+	immutable arms = ["fixed_1", "fixed_4", "fixed_16", "fixed_64", "fixed_256",
+        "adaptive_1", "adaptive_4", "adaptive_16", "adaptive_64", "adaptive_256",
+        "phobos_1", "phobos_4", "phobos_16", "phobos_64", "phobos_256"];
+	writeln("phase,sample,order,workload,arm,workers,item_count,elapsed_ns,checksum");
     foreach (workloadIndex, workload; workloads)
     {
         const expected = checksum(workload) * waves;
         foreach (sample; 0 .. warmups + samples)
         {
-            const offset = (sample + workloadIndex) % 2;
-            foreach (order; 0 .. 2)
+			const offset = (sample + workloadIndex) % arms.length;
+			foreach (order; 0 .. arms.length)
             {
-                const adaptive = ((offset + order) % 2) == 1;
+				const arm = arms[(offset + order) % arms.length];
                 const started = MonoTime.currTime;
-                const actual = run(workload, 4, adaptive);
+				const actual = run(workload, 4, arm);
                 const elapsed = (MonoTime.currTime - started).total!"nsecs";
                 enforce(actual == expected && elapsed > 0,
                     workload.name ~ "/checksum or timing mismatch");
                 writeln(sample < warmups ? "warmup" : "measure", ",", sample,
-                    ",", workload.name, ",",
-                    adaptive ? "adaptive" : "fixed", ",4,", workload.items,
+					",", order, ",", workload.name, ",", arm,
+					",4,", workload.items,
                     ",", elapsed, ",", actual);
             }
         }
