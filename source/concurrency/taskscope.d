@@ -7,6 +7,7 @@ module concurrency.taskscope;
 import concurrency.executor : Executor;
 import concurrency.cancellation : CancellationState, CancellationToken;
 import concurrency.task : TaskHandle;
+import concurrency.work_size : WorkSize;
 import std.traits : ReturnType;
 
 private struct ScopeJoinState
@@ -52,14 +53,15 @@ package(concurrency) final class TaskScopeState
      * maxTasks or has already joined. The returned handle observes the typed
      * result; it does not replace this scope's post-dispatch join.
      */
-    auto spawn(F)(auto ref F callable) @system
+    auto spawn(F)(auto ref F callable,
+        WorkSize workSize = WorkSize.small) @system
     {
         if (_joined)
             throw new Exception("cannot spawn after scope join");
         if (_used == _tasks.length)
             throw new Exception("scope maxTasks exceeded");
 
-        auto handle = _executor.submit(callable);
+        auto handle = _executor.submit(callable, workSize);
         alias R = ReturnType!F;
         _tasks[_used++] = ScopeJoinState(
             cast(Object) handle,
@@ -148,9 +150,10 @@ struct TaskScope
     }
 
     /** Submit one child and retain its join obligation in the lexical state. */
-    auto spawn(F)(auto ref F callable) @system
+    auto spawn(F)(auto ref F callable,
+        WorkSize workSize = WorkSize.small) @system
     {
-        return requireState().spawn(callable);
+        return requireState().spawn(callable, workSize);
     }
 
     /** Return a copyable signal for children to poll cooperatively. */

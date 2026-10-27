@@ -7,67 +7,87 @@ module concurrency.task;
 
 private import core.sync.mutex : Mutex;
 private import core.sync.condition : Condition;
+private import core.atomic : MemoryOrder, atomicLoad, atomicStore;
 private import concurrency.internal.lifecycle : LifecycleFailure, lifecycleFailStop;
 
-// Internal synchronized completion cell, independent of executor shutdown.
-package(concurrency) final class ResultCell(R)
+// One shared lock, but wait queues are created only for cells that actually wait.
+package(concurrency) final class ResultNotifier
 {
     private Mutex _mutex;
-    private Condition _changed;
-    private bool _done;
-    private Throwable _error;
-    private bool _returned;
-
-    static if (!is(R == void))
-        private R _value;
 
     this()
     {
         _mutex = new Mutex();
-        _changed = new Condition(_mutex);
+    }
+
+    void lock() { _mutex.lock(); }
+    void unlock() { _mutex.unlock(); }
+    Condition newCondition() { return new Condition(_mutex); }
+}
+
+// Internal synchronized completion cell, independent of executor shutdown.
+package(concurrency) final class ResultCell(R)
+{
+    private ResultNotifier _notifier;
+    private Condition _changed;
+    private shared uint _done;
+    private shared uint _returned;
+    private Throwable _error;
+
+    static if (!is(R == void))
+        private R _value;
+
+    this(ResultNotifier notifier)
+    {
+        _notifier = notifier;
+    }
+
+    private void prepareWait()
+    {
+        if (_changed is null)
+            _changed = _notifier.newCondition();
     }
 
     static if (is(R == void))
     {
         void succeed()
         {
-            synchronized (_mutex)
-            {
-                assert(!_done);
-                _done = true;
+            _notifier.lock();
+            scope(exit) _notifier.unlock();
+            assert(atomicLoad!(MemoryOrder.acq)(_done) == 0u);
+            atomicStore!(MemoryOrder.rel)(_done, 1u);
+            if (_changed !is null)
                 _changed.notifyAll();
-            }
         }
     }
     else
     {
         void succeed(R value)
         {
-            synchronized (_mutex)
-            {
-                assert(!_done);
-                _value = value;
-                _done = true;
+            _notifier.lock();
+            scope(exit) _notifier.unlock();
+            assert(atomicLoad!(MemoryOrder.acq)(_done) == 0u);
+            _value = value;
+            atomicStore!(MemoryOrder.rel)(_done, 1u);
+            if (_changed !is null)
                 _changed.notifyAll();
-            }
         }
     }
 
     void fail(Throwable failure)
     {
-        synchronized (_mutex)
-        {
-            assert(!_done);
-            _error = failure;
-            _done = true;
+        _notifier.lock();
+        scope(exit) _notifier.unlock();
+        assert(atomicLoad!(MemoryOrder.acq)(_done) == 0u);
+        _error = failure;
+        atomicStore!(MemoryOrder.rel)(_done, 1u);
+        if (_changed !is null)
             _changed.notifyAll();
-        }
     }
 
     bool isComplete()
     {
-        synchronized (_mutex)
-            return _done;
+        return atomicLoad!(MemoryOrder.acq)(_done) != 0u;
     }
 
     /** Published after the worker has stopped accessing the task record. */
@@ -75,11 +95,11 @@ package(concurrency) final class ResultCell(R)
     {
         try
         {
-            synchronized (_mutex)
-            {
-                _returned = true;
+            _notifier.lock();
+            scope(exit) _notifier.unlock();
+            atomicStore!(MemoryOrder.rel)(_returned, 1u);
+            if (_changed !is null)
                 _changed.notifyAll();
-            }
         }
         catch (Throwable)
         {
@@ -90,12 +110,17 @@ package(concurrency) final class ResultCell(R)
     /** Wait for post-dispatch return, which is later than result readiness. */
     package(concurrency) void waitUntilReturned() @system
     {
+        if (atomicLoad!(MemoryOrder.acq)(_returned) != 0u)
+            return;
+
         try
         {
-            synchronized (_mutex)
+            _notifier.lock();
+            scope(exit) _notifier.unlock();
+            prepareWait();
+            while (atomicLoad!(MemoryOrder.acq)(_returned) == 0u)
             {
-                while (!_returned)
-                    _changed.wait();
+                _changed.wait();
             }
         }
         catch (Throwable)
@@ -109,29 +134,44 @@ package(concurrency) final class ResultCell(R)
 
     package(concurrency) bool hasReturned()
     {
-        synchronized (_mutex)
-            return _returned;
+        return atomicLoad!(MemoryOrder.acq)(_returned) != 0u;
     }
 
     package(concurrency) Throwable taskFailure()
     {
-        synchronized (_mutex)
-            return _error;
+        _notifier.lock();
+        scope(exit) _notifier.unlock();
+        return _error;
     }
 
     auto get()
     {
-        synchronized (_mutex)
+        // Match Phobos' ready-result fast path: most streamed tasks are often
+        // complete by the time their bounded producer window is consumed.
+        if (atomicLoad!(MemoryOrder.acq)(_done) != 0u)
         {
-            while (!_done)
-                _changed.wait();
-
             if (_error !is null)
                 throw _error;
 
             static if (!is(R == void))
                 return _value;
+            else
+                return;
         }
+
+        _notifier.lock();
+        scope(exit) _notifier.unlock();
+        prepareWait();
+        while (atomicLoad!(MemoryOrder.acq)(_done) == 0u)
+        {
+            _changed.wait();
+        }
+
+        if (_error !is null)
+            throw _error;
+
+        static if (!is(R == void))
+            return _value;
     }
 }
 

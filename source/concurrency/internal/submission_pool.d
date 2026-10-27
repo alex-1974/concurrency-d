@@ -19,6 +19,7 @@ module concurrency.internal.submission_pool;
 import concurrency.internal.task_record :
     TaskHeader,
     TaskRef,
+    TaskBatchHint,
     dispatchTask;
 
 import concurrency.internal.work_stealing_queue :
@@ -27,7 +28,8 @@ import concurrency.internal.work_stealing_queue :
 import core.atomic :
     MemoryOrder,
     atomicFetchAdd,
-    atomicLoad;
+    atomicLoad,
+    atomicStore;
 
 import core.sync.mutex :
     Mutex;
@@ -72,6 +74,9 @@ private final class TaskInbox
     private TaskRef[] _slots;
     private size_t _head;
     private size_t _used;
+    // Advisory occupancy for OwnedTaskExecutor's serialized producers.
+    // The authoritative count remains `_used` under `_mutex`.
+    private shared size_t _usedSnapshot;
     private size_t _accepted;
     private size_t _completed;
     private size_t _generation;
@@ -107,6 +112,7 @@ private final class TaskInbox
             const tail = (_head + _used) % _slots.length;
             _slots[tail] = task;
             ++_used;
+            atomicStore!(MemoryOrder.rel)(_usedSnapshot, _used);
             ++_accepted;
             ++_generation;
 
@@ -121,12 +127,18 @@ private final class TaskInbox
     }
 
     /**
-     * Advisory full-inbox check, called while OwnedTaskExecutor's producer
-     * admission mutex is held. Worker threads only remove entries; another
-     * owned producer cannot add an entry before that owner's trySubmit.
+     * Lock-free advisory check for OwnedTaskExecutor's serialized producers.
+     * The next authoritative trySubmit rechecks under the inbox mutex. Only
+     * workers can change occupancy between the check and that attempt, and
+     * they only reduce it, so an available observation cannot over-admit.
      */
     bool hasCapacity()
     {
+        if (atomicLoad!(MemoryOrder.acq)(_usedSnapshot) < _slots.length)
+            return true;
+
+        // Confirm a full observation under the authoritative lock. A worker
+        // may have freed a slot just before this load became visible.
         synchronized (_mutex)
             return !_closed && _used < _slots.length;
     }
@@ -139,12 +151,25 @@ private final class TaskInbox
 
             while (taken < output.length && _used != 0)
             {
-                output[taken] = _slots[_head];
+                auto next = _slots[_head];
+                // Keep long-running tasks visible in shared ingress so other
+                // workers can claim them instead of prefetching a local batch.
+                if (taken != 0 && next.ptr.batchHint ==
+                    TaskBatchHint.oneAtATime)
+                    break;
+
+                output[taken] = next;
                 _slots[_head] = TaskRef.init;
                 _head = (_head + 1) % _slots.length;
                 --_used;
                 ++taken;
+
+                if (next.ptr.batchHint == TaskBatchHint.oneAtATime)
+                    break;
             }
+
+            if (taken != 0)
+                atomicStore!(MemoryOrder.rel)(_usedSnapshot, _used);
 
             return taken;
         }
@@ -907,6 +932,31 @@ version (unittest)
 
         assert(0, "isolated task was not executed after wakeup");
     }
+}
+
+unittest
+{
+    // A large estimated task is not prefetched behind a small task. The
+    // remaining queue entries stay available for another worker claim.
+    auto inbox = new TaskInbox(4);
+    shared CountingRecord[3] records;
+    records[0].header.batchHint = TaskBatchHint.normal;
+    records[1].header.batchHint = TaskBatchHint.oneAtATime;
+    records[2].header.batchHint = TaskBatchHint.normal;
+    assert(inbox.trySubmit(TaskRef(&records[0].header)) ==
+        SubmissionResult.accepted);
+    assert(inbox.trySubmit(TaskRef(&records[1].header)) ==
+        SubmissionResult.accepted);
+    assert(inbox.trySubmit(TaskRef(&records[2].header)) ==
+        SubmissionResult.accepted);
+
+    TaskRef[4] batch;
+    assert(inbox.takeBatch(batch[]) == 1);
+    assert(batch[0].ptr == &records[0].header);
+    assert(inbox.takeBatch(batch[]) == 1);
+    assert(batch[0].ptr == &records[1].header);
+    assert(inbox.takeBatch(batch[]) == 1);
+    assert(batch[0].ptr == &records[2].header);
 }
 
 unittest

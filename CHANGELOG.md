@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+- Add fixed and guided adaptive `Executor.parallelFor` range scheduling and a
+  `WorkSize` hint for submitted callables that are expected to run longer.
+- Add independent CPU-heavy and event-loop consumer examples, plus end-to-end,
+  adaptive-range and bounded-streaming diagnostics with checksum validation.
+- Document workload-specific tuning for workers, batching, range grains and
+  work-size hints; no universal performance improvement is claimed.
+
 ## [0.2.0] - release candidate
 
 - Add bounded lexical `TaskScope` groups, cooperative cancellation, and

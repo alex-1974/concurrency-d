@@ -12,5 +12,6 @@ module concurrency;
 public import concurrency.executor : Executor, JoinResult;
 public import concurrency.cancellation : CancellationToken;
 public import concurrency.task : TaskHandle;
+public import concurrency.work_size : WorkSize;
 public import concurrency.taskscope : TaskScope;
 public import concurrency.errors : ExecutorClosedException, WorkerSelfJoinException;
