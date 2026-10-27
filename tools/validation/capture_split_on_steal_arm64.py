@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Compare v0.3.0 and the checked-out split-on-steal scheduler on ARM64."""
+"""Compare v0.3.0, split-on-steal, and Phobos on native ARM64."""
 import csv
 import hashlib
 import io
@@ -63,7 +63,10 @@ workloads = [
     "medium_uniform_16384", "scattered_16384", "heavy_prefix_16384",
     "heavy_suffix_16384",
 ]
-expected_rows = len(workloads) * (SAMPLES + WARMUPS) * 2
+grains = (1, 4, 16, 64, 256)
+arms = ({f"{kind}_{grain}" for kind in ("fixed", "adaptive") for grain in grains}
+        | {f"phobos_{grain}" for grain in grains})
+expected_rows = len(workloads) * (SAMPLES + WARMUPS) * len(arms)
 meta = {
     "status": "IN_PROGRESS", "baseline_tag": "v0.3.0",
     "baseline_commit": subprocess.check_output(
@@ -73,9 +76,12 @@ meta = {
     "variants": {name: hashlib.sha256(path.read_bytes()).hexdigest()
                  for name, path in binaries.items()},
     "protocol": (f"{SESSIONS} sessions; {SAMPLES} measured and {WARMUPS} warmup "
-                 "samples; four participants; 10 workloads (1,024 and 16,384 "
-                 "items); fixed/adaptive arms with alternating order; eight "
-                 "reused waves per timed invocation"),
+                 "samples; four total participants; 10 workloads (1,024 and "
+                 "16,384 items); fixed/adaptive grain and Phobos batch sweeps (1,4,16,64,256) "
+                 "with rotating order; "
+                 "eight reused waves per timed invocation; Phobos uses "
+                 "TaskPool(3) plus its calling thread; executor ingress capacity "
+                 "is 64; all scheduler grain/batch sizes are swept"),
     "machine": platform.uname()._asdict(),
     "cpuinfo": pathlib.Path("/proc/cpuinfo").read_text(),
     "compiler": subprocess.check_output([DC, "--version"], text=True),
@@ -102,12 +108,12 @@ for session in range(1, SESSIONS + 1):
         for row in rows:
             pairs[(row["phase"], row["sample"], row["workload"],
                    row["workers"], row["item_count"])].append(row)
-        if len(pairs) != expected_rows // 2:
+        if len(pairs) != expected_rows // len(arms):
             raise RuntimeError(f"{name}: malformed row pairs")
         for key, pair in pairs.items():
-            if len(pair) != 2 or {r["arm"] for r in pair} != {"fixed", "adaptive"}:
+            if len(pair) != len(arms) or {r["arm"] for r in pair} != arms:
                 raise RuntimeError(f"{name}: malformed pair {key}")
-            if pair[0]["checksum"] != pair[1]["checksum"]:
+            if len({r["checksum"] for r in pair}) != 1:
                 raise RuntimeError(f"{name}: checksum mismatch {key}")
         path = OUT / f"{name}-session{session}.csv"
         with path.open("w", newline="") as stream:
@@ -133,17 +139,41 @@ with combined.open("w", newline="") as stream:
 
 samples = defaultdict(list)
 for row in all_rows:
-    if row["phase"] == "measure" and row["arm"] == "adaptive":
-        samples[(row["variant"], row["workload"])].append(int(row["elapsed_ns"]))
+    if row["phase"] == "measure":
+        samples[(row["variant"], row["workload"], row["arm"])].append(
+            int(row["elapsed_ns"]))
 summary = []
 for workload in workloads:
-    baseline = samples[("baseline", workload)]
-    candidate = samples[("candidate", workload)]
+    baseline = samples[("baseline", workload, "adaptive_1")]
+    candidate = samples[("candidate", workload, "adaptive_1")]
     percentile = lambda values, p: sorted(values)[max(0, (len(values) * p + 99) // 100 - 1)]
     base_p50 = statistics.median(baseline)
     cand_p50 = statistics.median(candidate)
     base_p95 = percentile(baseline, 95)
     cand_p95 = percentile(candidate, 95)
+    phobos_stats = {}
+    for batch in grains:
+        values = samples[("candidate", workload, f"phobos_{batch}")]
+        phobos_stats[str(batch)] = {
+            "p50_ns": statistics.median(values), "p95_ns": percentile(values, 95),
+            "samples": len(values),
+        }
+    best_batch = min(phobos_stats, key=lambda batch: phobos_stats[batch]["p50_ns"])
+    phobos_p50 = phobos_stats[best_batch]["p50_ns"]
+    phobos_p95 = phobos_stats[best_batch]["p95_ns"]
+    concurrency_stats = {}
+    for kind in ("fixed", "adaptive"):
+        for grain in grains:
+            arm = f"{kind}_{grain}"
+            values = samples[("candidate", workload, arm)]
+            concurrency_stats[arm] = {
+                "p50_ns": statistics.median(values), "p95_ns": percentile(values, 95),
+                "samples": len(values),
+            }
+    best_concurrency = min(concurrency_stats,
+                           key=lambda arm: concurrency_stats[arm]["p50_ns"])
+    concurrency_p50 = concurrency_stats[best_concurrency]["p50_ns"]
+    concurrency_p95 = concurrency_stats[best_concurrency]["p95_ns"]
     summary.append({
         "workload": workload, "samples_per_variant": len(baseline),
         "baseline_p50_ns": base_p50, "candidate_p50_ns": cand_p50,
@@ -151,6 +181,16 @@ for workload in workloads:
         "baseline_p95_ns": base_p95, "candidate_p95_ns": cand_p95,
         "p95_ratio_candidate_over_baseline": cand_p95 / base_p95,
         "p95_over_10_percent_screen": cand_p95 > base_p95 * 1.10,
+        "best_phobos_batch_by_p50": int(best_batch),
+        "phobos_batch_stats": phobos_stats,
+        "best_concurrency_arm_by_p50": best_concurrency,
+        "concurrency_grain_stats": concurrency_stats,
+        "best_concurrency_p50_ns": concurrency_p50,
+        "best_concurrency_p95_ns": concurrency_p95,
+        "best_phobos_p50_ns": phobos_p50,
+        "best_concurrency_p50_over_phobos": concurrency_p50 / phobos_p50,
+        "best_phobos_p95_ns": phobos_p95,
+        "best_concurrency_p95_over_phobos": concurrency_p95 / phobos_p95,
     })
 (OUT / "summary.json").write_text(json.dumps(summary, indent=2) + "\n")
 meta["timing_matrix_status"] = "COMPLETE"
