@@ -44,9 +44,14 @@ for divisor in (8, 4, 16):
     tree = work / f"divisor{divisor}"
     if divisor != 8:
         shutil.copytree(work / "divisor8", tree)
-    harness = tree / "benchmarks/adaptive-ranges/main.d"
-    harness.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copy2(ROOT / "benchmarks/adaptive-ranges/main.d", harness)
+    harness_dir = tree / "benchmarks/adaptive-ranges"
+    harness_dir.mkdir(parents=True, exist_ok=True)
+    # The focused benchmark was added after v0.3.0. Reuse the current harness
+    # and manifest while keeping each variant's library source at the tag.
+    for filename in ("main.d", "dub.json"):
+        shutil.copy2(ROOT / "benchmarks/adaptive-ranges" / filename,
+                     harness_dir / filename)
+    harness = harness_dir / "main.d"
     source = tree / "source/concurrency/executor.d"
     text = source.read_text()
     if divisor != 8:
