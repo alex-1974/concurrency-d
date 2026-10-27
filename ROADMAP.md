@@ -43,7 +43,7 @@ layer is deferred until a real consumer demonstrates a need for scheduler
 handoff or asynchronous operation graphs and can qualify their additional
 lifetime and cancellation semantics.
 
-## M2 — Consumer and performance qualification (in progress, target v0.3.0)
+## M2 — Consumer and performance qualification (release candidate, target v0.3.0)
 
 The current unreleased work adds independent CPU-heavy and event-loop-style
 consumer examples, including completion handoff to a consumer-controlled
@@ -55,7 +55,7 @@ or runtime prediction. End-to-end and bounded-streaming diagnostics compare
 these paths with checksummed alternatives. The executor guide records practical
 batching, worker-count, grain and work-size tuning advice.
 
-The implementation remains unreleased and is not yet a v0.3.0 qualification.
+The implementation is merged to `develop`; the v0.3.0 release candidate is being validated on a branch targeting `main`.
 Local DMD 2.111 and LDC 1.42 unit, lifecycle, public-consumer, worktree-package,
 event-loop and benchmark smoke checks pass. Optimized measurements are retained
 with host and workload limits; streaming comparisons fence Phobos producers
