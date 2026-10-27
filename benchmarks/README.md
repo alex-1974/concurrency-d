@@ -95,7 +95,12 @@ for example `20 5 1,4 1,64`. The `Fine adaptive ranges ARM64 qualification`
 workflow runs this reduced matrix on GitHub's native ARM64 runner, builds the
 pinned v0.3.0 baseline plus temporary guided divisors 4 and 16, and uploads
 four alternating sessions of checksum-validated raw CSV and host metadata.
-The run does not change the library source or select a release candidate.
+The run also attempts separate short- and heavy-callback `perf` call-graph
+captures for the v0.3.0 adaptive and fixed arms. It uses the user-space
+`cpu-clock` event, and records profiler availability/permission details in the
+artifact. These profiles show sampled on-CPU cost; they do not measure time
+spent blocked in joins. The run does not change the library source or select a
+release candidate.
 
 For repeated sessions, add a `session` column to each run before concatenating
 the CSVs. Compare adaptive and fixed arms at the same grain to see the value of

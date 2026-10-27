@@ -116,6 +116,77 @@ for session in range(1, SESSIONS + 1):
         print(f"ARM64_PROGRESS session={session}/{SESSIONS} divisor={divisor} rows={len(rows)}", flush=True)
     meta["sessions"].append(session_meta)
     (OUT / "metadata.json").write_text(json.dumps(meta, indent=2) + "\n")
+# Capture process-scoped CPU-clock call graphs for short and heavy callbacks.
+# Some hosted kernels restrict perf_event access; preserve the diagnostic status
+# and logs in the artifact instead of discarding the completed timing matrix.
+profile_dir = OUT / "profiles"
+profile_dir.mkdir()
+meta["profiles"] = []
+perf = shutil.which("perf")
+for profile_name, repeats in (("short", 3000), ("heavy", 300)):
+    package = variants[8].parent.parent / f"profile-{profile_name}"
+    package.mkdir(parents=True, exist_ok=True)
+    profile_manifest = {
+        "name": f"adaptive-profile-{profile_name}", "targetType": "executable",
+        "sourcePaths": [], "mainSourceFile": "main.d",
+        "targetName": f"adaptive-profile-{profile_name}",
+        "dependencies": {"concurrency-d": {"path": "../.."}}
+    }
+    (package / "dub.json").write_text(json.dumps(profile_manifest) + "\n")
+    shutil.copy2(ROOT / "benchmarks/adaptive-ranges/profiles" / f"{profile_name}.d",
+                 package / "main.d")
+    build = subprocess.run(
+        ["dub", "build", f"--root={package}", f"--compiler={DC}", "--build=release", "--force"],
+        cwd=variants[8].parents[2], text=True, stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT)
+    if build.returncode:
+        (profile_dir / f"{profile_name}-build.log").write_text(build.stdout)
+        meta["profiles"].append({"name": profile_name, "status": "build-failed", "log": f"{profile_name}-build.log"})
+        continue
+    binary = package / f"adaptive-profile-{profile_name}"
+    for mode in ("adaptive", "fixed"):
+        data = profile_dir / f"{profile_name}-{mode}.data"
+        log = profile_dir / f"{profile_name}-{mode}.log"
+        if not perf:
+            log.write_text("perf executable not found on runner\n")
+            meta["profiles"].append({"name": profile_name, "mode": mode, "status": "perf-unavailable", "log": log.name})
+            continue
+        record_command = [perf, "record", "-F", "997", "-e", "cpu-clock:u",
+                          "--call-graph", "dwarf,8192", "-o", str(data), "--",
+                          str(binary), mode, str(repeats)]
+        recorded = subprocess.run(record_command, cwd=variants[8].parents[2],
+                                  text=True, stdout=subprocess.PIPE,
+                                  stderr=subprocess.STDOUT)
+        record_log = recorded.stdout
+        if recorded.returncode != 0 and "perf_event_paranoid" in record_log:
+            # Hosted Linux images can lock perf_event_paranoid at 4. Try the
+            # user-space-only event policy on this throwaway CI VM, then rerun
+            # perf as the unprivileged workflow user.
+            policy = subprocess.run(
+                ["sudo", "-n", "sysctl", "-w", "kernel.perf_event_paranoid=0"],
+                text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+            record_log += "\nPERF_POLICY_ADJUSTMENT\n" + policy.stdout
+            if policy.returncode == 0:
+                recorded = subprocess.run(record_command, cwd=variants[8].parents[2],
+                                          text=True, stdout=subprocess.PIPE,
+                                          stderr=subprocess.STDOUT)
+                record_log += "\nPERF_RETRY\n" + recorded.stdout
+        log.write_text(record_log)
+        if recorded.returncode != 0 or not data.exists() or data.stat().st_size == 0:
+            meta["profiles"].append({"name": profile_name, "mode": mode,
+                                      "status": "record-failed", "log": log.name})
+            continue
+        report = subprocess.run(
+            [perf, "report", "--stdio", "--no-children", "-i", str(data),
+             "--percent-limit", "1"], text=True, stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT)
+        report_path = profile_dir / f"{profile_name}-{mode}-report.txt"
+        report_path.write_text(report.stdout)
+        meta["profiles"].append({"name": profile_name, "mode": mode,
+                                  "status": "complete" if report.returncode == 0 else "report-failed",
+                                  "repeats": repeats, "data": data.name,
+                                  "report": report_path.name, "log": log.name})
+
 meta["status"] = "COMPLETE"
 meta["ended_utc"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
 (OUT / "metadata.json").write_text(json.dumps(meta, indent=2) + "\n")
