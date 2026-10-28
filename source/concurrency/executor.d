@@ -464,6 +464,39 @@ final class Executor
     }
 
     /**
+     * Apply `body` to each item using a scheduler-selected grain based on the
+     * caller's estimate of per-item work. `WorkSize.small` may run a bounded
+     * range inline; larger domains and `WorkSize.large` use parallel ranges.
+     * This is a heuristic convenience overload. Use the explicit-grain
+     * overload when the caller needs direct control over claim size.
+     */
+    void parallelFor(F)(size_t itemCount, auto ref F body,
+        WorkSize itemWork) @system
+        if (supportedIndexTask!F)
+    {
+        if (itemCount == 0)
+            return;
+
+        size_t grainSize;
+        const inlineLimit = _workerCount <= size_t.max / 256
+            ? _workerCount * 256 : size_t.max;
+        if (itemWork == WorkSize.small && itemCount <= inlineLimit)
+        {
+            grainSize = itemCount;
+        }
+        else
+        {
+            const rangesPerWorker = itemWork == WorkSize.small ? 8 : 4;
+            const targetRanges = _workerCount <= size_t.max / rangesPerWorker
+                ? _workerCount * rangesPerWorker : size_t.max;
+            grainSize = itemCount / targetRanges +
+                (itemCount % targetRanges != 0 ? 1 : 0);
+        }
+
+        parallelForImpl(itemCount, grainSize, body, false);
+    }
+
+    /**
      * Apply `body` to every index from zero up to, but not including,
      * `itemCount`, using guided dynamic ranges. For `minGrainSize == 1`, work
      * is divided into cyclic blocks that idle participants can steal. Other
