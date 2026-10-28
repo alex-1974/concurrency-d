@@ -75,10 +75,12 @@ parameters. It stores independent sessions and host/compiler metadata as an
 artifact in `.github/workflows/m2-performance-capture.yml`.
 
 The short-task diagnostic compares a serial loop and the single-participant
-`parallelFor` path with parallel range claims, independent `submit` calls and
-atomic `submitBatch` calls. Submit arms report producer/admission and handle-
-wait time separately, plus total dispatch-to-completion time; with multiple
-producers the submission phase includes producer-thread startup and join.
+`parallelFor` path with parallel range claims, independent `submit` calls,
+atomic `submitBatch` calls and synchronous `submitBatchAndWait` calls. Submit
+arms report producer/admission and handle-wait time separately, plus total
+dispatch-to-completion time; with multiple producers the submission phase
+includes producer-thread startup and join. For `submitBatchAndWait`, submit
+time includes completion because the API returns only after the group drains.
 Tasks may execute while admission is still in progress, so phase timings are
 not additive. The executor, handle storage and result buffer are reused across
 samples, and every arm checks the same checksum. This benchmark locates
@@ -136,24 +138,39 @@ producer-thread startup, so it is directional rather than an isolated lock
 measurement. A follow-up dedicated comparison used three independent LDC 1.42
 processes, each with 20 measured samples after four warmups, 16,384 one-store
 items and four workers. At one producer and ingress/retention capacities of
-16,384, the pooled 60 observations gave median total times of 1.86 ms vs 1.07
-ms at grain 16, 504 μs vs 304 μs at grain 64, and 170 μs vs 108 μs at grain
-256 for repeated `submit` vs `submitBatch`. At four producers with queue and
-retention limits 256 / 512, medians were 5.06 ms vs 1.54 ms at grain 16, 1.43
-ms vs 533 μs at grain 64, and 548 μs vs 343 μs at grain 256. Producer-thread
+16,384, the pooled 60 observations gave median total times of 1.01 ms vs 488
+μs at grain 16, 234 μs vs 153 μs at grain 64, and 70 μs vs 56 μs at grain 256
+for repeated `submit` vs `submitBatch`. At four producers with queue and
+retention limits 256 / 512, medians were 2.45 ms vs 837 μs at grain 16, 729
+μs vs 287 μs at grain 64, and 290 μs vs 178 μs at grain 256. In the same
+workload, synchronous `submitBatchAndWait` medians were 308 μs, 96 μs and
+38 μs at one producer for grains 16, 64 and 256; at four producers they were
+628 μs, 251 μs and 182 μs. The batch-wait arm is useful when the caller needs
+group completion before continuing; its `submit_ns` includes task completion.
+It reduced measured producer allocation per logical item versus async
+`submitBatch` by about 37% at one producer and 30% at four producers for grain
+16. Compared with repeated `submit`, allocation bytes were lower for one
+producer at grains 16–256 and for four producers at grain 64; its per-group
+arrays can outweigh the avoided handle allocations at other settings.
+Producer-thread
 startup and join are included symmetrically. Batch-of-one is omitted for four
 producers because each producer's complete group cannot fit the configured
 capacities. These host-specific diagnostics show repeatable gains for this
 workload, not portable promises; measure representative task durations on the
 target host before choosing a batch size.
 
-The submission path originally allocated three GC objects per accepted task:
-a result cell, an owned task node and a typed handle. The result cell is now the
-base of the owned node, preserving the same typed handle and task lifetime
-while removing one object allocation per task. The task record and handle
-remain individual allocations. The benchmark's `producer_allocated_bytes`
-column reads D's current-thread GC allocation counter around submission (and
-sums the producer threads); it excludes their thread startup and wait phase.
+The asynchronous submission path originally allocated three GC objects per
+accepted task: a result cell, an owned task node and a typed handle. The result
+cell is now the base of the owned node, preserving the same typed handle and
+task lifetime while removing one object allocation per task. The task record
+and handle remain individual allocations for asynchronous APIs. The
+`submitBatchAndWait` path instead shares one completion cell across the batch
+and creates no per-task handles. The benchmark's `producer_allocated_bytes`
+column reads D's current-thread GC allocation counter in each producer and
+sums the values. For asynchronous `submit` and `submitBatch`, it covers
+admission and handle creation, excluding handle waits and producer-thread
+startup. For `submitBatchAndWait`, it spans the full call, including task
+completion; producer-thread startup remains excluded.
 In a five-sample, two-warmup one-producer capture with 16,384 items, repeated
 single-task submission allocated a median 176.5 bytes/item before and 160.5
 after the change. Batch-of-one allocated 241.5 vs 225.5 bytes/item, including

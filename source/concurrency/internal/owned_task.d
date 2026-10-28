@@ -37,7 +37,8 @@ import core.thread :
     Thread;
 
 import concurrency.internal.lifecycle : LifecycleFailure, lifecycleFailStop;
-import concurrency.task : ResultCell, ResultNotifier, TaskHandle;
+import concurrency.task : BatchResultCell, ResultCell, ResultNotifier,
+    TaskHandle;
 import concurrency.work_size : WorkSize;
 import concurrency.errors : ExecutorClosedException;
 
@@ -156,6 +157,72 @@ private final class OwnedNode(F, R) : ResultCell!R
         auto cell = record.cell;
         atomicStore!(MemoryOrder.rel)(record.prefix.returned, 1u);
         cell.markReturned();
+    }
+}
+
+/** One task record within a submitBatchAndWait operation. */
+private final class OwnedBatchNode(F, R)
+{
+    private struct Record
+    {
+        CompletionPrefix prefix;
+        F callable;
+        BatchResultCell!R batch;
+        size_t index;
+    }
+
+    static assert(Record.prefix.offsetof == 0);
+
+    private Record _record;
+
+    this(F callable, BatchResultCell!R batch, size_t index,
+        WorkSize workSize)
+    {
+        _record.callable = callable;
+        _record.batch = batch;
+        _record.index = index;
+        _record.prefix.header.execute = &execute;
+        _record.prefix.header.batchHint = workSize == WorkSize.large
+            ? TaskBatchHint.oneAtATime : TaskBatchHint.normal;
+        _record.prefix.afterExecution = &publishReturned;
+        atomicStore!(MemoryOrder.raw)(_record.prefix.returned, 0u);
+    }
+
+    TaskRef reference()
+    {
+        return TaskRef(cast(shared(TaskHeader)*) &_record.prefix.header);
+    }
+
+    shared(uint)* returnedFlag()
+    {
+        return &_record.prefix.returned;
+    }
+
+    private static void execute(shared(TaskHeader)* header)
+        @trusted nothrow
+    {
+        auto record = cast(Record*) header;
+        try
+        {
+            static if (is(R == void))
+                record.callable();
+            else
+                record.batch.setValue(record.index, record.callable());
+        }
+        catch (Throwable failure)
+        {
+            record.batch.recordFailure(failure);
+        }
+    }
+
+    private static void publishReturned(TaskRef task)
+        @trusted nothrow
+    {
+        auto record = cast(Record*) task.ptr;
+        auto batch = record.batch;
+        const index = record.index;
+        atomicStore!(MemoryOrder.rel)(record.prefix.returned, 1u);
+        batch.completeTask();
     }
 }
 
@@ -362,17 +429,15 @@ package(concurrency) final class OwnedTaskExecutor
         }
 
         auto handles = new TaskHandle!R[callables.length];
-        auto nodes = new OwnedNode!(F, R)[callables.length];
         auto refs = new TaskRef[callables.length];
         auto roots = new RetainedTask[callables.length];
         foreach (index, ref callable; callables)
         {
-            nodes[index] = new OwnedNode!(F, R)(callable, _resultNotifier,
+            auto node = new OwnedNode!(F, R)(callable, _resultNotifier,
                 workSize);
-            handles[index] = new TaskHandle!R(nodes[index]);
-            refs[index] = nodes[index].reference();
-            roots[index] = RetainedTask(nodes[index],
-                nodes[index].returnedFlag());
+            handles[index] = new TaskHandle!R(node);
+            refs[index] = node.reference();
+            roots[index] = RetainedTask(node, node.returnedFlag());
         }
 
         while (true)
@@ -405,6 +470,88 @@ package(concurrency) final class OwnedTaskExecutor
                 continue;
             Thread.yield();
         }
+    }
+
+    /** Submit a homogeneous group and collect its results as one operation. */
+    auto submitBatchAndWait(F)(scope F[] callables,
+        WorkSize workSize = WorkSize.small) @system
+    {
+        alias R = ReturnType!F;
+        static if (is(R == void))
+        {
+            if (callables.length == 0)
+                return;
+        }
+        else
+        {
+            if (callables.length == 0)
+                return new R[0];
+        }
+
+        if (callables.length > _maxRetained ||
+            callables.length > _ingressCapacity)
+            throw new Exception("submitBatchAndWait exceeds executor capacity");
+
+        synchronized (_mutex)
+        {
+            if (_lifecycle != Lifecycle.running)
+                throw new ExecutorClosedException();
+        }
+
+        auto batch = new BatchResultCell!R(_resultNotifier, callables.length);
+        auto refs = new TaskRef[callables.length];
+        auto roots = new RetainedTask[callables.length];
+        foreach (index, ref callable; callables)
+        {
+            auto node = new OwnedBatchNode!(F, R)(callable, batch,
+                index, workSize);
+            refs[index] = node.reference();
+            roots[index] = RetainedTask(node, node.returnedFlag());
+        }
+
+        while (true)
+        {
+            bool retry;
+            synchronized (_mutex)
+            {
+                if (_lifecycle != Lifecycle.running)
+                    throw new ExecutorClosedException();
+
+                if (_retained.length > _maxRetained - roots.length)
+                {
+                    reapCompletedUnderLock();
+                    retry = _retained.length > _maxRetained - roots.length;
+                }
+
+                if (!retry && !_pool.hasIngressCapacity(refs.length))
+                    retry = true;
+
+                if (!retry)
+                {
+                    _retained ~= roots;
+                    const status = _pool.trySubmitBatch(refs);
+                    assert(status == SubmissionResult.accepted);
+                    break;
+                }
+            }
+
+            if (_pool.isCurrentWorker() && _pool.helpCurrentWorkerOnce())
+                continue;
+            Thread.yield();
+        }
+
+        if (_pool.isCurrentWorker())
+        {
+            while (!batch.isComplete())
+            {
+                if (!_pool.helpCurrentWorkerOnce())
+                    Thread.yield();
+            }
+        }
+        else
+            batch.waitForCompletion();
+
+        return batch.get();
     }
 
     /**

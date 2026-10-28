@@ -49,6 +49,7 @@ These are executable integration examples, not latency claims.
 | `executor.trySubmit(callable, workSize = WorkSize.small)` | One attempt: typed handle on success, null on bounded capacity, ExecutorClosedException after close |
 | `executor.submit(callable, workSize = WorkSize.small)` | Retry capacity rejection until admitted or closed; may wait indefinitely |
 | `executor.submitBatch(callables, workSize = WorkSize.small)` | Atomically admit a homogeneous callable array and return typed handles; the whole batch must fit both capacities |
+| `executor.submitBatchAndWait(callables, workSize = WorkSize.small)` | Atomically admit a homogeneous batch, wait for every task, then return input-ordered results (or void); creates no per-task handles |
 | `executor.parallelFor(itemCount, grainSize, body)` | Run `body(index)` over `[0, itemCount)`; workers dynamically claim contiguous ranges of up to `grainSize`, and all workers are joined before returning |
 | `executor.parallelFor(itemCount, body, workSize)` | Choose a claim grain from the per-item work estimate; small total ranges may run inline, while larger ranges use parallel workers |
 | `executor.parallelForAdaptive(itemCount, minGrainSize, body)` | Run indexed work with adaptive claims; `minGrainSize == 1` uses cyclic blocks that idle participants can steal, while other minimums use guided ranges; all workers are joined before returning |
@@ -210,6 +211,22 @@ make the last task wait behind slow work in the same group. The measured gain
 shrinks as each callable does more work, so benchmark with representative task
 durations. Use `parallelFor` for indexed work, which avoids per-item task
 records altogether.
+
+When the caller needs the whole group to finish before continuing and does not
+need independent task handles, `submitBatchAndWait` avoids one handle object
+per task:
+
+```d
+auto values = executor.submitBatchAndWait(jobs[]); // non-void tasks
+executor.submitBatchAndWait(voidJobs[]);           // void tasks
+```
+
+The non-void overload returns results in input order. It waits for every task
+before returning or rethrowing the first observed task failure. It has the same
+atomic capacity rule as `submitBatch`; an oversized batch throws and a
+temporarily full executor waits. Since completion is synchronous, use
+`submitBatch` when results must be observed independently or work should
+overlap with later caller activity.
 
 `parallelForAdaptive` is an opt-in alternative for workloads with uneven or
 uncertain item costs. For `minGrainSize == 1`, the scheduler divides the domain

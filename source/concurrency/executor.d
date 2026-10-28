@@ -373,6 +373,20 @@ final class Executor
     }
 
     /**
+     * Submit a homogeneous group and wait for every task to return. Non-void
+     * tasks produce an input-ordered result array; void tasks return void.
+     * The batch must fit both capacities, and errors are rethrown after the
+     * whole batch drains. No per-task TaskHandle is created. The call may wait
+     * indefinitely if existing work cannot release capacity.
+     */
+    auto submitBatchAndWait(F)(scope F[] callables,
+        WorkSize workSize = WorkSize.small) @system
+        if (supportedTask!F)
+    {
+        return _impl.submitBatchAndWait(callables, workSize);
+    }
+
+    /**
      * Reject new admission, drain accepted work and positively join workers.
      * Successful external calls are idempotent and coordinate concurrent
      * closers. A task that never returns can prevent this call from returning.
