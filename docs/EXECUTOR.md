@@ -194,6 +194,15 @@ queues. Larger minimum grains retain guided dynamic ranges, which begin larger
 and shrink toward the requested minimum. If the minimum is at least
 `itemCount`, the whole domain is one claim and runs on the calling thread.
 
+When the average cost of one index is known, the convenience overload
+`parallelFor(itemCount, body, WorkSize.small)` or `WorkSize.large` chooses an
+inline path or a claim grain from that estimate and the item count. Use `small`
+for cheap, reasonably uniform callbacks; an incorrect small estimate can make
+a medium-cost range run serially. Use `large` when each item has enough work to
+amortize scheduling. For highly uneven costs, prefer `parallelForAdaptive` or
+the explicit-grain overload. The heuristic is a starting point and may change;
+it does not promise an optimal grain.
+
 The cyclic-block path showed lower times for fine adaptive work in paired XPS
 and native ARM64 runs, especially at 1,024 items. At 16,384 items, short work
 improved while medium and clustered work stayed near parity in the ARM64
