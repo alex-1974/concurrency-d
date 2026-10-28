@@ -230,6 +230,23 @@ private void parallelForRanges()
             "parallelFor must not duplicate index visits");
     executor.parallelFor(0, 3, (size_t index) {});
 
+    shared uint[37] smallWorkVisits;
+    executor.parallelFor(37, (size_t index) {
+        atomicFetchAdd!(MemoryOrder.rel)(smallWorkVisits[index], 1u);
+    }, WorkSize.small);
+    foreach (count; smallWorkVisits)
+        enforce(atomicLoad!(MemoryOrder.acq)(count) == 1,
+            "small-work hint must visit each index exactly once");
+
+    shared uint[37] largeWorkVisits;
+    executor.parallelFor(37, (size_t index) {
+        atomicFetchAdd!(MemoryOrder.rel)(largeWorkVisits[index], 1u);
+    }, WorkSize.large);
+    foreach (count; largeWorkVisits)
+        enforce(atomicLoad!(MemoryOrder.acq)(count) == 1,
+            "large-work hint must visit each index exactly once");
+    executor.parallelFor(0, (size_t index) {}, WorkSize.small);
+
     auto adaptiveValues = new size_t[37];
     shared uint[37] adaptiveVisits;
     executor.parallelForAdaptive(adaptiveValues.length, 1, (size_t index) {

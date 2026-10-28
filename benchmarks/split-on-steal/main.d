@@ -1,6 +1,6 @@
 module concurrency.benchmarks.split_on_steal;
 
-import concurrency : Executor;
+import concurrency : Executor, WorkSize;
 import core.time : MonoTime;
 import std.conv : to;
 import std.exception : enforce;
@@ -66,6 +66,16 @@ private ulong checksum(Workload workload)
     return result;
 }
 
+private size_t hintedGrain(size_t itemCount, WorkSize itemWork)
+{
+    const workers = 4;
+    const inlineLimit = workers * 256;
+    if (itemWork == WorkSize.small && itemCount <= inlineLimit)
+        return itemCount;
+    const targetRanges = workers * (itemWork == WorkSize.small ? 8 : 4);
+    return itemCount / targetRanges + (itemCount % targetRanges != 0 ? 1 : 0);
+}
+
 private ulong runPhobos(TaskPool pool, Workload workload, size_t batchSize,
     ulong[] values)
 {
@@ -90,7 +100,8 @@ private ulong run(Executor executor, TaskPool pool, Workload workload,
     const inlinePath = arm == "inline";
     const separator = arm.indexOf('_');
     const grain = inlinePath ? workload.items
-        : serialPath ? 0 : to!size_t(arm[separator + 1 .. $]);
+        : serialPath ? 0 : arm.startsWith("hint_")
+        ? 1 : to!size_t(arm[separator + 1 .. $]);
     const adaptive = arm.startsWith("adaptive_");
     ulong result;
     foreach (_; 0 .. waves)
@@ -102,6 +113,24 @@ private ulong run(Executor executor, TaskPool pool, Workload workload,
         {
             foreach (index; 0 .. workload.items)
                 body(index);
+        }
+        else if (arm == "hint_small")
+        {
+            static if (__traits(compiles,
+                executor.parallelFor(workload.items, body, WorkSize.small)))
+                executor.parallelFor(workload.items, body, WorkSize.small);
+            else
+                executor.parallelFor(workload.items,
+                    hintedGrain(workload.items, WorkSize.small), body);
+        }
+        else if (arm == "hint_large")
+        {
+            static if (__traits(compiles,
+                executor.parallelFor(workload.items, body, WorkSize.large)))
+                executor.parallelFor(workload.items, body, WorkSize.large);
+            else
+                executor.parallelFor(workload.items,
+                    hintedGrain(workload.items, WorkSize.large), body);
         }
         else if (adaptive)
             executor.parallelForAdaptive(workload.items, grain, body);
@@ -136,7 +165,8 @@ void main(string[] args)
         "fixed_512", "fixed_1024", "adaptive_1", "adaptive_4", "adaptive_16",
         "adaptive_64", "adaptive_256", "adaptive_512", "adaptive_1024",
         "phobos_1", "phobos_4", "phobos_16", "phobos_64", "phobos_256",
-        "phobos_512", "phobos_1024", "inline", "serial"];
+        "phobos_512", "phobos_1024", "inline", "serial", "hint_small",
+        "hint_large"];
     auto executor = new Executor(4, 64, 64);
     scope (exit) executor.closeAndJoin();
     auto pool = new TaskPool(3);

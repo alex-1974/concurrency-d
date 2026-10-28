@@ -101,8 +101,8 @@ alternate baseline/candidate process order; the artifact contains raw CSV,
 host/compiler metadata, and per-workload p50/p95 ratios. The 10% p95 flag is a
 review screen, not a CI pass/fail threshold.
 The comparison sweeps grain and batch sizes 1, 4, 16, 64, 256, 512 and 1,024,
-and includes serial-loop and `parallelFor`-inline controls to expose the
-break-even point for parallel scheduling.
+and includes serial-loop, `parallelFor`-inline and `WorkSize` controls to expose
+the break-even point for parallel scheduling.
 Locally, build and smoke-test the harness with:
 
 ```sh
