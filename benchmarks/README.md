@@ -94,9 +94,12 @@ The `Split-on-steal native ARM64 qualification` workflow compares the checked
 out scheduler against the pinned v0.3.0 source using the same checksum-checked
 benchmark. It focuses on four participants, fine adaptive work (`minGrainSize`
 1), 1,024 and 16,384 items, uniform and clustered-cost callbacks, and eight
-reused waves. Four sessions alternate baseline/candidate process order; the
-artifact contains raw CSV, host/compiler metadata, and per-workload p50/p95
-ratios. The 10% p95 flag is a review screen, not a CI pass/fail threshold.
+waves per timed invocation. Each process reuses one executor, one Phobos pool,
+and one output buffer per workload across warmups and measured samples, so the
+timed path excludes pool construction and buffer allocation. Four sessions
+alternate baseline/candidate process order; the artifact contains raw CSV,
+host/compiler metadata, and per-workload p50/p95 ratios. The 10% p95 flag is a
+review screen, not a CI pass/fail threshold.
 Locally, build and smoke-test the harness with:
 
 ```sh
