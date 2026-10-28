@@ -175,6 +175,111 @@ package(concurrency) class ResultCell(R)
     }
 }
 
+/** Shared completion and optional result storage for a synchronous batch. */
+package(concurrency) final class BatchResultCell(R)
+{
+    private ResultNotifier _notifier;
+    private Condition _changed;
+    private size_t _remaining;
+    private Throwable _error;
+
+    static if (!is(R == void))
+        private R[] _values;
+
+    this(ResultNotifier notifier, size_t count)
+    {
+        assert(count > 0);
+        _notifier = notifier;
+        _remaining = count;
+        static if (!is(R == void))
+            _values = new R[count];
+    }
+
+    static if (!is(R == void))
+    {
+        void setValue(size_t index, R value)
+        {
+            _values[index] = value;
+        }
+    }
+
+    void recordFailure(Throwable failure) @system nothrow
+    {
+        try
+        {
+            _notifier.lock();
+            scope(exit) _notifier.unlock();
+            if (_error is null)
+                _error = failure;
+        }
+        catch (Throwable)
+        {
+            lifecycleFailStop(LifecycleFailure.worker);
+        }
+    }
+
+    void completeTask() @system nothrow
+    {
+        try
+        {
+            _notifier.lock();
+            scope(exit) _notifier.unlock();
+            assert(_remaining > 0);
+            --_remaining;
+            if (_remaining == 0 && _changed !is null)
+                _changed.notifyAll();
+        }
+        catch (Throwable)
+        {
+            lifecycleFailStop(LifecycleFailure.worker);
+        }
+    }
+
+    void waitForCompletion() @system
+    {
+        try
+        {
+            _notifier.lock();
+            scope(exit) _notifier.unlock();
+            if (_changed is null)
+                _changed = _notifier.newCondition();
+            while (_remaining != 0)
+                _changed.wait();
+        }
+        catch (Throwable)
+        {
+            // Accepted children may borrow caller storage until the batch
+            // returns, so uncertain waiting cannot unwind safely.
+            lifecycleFailStop(LifecycleFailure.owner);
+        }
+    }
+
+    bool isComplete() @system nothrow
+    {
+        try
+        {
+            _notifier.lock();
+            scope(exit) _notifier.unlock();
+            return _remaining == 0;
+        }
+        catch (Throwable)
+        {
+            lifecycleFailStop(LifecycleFailure.owner);
+            assert(0, "lifecycleFailStop returned unexpectedly");
+        }
+    }
+
+    auto get()
+    {
+        waitForCompletion();
+        if (_error !is null)
+            throw _error;
+
+        static if (!is(R == void))
+            return _values;
+    }
+}
+
 /**
  * A typed result handle. Dropping it never cancels accepted work.
  * The executor owns the task record, not the TaskHandle.

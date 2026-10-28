@@ -42,6 +42,39 @@ private struct BatchValue
     this(ulong[] values, size_t index) { this.values = values; this.index = index; }
     void opCall() nothrow { values[index] = index + 1; }
 }
+private struct BatchNumber
+{
+    int value;
+    this(int value) { this.value = value; }
+    int opCall() nothrow { return value * 2; }
+}
+private struct BatchMaybeFail
+{
+    shared uint* completed;
+    bool fail;
+    this(shared uint* completed, bool fail)
+    {
+        this.completed = completed;
+        this.fail = fail;
+    }
+    int opCall()
+    {
+        atomicFetchAdd!(MemoryOrder.rel)(*completed, 1u);
+        if (fail)
+            throw new Exception("batch child failure");
+        return 9;
+    }
+}
+private struct NestedBatch
+{
+    Executor executor;
+    int opCall()
+    {
+        BatchNumber[2] jobs = [BatchNumber(2), BatchNumber(3)];
+        auto values = executor.submitBatchAndWait(jobs[]);
+        return values[0] + values[1];
+    }
+}
 private struct Hits
 {
     shared uint* hits;
@@ -272,6 +305,77 @@ private void batchSubmission()
         handle.get();
     enforce(values[0] == 1 && values[1] == 2,
         "waiting batch admission must publish all tasks");
+}
+
+private void batchSubmissionAndWait()
+{
+    auto executor = new Executor(2, 4, 8);
+    scope(exit) executor.closeAndJoin();
+
+    BatchNumber[4] jobs = [BatchNumber(1), BatchNumber(2),
+        BatchNumber(3), BatchNumber(4)];
+    auto values = executor.submitBatchAndWait(jobs[]);
+    enforce(values.length == 4 && values[0] == 2 && values[3] == 8,
+        "submitBatchAndWait must return input-ordered typed results");
+
+    BatchValue[4] voidJobs;
+    auto outputs = new ulong[4];
+    foreach (index; 0 .. voidJobs.length)
+        voidJobs[index] = BatchValue(outputs, index);
+    executor.submitBatchAndWait(voidJobs[]);
+    enforce(outputs[0] == 1 && outputs[3] == 4,
+        "void submitBatchAndWait must drain every task");
+
+    shared uint completed;
+    BatchMaybeFail[3] failures;
+    failures[0] = BatchMaybeFail(&completed, true);
+    failures[1] = BatchMaybeFail(&completed, false);
+    failures[2] = BatchMaybeFail(&completed, false);
+    bool caught;
+    try { executor.submitBatchAndWait(failures[]); }
+    catch (Exception error) { caught = error.msg == "batch child failure"; }
+    enforce(caught && atomicLoad!(MemoryOrder.acq)(completed) == 3,
+        "batch failure must be reported only after all children return");
+
+    BatchNumber[] empty;
+    enforce(executor.submitBatchAndWait(empty[]).length == 0,
+        "empty submitBatchAndWait must return no results");
+
+    BatchNumber[9] oversized;
+    bool rejected;
+    try { executor.submitBatchAndWait(oversized[]); }
+    catch (Exception error)
+        rejected = error.msg ==
+            "submitBatchAndWait exceeds executor capacity";
+    enforce(rejected, "oversized submitBatchAndWait must be rejected");
+
+    auto bounded = new Executor(1, 2, 4);
+    auto gate = new Gate;
+    scope(exit) { gate.release(); bounded.closeAndJoin(); }
+    Block blocker;
+    blocker.gate = gate;
+    auto running = bounded.submit(blocker);
+    gate.untilEntered();
+    auto queued = bounded.submit(&functionResult);
+    BatchNumber[2] waitingJobs = [BatchNumber(5), BatchNumber(6)];
+    auto delayedRelease = new Thread({
+        Thread.sleep(dur!"msecs"(10));
+        gate.release();
+    });
+    delayedRelease.start();
+    auto waitingValues = bounded.submitBatchAndWait(waitingJobs[]);
+    delayedRelease.join();
+    enforce(waitingValues[0] == 10 && waitingValues[1] == 12 &&
+        queued.get() == 42,
+        "waiting batch completion must progress after temporary backpressure");
+    running.get();
+
+    auto singleWorker = new Executor(1, 4, 8);
+    scope(exit) singleWorker.closeAndJoin();
+    NestedBatch nested;
+    nested.executor = singleWorker;
+    enforce(singleWorker.submit(nested).get() == 10,
+        "worker submitBatchAndWait must help drain its own batch");
 }
 
 private void parallelForRanges()
@@ -933,6 +1037,7 @@ void main()
 {
     resultsAndSelfClose();
     batchSubmission();
+    batchSubmissionAndWait();
     parallelForRanges();
     backpressure();
     multipleResultWaiters();
@@ -955,5 +1060,5 @@ void main()
         catch (Exception) { rejected = true; }
         enforce(rejected, "invalid limits accepted");
     }
-    writeln("PUBLIC_API_PASS typed_void_error=true batch_submission=atomic,typed_handles,empty,capacity result_waiters=2 backpressure=ingress,records scopes=borrow,unwind,errors,capacity,nested,recursion,moved_view,gc_graph fork_join=typed,void,inline_failure_drain parallel_for=dynamic_ranges,empty,zero_grain,callback_failure,reuse worker_help=admission,join cancellation=running,prepublish,queued,complete_race64,shutdown16 gc_graphs=owned8,scoped1 close_races=8 budget_reuse=256");
+    writeln("PUBLIC_API_PASS typed_void_error=true batch_submission=atomic,typed_handles,empty,capacity batch_wait=typed_results,void,drain_errors,empty,capacity,worker_help result_waiters=2 backpressure=ingress,records scopes=borrow,unwind,errors,capacity,nested,recursion,moved_view,gc_graph fork_join=typed,void,inline_failure_drain parallel_for=dynamic_ranges,empty,zero_grain,callback_failure,reuse worker_help=admission,join cancellation=running,prepublish,queued,complete_race64,shutdown16 gc_graphs=owned8,scoped1 close_races=8 budget_reuse=256");
 }

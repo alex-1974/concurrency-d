@@ -71,6 +71,23 @@ private Thread makeSubmitThread(Executor executor, StoreRange[] jobs,
     });
 }
 
+private void waitSubmitRange(Executor executor, StoreRange[] jobs,
+    size_t first, size_t last, out ulong allocatedBytes)
+{
+    const allocatedBefore = GC.allocatedInCurrentThread();
+    executor.submitBatchAndWait(jobs[first .. last]);
+    allocatedBytes = GC.allocatedInCurrentThread() - allocatedBefore;
+}
+
+private Thread makeWaitSubmitThread(Executor executor, StoreRange[] jobs,
+    size_t first, size_t last, ulong[] producerAllocations, size_t producer)
+{
+    return new Thread({
+        waitSubmitRange(executor, jobs, first, last,
+            producerAllocations[producer]);
+    });
+}
+
 void main(string[] args)
 {
     enforce(args.length == 5 || args.length == 6 || args.length == 7 ||
@@ -119,7 +136,10 @@ void main(string[] args)
         const tasksPerProducer = jobSets[grainIndex].length / producers +
             (jobSets[grainIndex].length % producers != 0 ? 1 : 0);
         if (tasksPerProducer <= ingress && tasksPerProducer <= retained)
+        {
             arms ~= "batch_" ~ to!string(grain);
+            arms ~= "batchwait_" ~ to!string(grain);
+        }
     }
     writeln("phase,sample,order,arm,workers,producers,items,ingress,retained,tasks,submit_ns,wait_ns,total_ns,producer_allocated_bytes,checksum");
 
@@ -151,6 +171,40 @@ void main(string[] args)
             {
                 const grain = to!size_t(arm[9 .. $]);
                 executor.parallelFor(items, grain, body);
+            }
+            else if (arm.startsWith("batchwait_"))
+            {
+                const grain = to!size_t(arm[10 .. $]);
+                size_t grainIndex;
+                foreach (index, candidate; grains)
+                {
+                    if (candidate == grain)
+                    {
+                        grainIndex = index;
+                        break;
+                    }
+                }
+                auto selectedJobs = jobSets[grainIndex];
+                taskCount = selectedJobs.length;
+                const submitStart = MonoTime.currTime;
+                if (producers == 1)
+                    waitSubmitRange(executor, selectedJobs, 0, taskCount,
+                        producerAllocations[0]);
+                else
+                {
+                    Thread[] producerThreads;
+                    foreach (producer; 0 .. producers)
+                    {
+                        const first = taskCount * producer / producers;
+                        const last = taskCount * (producer + 1) / producers;
+                        producerThreads ~= makeWaitSubmitThread(executor,
+                            selectedJobs, first, last, producerAllocations,
+                            producer);
+                    }
+                    foreach (thread; producerThreads) thread.start();
+                    foreach (thread; producerThreads) thread.join();
+                }
+                submitNs = elapsedNs(submitStart);
             }
             else if (arm.startsWith("batch_"))
             {
