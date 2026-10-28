@@ -35,6 +35,13 @@ private final class Gate
 }
 private struct Block { Gate gate; void opCall() { gate.wait(); } }
 private struct Value { int value; int opCall() { return value * 3; } }
+private struct BatchValue
+{
+    ulong[] values;
+    size_t index;
+    this(ulong[] values, size_t index) { this.values = values; this.index = index; }
+    void opCall() nothrow { values[index] = index + 1; }
+}
 private struct Hits
 {
     shared uint* hits;
@@ -210,6 +217,61 @@ private void resultsAndSelfClose()
     try { executor.submit(value); }
     catch (ExecutorClosedException) { caught = true; }
     enforce(caught, "closed submit did not terminate");
+}
+
+private void batchSubmission()
+{
+    auto executor = new Executor(2, 4, 8);
+    scope(exit) executor.closeAndJoin();
+
+    auto values = new ulong[4];
+    BatchValue[4] jobs;
+    foreach (index; 0 .. jobs.length)
+        jobs[index] = BatchValue(values, index);
+    auto handles = executor.submitBatch(jobs[]);
+    enforce(handles.length == jobs.length,
+        "submitBatch must return one handle per callable");
+    ulong total;
+    foreach (handle; handles)
+        handle.get();
+    foreach (value; values)
+        total += value;
+    enforce(total == 10, "submitBatch must execute every callable once");
+
+    BatchValue[] empty;
+    enforce(executor.submitBatch(empty[]).length == 0,
+        "empty submitBatch must return an empty handle array");
+
+    BatchValue[5] oversized;
+    bool rejected;
+    try { executor.submitBatch(oversized[]); }
+    catch (Exception error)
+        rejected = error.msg == "submitBatch exceeds executor capacity";
+    enforce(rejected,
+        "submitBatch larger than ingress capacity must fail instead of waiting forever");
+
+    auto bounded = new Executor(1, 2, 4);
+    auto gate = new Gate;
+    scope(exit) { gate.release(); bounded.closeAndJoin(); }
+    Block blockerJob;
+    blockerJob.gate = gate;
+    auto blocker = bounded.submit(blockerJob);
+    gate.untilEntered();
+    auto queued = bounded.submit(&functionResult);
+    auto delayedRelease = new Thread({
+        Thread.sleep(dur!"msecs"(10));
+        gate.release();
+    });
+    delayedRelease.start();
+    auto admitted = bounded.submitBatch(jobs[0 .. 2]);
+    delayedRelease.join();
+    blocker.get();
+    enforce(queued.get() == 42,
+        "queued task must complete before waiting batch admission");
+    foreach (handle; admitted)
+        handle.get();
+    enforce(values[0] == 1 && values[1] == 2,
+        "waiting batch admission must publish all tasks");
 }
 
 private void parallelForRanges()
@@ -870,6 +932,7 @@ private void concurrentClose()
 void main()
 {
     resultsAndSelfClose();
+    batchSubmission();
     parallelForRanges();
     backpressure();
     multipleResultWaiters();
@@ -892,5 +955,5 @@ void main()
         catch (Exception) { rejected = true; }
         enforce(rejected, "invalid limits accepted");
     }
-    writeln("PUBLIC_API_PASS typed_void_error=true result_waiters=2 backpressure=ingress,records scopes=borrow,unwind,errors,capacity,nested,recursion,moved_view,gc_graph fork_join=typed,void,inline_failure_drain parallel_for=dynamic_ranges,empty,zero_grain,callback_failure,reuse worker_help=admission,join cancellation=running,prepublish,queued,complete_race64,shutdown16 gc_graphs=owned8,scoped1 close_races=8 budget_reuse=256");
+    writeln("PUBLIC_API_PASS typed_void_error=true batch_submission=atomic,typed_handles,empty,capacity result_waiters=2 backpressure=ingress,records scopes=borrow,unwind,errors,capacity,nested,recursion,moved_view,gc_graph fork_join=typed,void,inline_failure_drain parallel_for=dynamic_ranges,empty,zero_grain,callback_failure,reuse worker_help=admission,join cancellation=running,prepublish,queued,complete_race64,shutdown16 gc_graphs=owned8,scoped1 close_races=8 budget_reuse=256");
 }

@@ -74,6 +74,79 @@ native ARM64/LDC runs; the same workflow can be started manually with custom
 parameters. It stores independent sessions and host/compiler metadata as an
 artifact in `.github/workflows/m2-performance-capture.yml`.
 
+The short-task diagnostic compares a serial loop and the single-participant
+`parallelFor` path with parallel range claims, independent `submit` calls and
+atomic `submitBatch` calls. Submit arms report producer/admission and handle-
+wait time separately, plus total dispatch-to-completion time; with multiple
+producers the submission phase includes producer-thread startup and join.
+Tasks may execute while admission is still in progress, so phase timings are
+not additive. The executor, handle storage and result buffer are reused across
+samples, and every arm checks the same checksum. This benchmark locates
+scheduler costs; it has no pass threshold.
+
+```sh
+dub build --root=benchmarks/short-tasks --build=release --compiler=ldc2
+./benchmarks/short-tasks/concurrency-short-tasks-benchmark 30 5 1024 4 > short-tasks.csv
+```
+
+The required arguments are measured samples, warmups, item count and worker
+count. An optional fifth argument sets producer count; alternatively, ingress
+capacity and retained-record budget can be set before producer count. For
+example, this uses four producers with the executor defaults:
+
+```sh
+./benchmarks/short-tasks/concurrency-short-tasks-benchmark 20 3 16384 4 4 > short-tasks-4p.csv
+```
+
+This command raises both capacities to 16,384 for an unconstrained diagnostic:
+
+```sh
+./benchmarks/short-tasks/concurrency-short-tasks-benchmark 30 5 16384 4 16384 16384 > short-tasks-unbounded.csv
+```
+
+Run separate item counts because scheduling cost changes relative to callback
+work. In a local XPS 15 / LDC 1.42 run, 1,024 tiny stores took a median
+1.3 μs serially or inline, versus 13–34 μs for parallel range claims. At
+16,384 stores, grain 256 took 24.4 μs versus 26.7 μs serially. Submitting one
+task per item took about 1.14 ms and 26.5 ms, respectively. Atomic batches
+reduced those totals to 586 μs and 11.2 ms at batch size 1, and to 13.4 μs and
+73.3 μs at batch size 256. The submit phase shrank while the wait phase grew
+because workers received tasks sooner; compare total time for end-to-end
+results. These are host-specific diagnostic measurements; repeat them on
+native ARM64 and across process sessions before changing scheduler policy.
+
+At four producers with the practical queue 256 / retention 512 limits, atomic
+batches of 16 logical tasks reduced median total time from 3.23 ms to 0.97 ms;
+batches of 64 reduced it from 0.87 ms to 0.35 ms. Thread startup is included
+for both the single-submit and batch arms in this multi-producer comparison.
+
+An isolation sweep at 16,384 items compared default capacities (ingress 256,
+retention 512) with each limit raised to 16,384. For one task per item, median
+submission remained about 19–22 ms in every configuration. Batch 16 remained
+about 1.1 ms, and batch 256 about 75–85 μs. Raising either limit did not yield
+a repeatable improvement, so retention scans and ingress backpressure alone do
+not explain the per-task cost. The fixed path still creates a result cell,
+owned node and typed handle for every task, while acquiring the owned-executor
+and inbox mutexes. The `submitBatch` arms compare atomic single-record and
+multi-record admissions under identical task work. The API rejects batches
+that cannot fit configured capacities and waits only when occupancy is
+temporary.
+
+The existing public-executor producer diagnostic also shows serialization:
+for 8,192 one-iteration tasks, five local runs had median total times of 11.6
+ms with one producer and 25.0 ms with four. That harness includes executor and
+producer-thread startup, so it is directional rather than an isolated lock
+measurement. A dedicated repeated-producer comparison remains needed before
+claiming a multi-producer speedup.
+
+A follow-up experiment skipped creation of the unused cancellation state in
+internal `parallelFor` scopes. Three alternating baseline/candidate sessions
+with 50 measured samples each showed no consistent reduction: at 1,024 items,
+parallel range arms were 2–5% slower in the candidate; at 16,384 items, the
+grain-64 arm was 3% faster while grain 256 was unchanged. The experiment was
+discarded. This comparison points away from that allocation and keeps task
+submission/record creation as the stronger optimization target.
+
 The focused adaptive-range diagnostic compares only fixed and adaptive
 `parallelFor` over short (16 iterations), medium (256), long (4096), scattered
 hotspots, and expensive items clustered at the beginning or end. The hotspot
