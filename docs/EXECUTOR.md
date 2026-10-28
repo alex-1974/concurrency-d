@@ -200,10 +200,16 @@ The batch is accepted as one unit: no task is published unless the full batch
 fits the configured ingress and retained-record limits. An empty batch returns
 an empty handle array. A batch larger than either limit throws; a temporarily
 full executor waits until the entire batch fits, and can wait indefinitely if
-existing tasks cannot release capacity. Each callable still gets its own node,
-result cell and typed handle, so batching reduces lock traffic rather than
-per-task allocation count. Use `parallelFor` for indexed work, which avoids
-per-item task records altogether.
+existing tasks cannot release capacity. Each callable gets its own typed
+handle and task record. Batching admits many records under one pair of locks,
+so it is most useful when each callable is too irregular or dependency-bound
+for `parallelFor`. Start with batches of 16–64 small, independent callables;
+increase the batch when the producer spends more time submitting than waiting,
+and reduce it when larger batches wait too long for the whole queue budget or
+make the last task wait behind slow work in the same group. The measured gain
+shrinks as each callable does more work, so benchmark with representative task
+durations. Use `parallelFor` for indexed work, which avoids per-item task
+records altogether.
 
 `parallelForAdaptive` is an opt-in alternative for workloads with uneven or
 uncertain item costs. For `minGrainSize == 1`, the scheduler divides the domain

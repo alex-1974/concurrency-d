@@ -2,6 +2,7 @@ module concurrency.benchmarks.short_tasks;
 
 import concurrency : Executor, TaskHandle;
 import core.thread : Thread;
+import core.memory : GC;
 import core.time : MonoTime;
 import std.conv : to;
 import std.exception : enforce;
@@ -42,25 +43,31 @@ private ulong checksum(ulong[] values) nothrow
 }
 
 private void submitRange(Executor executor, StoreRange[] jobs,
-    TaskHandle!void[] handles, size_t first, size_t last, bool batched)
+    TaskHandle!void[] handles, size_t first, size_t last, bool batched,
+    out ulong allocatedBytes)
 {
+    const allocatedBefore = GC.allocatedInCurrentThread();
     if (!batched)
     {
         foreach (index; first .. last)
             handles[index] = executor.submit(jobs[index]);
-        return;
     }
-
-    auto batchHandles = executor.submitBatch(jobs[first .. last]);
-    foreach (offset, handle; batchHandles)
-        handles[first + offset] = handle;
+    else
+    {
+        auto batchHandles = executor.submitBatch(jobs[first .. last]);
+        foreach (offset, handle; batchHandles)
+            handles[first + offset] = handle;
+    }
+    allocatedBytes = GC.allocatedInCurrentThread() - allocatedBefore;
 }
 
 private Thread makeSubmitThread(Executor executor, StoreRange[] jobs,
-    TaskHandle!void[] handles, size_t first, size_t last, bool batched)
+    TaskHandle!void[] handles, size_t first, size_t last, bool batched,
+    ulong[] producerAllocations, size_t producer)
 {
     return new Thread({
-        submitRange(executor, jobs, handles, first, last, batched);
+        submitRange(executor, jobs, handles, first, last, batched,
+            producerAllocations[producer]);
     });
 }
 
@@ -87,6 +94,7 @@ void main(string[] args)
     scope (exit) executor.closeAndJoin();
     auto values = new ulong[items];
     auto handles = new TaskHandle!void[items];
+    auto producerAllocations = new ulong[producers];
     const expected = cast(ulong) items * (items + 1) / 2;
     immutable grains = [1UL, 4UL, 16UL, 64UL, 256UL];
     StoreRange[][] jobSets;
@@ -113,7 +121,7 @@ void main(string[] args)
         if (tasksPerProducer <= ingress && tasksPerProducer <= retained)
             arms ~= "batch_" ~ to!string(grain);
     }
-    writeln("phase,sample,order,arm,workers,producers,items,ingress,retained,tasks,submit_ns,wait_ns,total_ns,checksum");
+    writeln("phase,sample,order,arm,workers,producers,items,ingress,retained,tasks,submit_ns,wait_ns,total_ns,producer_allocated_bytes,checksum");
 
     foreach (sample; 0 .. warmups + samples)
     {
@@ -126,6 +134,7 @@ void main(string[] args)
             long waitNs;
             long totalNs;
             size_t taskCount;
+            producerAllocations[] = 0;
             const totalStart = MonoTime.currTime;
             auto body = (size_t index) { values[index] = index + 1; };
 
@@ -160,7 +169,7 @@ void main(string[] args)
                 const submitStart = MonoTime.currTime;
                 if (producers == 1)
                     submitRange(executor, selectedJobs, handles,
-                        0, taskCount, true);
+                        0, taskCount, true, producerAllocations[0]);
                 else
                 {
                     Thread[] producerThreads;
@@ -169,7 +178,8 @@ void main(string[] args)
                         const first = taskCount * producer / producers;
                         const last = taskCount * (producer + 1) / producers;
                         producerThreads ~= makeSubmitThread(executor,
-                            selectedJobs, handles, first, last, true);
+                            selectedJobs, handles, first, last, true,
+                            producerAllocations, producer);
                     }
                     foreach (thread; producerThreads) thread.start();
                     foreach (thread; producerThreads) thread.join();
@@ -197,7 +207,7 @@ void main(string[] args)
                 const submitStart = MonoTime.currTime;
                 if (producers == 1)
                     submitRange(executor, selectedJobs, handles,
-                        0, taskCount, false);
+                        0, taskCount, false, producerAllocations[0]);
                 else
                 {
                     Thread[] producerThreads;
@@ -206,7 +216,8 @@ void main(string[] args)
                         const first = taskCount * producer / producers;
                         const last = taskCount * (producer + 1) / producers;
                         producerThreads ~= makeSubmitThread(executor,
-                            selectedJobs, handles, first, last, false);
+                            selectedJobs, handles, first, last, false,
+                            producerAllocations, producer);
                     }
                     foreach (thread; producerThreads) thread.start();
                     foreach (thread; producerThreads) thread.join();
@@ -220,13 +231,17 @@ void main(string[] args)
 
             totalNs = elapsedNs(totalStart);
             const actual = checksum(values);
+            ulong allocatedBytes;
+            foreach (allocation; producerAllocations)
+                allocatedBytes += allocation;
             enforce(actual == expected && totalNs > 0,
                 arm ~ ": checksum or timing mismatch");
             writeln(sample < warmups ? "warmup" : "measure", ",", sample,
                 ",", order, ",", arm, ",", workers, ",", producers, ",",
                 items, ",",
                 ingress, ",", retained, ",", taskCount, ",", submitNs,
-                ",", waitNs, ",", totalNs, ",", actual);
+                ",", waitNs, ",", totalNs, ",", allocatedBytes, ",",
+                actual);
         }
     }
 }
