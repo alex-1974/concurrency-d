@@ -72,10 +72,11 @@ private struct RetainedTask
 }
 
 /**
- * Concrete node with an embedded header-first record. The class itself
- * supplies GC retention; only the record header address reaches the deque.
+ * Concrete node with an embedded header-first record. Inheriting the result
+ * cell keeps the handle and executor-owned task record in one GC allocation;
+ * only the record header address reaches the deque.
  */
-private final class OwnedNode(F, R)
+private final class OwnedNode(F, R) : ResultCell!R
 {
     private struct Record
     {
@@ -88,10 +89,11 @@ private final class OwnedNode(F, R)
 
     private Record _record;
 
-    this(F callable, ResultCell!R cell, WorkSize workSize)
+    this(F callable, ResultNotifier notifier, WorkSize workSize)
     {
+        super(notifier);
         _record.callable = callable;
-        _record.cell = cell;
+        _record.cell = this;
         _record.prefix.header.execute = &execute;
         _record.prefix.header.batchHint = workSize == WorkSize.large
             ? TaskBatchHint.oneAtATime : TaskBatchHint.normal;
@@ -242,9 +244,9 @@ package(concurrency) final class OwnedTaskExecutor
             if (!_pool.hasIngressCapacity())
                 return TaskHandle!R.init;
 
-            auto cell = new ResultCell!R(_resultNotifier);
-            handle = new TaskHandle!R(cell);
-            auto node = new OwnedNode!(F, R)(callable, cell, workSize);
+            auto node = new OwnedNode!(F, R)(callable, _resultNotifier,
+                workSize);
+            handle = new TaskHandle!R(node);
 
             // Install the strong GC root before any worker can claim the
             // record. If admission fails, clear the tail GC slot too.
@@ -365,9 +367,9 @@ package(concurrency) final class OwnedTaskExecutor
         auto roots = new RetainedTask[callables.length];
         foreach (index, ref callable; callables)
         {
-            auto cell = new ResultCell!R(_resultNotifier);
-            handles[index] = new TaskHandle!R(cell);
-            nodes[index] = new OwnedNode!(F, R)(callable, cell, workSize);
+            nodes[index] = new OwnedNode!(F, R)(callable, _resultNotifier,
+                workSize);
+            handles[index] = new TaskHandle!R(nodes[index]);
             refs[index] = nodes[index].reference();
             roots[index] = RetainedTask(nodes[index],
                 nodes[index].returnedFlag());

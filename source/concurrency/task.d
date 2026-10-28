@@ -26,7 +26,7 @@ package(concurrency) final class ResultNotifier
 }
 
 // Internal synchronized completion cell, independent of executor shutdown.
-package(concurrency) final class ResultCell(R)
+package(concurrency) class ResultCell(R)
 {
     private ResultNotifier _notifier;
     private Condition _changed;

@@ -362,7 +362,7 @@ final class Executor
      * fits and may wait indefinitely if existing work cannot release capacity.
      * A same-pool worker helps execute queued work while waiting. The batch
      * uses one admission lock and one inbox lock, reducing synchronization for
-     * many small tasks. Callables and handles are still allocated individually.
+     * many small tasks. Each task still has its own record and typed handle.
      * Arbitrary captures remain the caller's responsibility.
      */
     auto submitBatch(F)(scope F[] callables,

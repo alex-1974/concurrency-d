@@ -122,22 +122,45 @@ for both the single-submit and batch arms in this multi-producer comparison.
 
 An isolation sweep at 16,384 items compared default capacities (ingress 256,
 retention 512) with each limit raised to 16,384. For one task per item, median
-submission remained about 19–22 ms in every configuration. Batch 16 remained
-about 1.1 ms, and batch 256 about 75–85 μs. Raising either limit did not yield
-a repeatable improvement, so retention scans and ingress backpressure alone do
-not explain the per-task cost. The fixed path still creates a result cell,
-owned node and typed handle for every task, while acquiring the owned-executor
-and inbox mutexes. The `submitBatch` arms compare atomic single-record and
-multi-record admissions under identical task work. The API rejects batches
-that cannot fit configured capacities and waits only when occupancy is
-temporary.
+submission remained about 19–22 ms in every configuration. Raising either
+limit did not yield a repeatable improvement, so retention scans and ingress
+backpressure alone do not explain the per-task cost. The `submitBatch` arms
+compare atomic single-record and multi-record admissions under identical task
+work. The API rejects batches that cannot fit configured capacities and waits
+only when occupancy is temporary.
 
 The existing public-executor producer diagnostic also shows serialization:
 for 8,192 one-iteration tasks, five local runs had median total times of 11.6
 ms with one producer and 25.0 ms with four. That harness includes executor and
 producer-thread startup, so it is directional rather than an isolated lock
-measurement. A dedicated repeated-producer comparison remains needed before
-claiming a multi-producer speedup.
+measurement. A follow-up dedicated comparison used three independent LDC 1.42
+processes, each with 20 measured samples after four warmups, 16,384 one-store
+items and four workers. At one producer and ingress/retention capacities of
+16,384, the pooled 60 observations gave median total times of 1.86 ms vs 1.07
+ms at grain 16, 504 μs vs 304 μs at grain 64, and 170 μs vs 108 μs at grain
+256 for repeated `submit` vs `submitBatch`. At four producers with queue and
+retention limits 256 / 512, medians were 5.06 ms vs 1.54 ms at grain 16, 1.43
+ms vs 533 μs at grain 64, and 548 μs vs 343 μs at grain 256. Producer-thread
+startup and join are included symmetrically. Batch-of-one is omitted for four
+producers because each producer's complete group cannot fit the configured
+capacities. These host-specific diagnostics show repeatable gains for this
+workload, not portable promises; measure representative task durations on the
+target host before choosing a batch size.
+
+The submission path originally allocated three GC objects per accepted task:
+a result cell, an owned task node and a typed handle. The result cell is now the
+base of the owned node, preserving the same typed handle and task lifetime
+while removing one object allocation per task. The task record and handle
+remain individual allocations. The benchmark's `producer_allocated_bytes`
+column reads D's current-thread GC allocation counter around submission (and
+sums the producer threads); it excludes their thread startup and wait phase.
+In a five-sample, two-warmup one-producer capture with 16,384 items, repeated
+single-task submission allocated a median 176.5 bytes/item before and 160.5
+after the change. Batch-of-one allocated 241.5 vs 225.5 bytes/item, including
+the batch API's temporary arrays. The exact 16-byte/item reduction confirms
+the removed cell allocation. Because allocation-counter reads add a little
+measurement work, use separate captures without allocation accounting when
+comparing very small latency differences.
 
 A follow-up experiment skipped creation of the unused cancellation state in
 internal `parallelFor` scopes. Three alternating baseline/candidate sessions
