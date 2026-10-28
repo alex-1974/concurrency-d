@@ -86,20 +86,27 @@ private ulong run(Executor executor, TaskPool pool, Workload workload,
     if (arm.startsWith("phobos_"))
         return runPhobos(pool, workload, to!size_t(arm[7 .. $]), values);
 
+    const serialPath = arm == "serial";
+    const inlinePath = arm == "inline";
     const separator = arm.indexOf('_');
-    const grain = to!size_t(arm[separator + 1 .. $]);
+    const grain = inlinePath ? workload.items
+        : serialPath ? 0 : to!size_t(arm[separator + 1 .. $]);
     const adaptive = arm.startsWith("adaptive_");
     ulong result;
     foreach (_; 0 .. waves)
     {
-        if (adaptive)
-            executor.parallelForAdaptive(workload.items, grain, (size_t index) {
-                values[index] = Job(index, workload)();
-            });
+        auto body = (size_t index) {
+            values[index] = Job(index, workload)();
+        };
+        if (serialPath)
+        {
+            foreach (index; 0 .. workload.items)
+                body(index);
+        }
+        else if (adaptive)
+            executor.parallelForAdaptive(workload.items, grain, body);
         else
-            executor.parallelFor(workload.items, grain, (size_t index) {
-                values[index] = Job(index, workload)();
-            });
+            executor.parallelFor(workload.items, grain, body);
         foreach (value; values)
             result += value;
     }
@@ -126,8 +133,10 @@ void main(string[] args)
         Workload("heavy_suffix_16384", 16384, 128, 896, Pattern.suffix),
     ];
     immutable arms = ["fixed_1", "fixed_4", "fixed_16", "fixed_64", "fixed_256",
-        "adaptive_1", "adaptive_4", "adaptive_16", "adaptive_64", "adaptive_256",
-        "phobos_1", "phobos_4", "phobos_16", "phobos_64", "phobos_256"];
+        "fixed_512", "fixed_1024", "adaptive_1", "adaptive_4", "adaptive_16",
+        "adaptive_64", "adaptive_256", "adaptive_512", "adaptive_1024",
+        "phobos_1", "phobos_4", "phobos_16", "phobos_64", "phobos_256",
+        "phobos_512", "phobos_1024", "inline", "serial"];
     auto executor = new Executor(4, 64, 64);
     scope (exit) executor.closeAndJoin();
     auto pool = new TaskPool(3);

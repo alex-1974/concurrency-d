@@ -63,9 +63,9 @@ workloads = [
     "medium_uniform_16384", "scattered_16384", "heavy_prefix_16384",
     "heavy_suffix_16384",
 ]
-grains = (1, 4, 16, 64, 256)
+grains = (1, 4, 16, 64, 256, 512, 1024)
 arms = ({f"{kind}_{grain}" for kind in ("fixed", "adaptive") for grain in grains}
-        | {f"phobos_{grain}" for grain in grains})
+        | {f"phobos_{grain}" for grain in grains} | {"inline", "serial"})
 expected_rows = len(workloads) * (SAMPLES + WARMUPS) * len(arms)
 meta = {
     "status": "IN_PROGRESS", "baseline_tag": "v0.3.0",
@@ -77,7 +77,8 @@ meta = {
                  for name, path in binaries.items()},
     "protocol": (f"{SESSIONS} sessions; {SAMPLES} measured and {WARMUPS} warmup "
                  "samples; four total participants; 10 workloads (1,024 and "
-                 "16,384 items); fixed/adaptive grain and Phobos batch sweeps (1,4,16,64,256) "
+                 "16,384 items); fixed/adaptive grain and Phobos batch sweeps "
+                 "(1,4,16,64,256,512,1024), plus inline and serial controls "
                  "with rotating order; one Executor, one Phobos TaskPool, and "
                  "one output buffer per workload are reused across measured "
                  "samples; eight waves per timed invocation; Phobos uses "
@@ -171,6 +172,13 @@ for workload in workloads:
                 "p50_ns": statistics.median(values), "p95_ns": percentile(values, 95),
                 "samples": len(values),
             }
+    control_stats = {}
+    for arm in ("inline", "serial"):
+        values = samples[("candidate", workload, arm)]
+        control_stats[arm] = {
+            "p50_ns": statistics.median(values), "p95_ns": percentile(values, 95),
+            "samples": len(values),
+        }
     best_concurrency = min(concurrency_stats,
                            key=lambda arm: concurrency_stats[arm]["p50_ns"])
     concurrency_p50 = concurrency_stats[best_concurrency]["p50_ns"]
@@ -186,6 +194,7 @@ for workload in workloads:
         "phobos_batch_stats": phobos_stats,
         "best_concurrency_arm_by_p50": best_concurrency,
         "concurrency_grain_stats": concurrency_stats,
+        "control_stats": control_stats,
         "best_concurrency_p50_ns": concurrency_p50,
         "best_concurrency_p95_ns": concurrency_p95,
         "best_phobos_p50_ns": phobos_p50,
