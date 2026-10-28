@@ -48,6 +48,7 @@ These are executable integration examples, not latency claims.
 | `Executor(workers, ingressCapacity, maxRetained = 4096)` | Explicit positive limits; setup completes before native worker startup |
 | `executor.trySubmit(callable, workSize = WorkSize.small)` | One attempt: typed handle on success, null on bounded capacity, ExecutorClosedException after close |
 | `executor.submit(callable, workSize = WorkSize.small)` | Retry capacity rejection until admitted or closed; may wait indefinitely |
+| `executor.submitBatch(callables, workSize = WorkSize.small)` | Atomically admit a homogeneous callable array and return typed handles; the whole batch must fit both capacities |
 | `executor.parallelFor(itemCount, grainSize, body)` | Run `body(index)` over `[0, itemCount)`; workers dynamically claim contiguous ranges of up to `grainSize`, and all workers are joined before returning |
 | `executor.parallelFor(itemCount, body, workSize)` | Choose a claim grain from the per-item work estimate; small total ranges may run inline, while larger ranges use parallel workers |
 | `executor.parallelForAdaptive(itemCount, minGrainSize, body)` | Run indexed work with adaptive claims; `minGrainSize == 1` uses cyclic blocks that idle participants can steal, while other minimums use guided ranges; all workers are joined before returning |
@@ -184,6 +185,25 @@ sweep in [the end-to-end benchmark](../benchmarks/README.md) compares several
 grain sizes. `grainSize` is the maximum number of indices claimed at once, not
 the worker count or a time estimate. For opaque tasks or custom dependencies,
 use `submit` and choose the task grouping explicitly.
+
+For a prebuilt array of same-type callables, `submitBatch` amortizes admission
+and inbox synchronization across the group:
+
+```d
+auto jobs = [job0, job1, job2, job3];
+auto results = executor.submitBatch(jobs[]);
+foreach (result; results)
+    result.get();
+```
+
+The batch is accepted as one unit: no task is published unless the full batch
+fits the configured ingress and retained-record limits. An empty batch returns
+an empty handle array. A batch larger than either limit throws; a temporarily
+full executor waits until the entire batch fits, and can wait indefinitely if
+existing tasks cannot release capacity. Each callable still gets its own node,
+result cell and typed handle, so batching reduces lock traffic rather than
+per-task allocation count. Use `parallelFor` for indexed work, which avoids
+per-item task records altogether.
 
 `parallelForAdaptive` is an opt-in alternative for workloads with uneven or
 uncertain item costs. For `minGrainSize == 1`, the scheduler divides the domain

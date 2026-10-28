@@ -355,6 +355,24 @@ final class Executor
     }
 
     /**
+     * Submit a homogeneous batch atomically and return one typed
+     * handle per callable. The batch must fit both ingress and retained-record
+     * capacities; otherwise this throws. An empty batch returns no handles.
+     * If current capacity is occupied, the call waits until the whole batch
+     * fits and may wait indefinitely if existing work cannot release capacity.
+     * A same-pool worker helps execute queued work while waiting. The batch
+     * uses one admission lock and one inbox lock, reducing synchronization for
+     * many small tasks. Callables and handles are still allocated individually.
+     * Arbitrary captures remain the caller's responsibility.
+     */
+    auto submitBatch(F)(scope F[] callables,
+        WorkSize workSize = WorkSize.small) @system
+        if (supportedTask!F)
+    {
+        return _impl.submitBatch(callables, workSize);
+    }
+
+    /**
      * Reject new admission, drain accepted work and positively join workers.
      * Successful external calls are idempotent and coordinate concurrent
      * closers. A task that never returns can prevent this call from returning.

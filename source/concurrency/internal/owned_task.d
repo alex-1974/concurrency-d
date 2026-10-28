@@ -181,6 +181,7 @@ package(concurrency) final class OwnedTaskExecutor
     private Condition _lifecycleChanged;
     private RetainedTask[] _retained;
     private size_t _maxRetained;
+    private size_t _ingressCapacity;
 
     // _mutex serializes admission against shutdown. Exactly one caller
     // performs the worker join; other closers wait for the same outcome.
@@ -198,6 +199,7 @@ package(concurrency) final class OwnedTaskExecutor
         _resultNotifier = new ResultNotifier();
         _lifecycle = Lifecycle.running;
         _maxRetained = maxRetained;
+        _ingressCapacity = ingressCapacity;
         _pool = new SubmissionWorkerPool(
             workers, ingressCapacity, &markReturned);
     }
@@ -336,6 +338,69 @@ package(concurrency) final class OwnedTaskExecutor
             if (_pool.isCurrentWorker() && _pool.helpCurrentWorkerOnce())
                 continue;
 
+            Thread.yield();
+        }
+    }
+
+    /** Admit a homogeneous batch atomically with one owner and inbox lock. */
+    auto submitBatch(F)(scope F[] callables,
+        WorkSize workSize = WorkSize.small) @system
+    {
+        alias R = ReturnType!F;
+        if (callables.length == 0)
+            return new TaskHandle!R[0];
+        if (callables.length > _maxRetained ||
+            callables.length > _ingressCapacity)
+            throw new Exception("submitBatch exceeds executor capacity");
+
+        synchronized (_mutex)
+        {
+            if (_lifecycle != Lifecycle.running)
+                throw new ExecutorClosedException();
+        }
+
+        auto handles = new TaskHandle!R[callables.length];
+        auto nodes = new OwnedNode!(F, R)[callables.length];
+        auto refs = new TaskRef[callables.length];
+        auto roots = new RetainedTask[callables.length];
+        foreach (index, ref callable; callables)
+        {
+            auto cell = new ResultCell!R(_resultNotifier);
+            handles[index] = new TaskHandle!R(cell);
+            nodes[index] = new OwnedNode!(F, R)(callable, cell, workSize);
+            refs[index] = nodes[index].reference();
+            roots[index] = RetainedTask(nodes[index],
+                nodes[index].returnedFlag());
+        }
+
+        while (true)
+        {
+            bool retry;
+            synchronized (_mutex)
+            {
+                if (_lifecycle != Lifecycle.running)
+                    throw new ExecutorClosedException();
+
+                if (_retained.length > _maxRetained - roots.length)
+                {
+                    reapCompletedUnderLock();
+                    retry = _retained.length > _maxRetained - roots.length;
+                }
+
+                if (!retry && !_pool.hasIngressCapacity(refs.length))
+                    retry = true;
+
+                if (!retry)
+                {
+                    _retained ~= roots;
+                    const status = _pool.trySubmitBatch(refs);
+                    assert(status == SubmissionResult.accepted);
+                    return handles;
+                }
+            }
+
+            if (_pool.isCurrentWorker() && _pool.helpCurrentWorkerOnce())
+                continue;
             Thread.yield();
         }
     }

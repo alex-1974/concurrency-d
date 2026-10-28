@@ -126,6 +126,35 @@ private final class TaskInbox
         }
     }
 
+    SubmissionResult trySubmitBatch(TaskRef[] tasks)
+    {
+        foreach (task; tasks)
+            if (task.ptr is null)
+                throw new Exception("cannot submit a null TaskRef");
+
+        synchronized (_mutex)
+        {
+            if (_closed)
+                return SubmissionResult.closed;
+            if (tasks.length > _slots.length - _used)
+                return SubmissionResult.full;
+
+            foreach (offset, task; tasks)
+            {
+                const tail = (_head + _used + offset) % _slots.length;
+                _slots[tail] = task;
+            }
+            _used += tasks.length;
+            atomicStore!(MemoryOrder.rel)(_usedSnapshot, _used);
+            _accepted += tasks.length;
+            _generation += tasks.length;
+
+            if (_waiters != 0)
+                _changed.notifyAll();
+            return SubmissionResult.accepted;
+        }
+    }
+
     /**
      * Lock-free advisory check for OwnedTaskExecutor's serialized producers.
      * The next authoritative trySubmit rechecks under the inbox mutex. Only
@@ -141,6 +170,17 @@ private final class TaskInbox
         // may have freed a slot just before this load became visible.
         synchronized (_mutex)
             return !_closed && _used < _slots.length;
+    }
+
+    bool hasCapacityFor(size_t count)
+    {
+        if (count > _slots.length)
+            return false;
+        if (_slots.length - atomicLoad!(MemoryOrder.acq)(_usedSnapshot) >= count)
+            return true;
+
+        synchronized (_mutex)
+            return !_closed && _slots.length - _used >= count;
     }
 
     size_t takeBatch(scope TaskRef[] output)
@@ -422,6 +462,16 @@ package(concurrency) final class SubmissionWorkerPool
     SubmissionResult trySubmit(TaskRef task)
     {
         return _inbox.trySubmit(task);
+    }
+
+    SubmissionResult trySubmitBatch(TaskRef[] tasks)
+    {
+        return _inbox.trySubmitBatch(tasks);
+    }
+
+    bool hasIngressCapacity(size_t count)
+    {
+        return _inbox.hasCapacityFor(count);
     }
 
     /** Reject known-full inboxes before creating owned task records. */

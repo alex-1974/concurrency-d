@@ -1,0 +1,10 @@
+{
+  "name": "concurrency-short-tasks-benchmark",
+  "targetType": "executable",
+  "sourcePaths": [],
+  "mainSourceFile": "main.d",
+  "targetName": "concurrency-short-tasks-benchmark",
+  "dependencies": {
+    "concurrency-d": { "path": "../.." }
+  }
+}
