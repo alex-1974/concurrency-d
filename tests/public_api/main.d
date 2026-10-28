@@ -45,12 +45,18 @@ private struct BatchValue
 private struct BatchNumber
 {
     int value;
+    this(int value) { this.value = value; }
     int opCall() nothrow { return value * 2; }
 }
 private struct BatchMaybeFail
 {
     shared uint* completed;
     bool fail;
+    this(shared uint* completed, bool fail)
+    {
+        this.completed = completed;
+        this.fail = fail;
+    }
     int opCall()
     {
         atomicFetchAdd!(MemoryOrder.rel)(*completed, 1u);
