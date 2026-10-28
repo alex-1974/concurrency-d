@@ -66,34 +66,30 @@ private ulong checksum(Workload workload)
     return result;
 }
 
-private ulong runPhobos(Workload workload, size_t workers, size_t batchSize)
+private ulong runPhobos(TaskPool pool, Workload workload, size_t batchSize,
+    ulong[] values)
 {
-	auto pool = new TaskPool(workers - 1);
-	scope (exit) pool.finish(true);
-	auto values = new ulong[workload.items];
-	ulong result;
-	foreach (_; 0 .. waves)
-	{
-		foreach (index; pool.parallel(iota(0, workload.items), batchSize))
-			values[index] = Job(index, workload)();
-		foreach (value; values)
-			result += value;
-	}
-	return result;
+    ulong result;
+    foreach (_; 0 .. waves)
+    {
+        foreach (index; pool.parallel(iota(0, workload.items), batchSize))
+            values[index] = Job(index, workload)();
+        foreach (value; values)
+            result += value;
+    }
+    return result;
 }
 
-private ulong run(Workload workload, size_t workers, string arm)
+private ulong run(Executor executor, TaskPool pool, Workload workload,
+    string arm, ulong[] values)
 {
     if (arm.startsWith("phobos_"))
-        return runPhobos(workload, workers, to!size_t(arm[7 .. $]));
+        return runPhobos(pool, workload, to!size_t(arm[7 .. $]), values);
 
     const separator = arm.indexOf('_');
     const grain = to!size_t(arm[separator + 1 .. $]);
     const adaptive = arm.startsWith("adaptive_");
-    auto values = new ulong[workload.items];
     ulong result;
-    auto executor = new Executor(workers, 64, 64);
-    scope (exit) executor.closeAndJoin();
     foreach (_; 0 .. waves)
     {
         if (adaptive)
@@ -104,8 +100,8 @@ private ulong run(Workload workload, size_t workers, string arm)
             executor.parallelFor(workload.items, grain, (size_t index) {
                 values[index] = Job(index, workload)();
             });
-		foreach (value; values)
-			result += value;
+        foreach (value; values)
+            result += value;
     }
     return result;
 }
@@ -129,21 +125,26 @@ void main(string[] args)
         Workload("heavy_prefix_16384", 16384, 128, 896, Pattern.prefix),
         Workload("heavy_suffix_16384", 16384, 128, 896, Pattern.suffix),
     ];
-	immutable arms = ["fixed_1", "fixed_4", "fixed_16", "fixed_64", "fixed_256",
+    immutable arms = ["fixed_1", "fixed_4", "fixed_16", "fixed_64", "fixed_256",
         "adaptive_1", "adaptive_4", "adaptive_16", "adaptive_64", "adaptive_256",
         "phobos_1", "phobos_4", "phobos_16", "phobos_64", "phobos_256"];
-	writeln("phase,sample,order,workload,arm,workers,item_count,elapsed_ns,checksum");
+    auto executor = new Executor(4, 64, 64);
+    scope (exit) executor.closeAndJoin();
+    auto pool = new TaskPool(3);
+    scope (exit) pool.finish(true);
+    writeln("phase,sample,order,workload,arm,workers,item_count,elapsed_ns,checksum");
     foreach (workloadIndex, workload; workloads)
     {
         const expected = checksum(workload) * waves;
+        auto values = new ulong[workload.items];
         foreach (sample; 0 .. warmups + samples)
         {
-			const offset = (sample + workloadIndex) % arms.length;
-			foreach (order; 0 .. arms.length)
+            const offset = (sample + workloadIndex) % arms.length;
+            foreach (order; 0 .. arms.length)
             {
-				const arm = arms[(offset + order) % arms.length];
+                const arm = arms[(offset + order) % arms.length];
                 const started = MonoTime.currTime;
-				const actual = run(workload, 4, arm);
+                const actual = run(executor, pool, workload, arm, values);
                 const elapsed = (MonoTime.currTime - started).total!"nsecs";
                 enforce(actual == expected && elapsed > 0,
                     workload.name ~ "/checksum or timing mismatch");

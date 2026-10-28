@@ -78,8 +78,9 @@ meta = {
     "protocol": (f"{SESSIONS} sessions; {SAMPLES} measured and {WARMUPS} warmup "
                  "samples; four total participants; 10 workloads (1,024 and "
                  "16,384 items); fixed/adaptive grain and Phobos batch sweeps (1,4,16,64,256) "
-                 "with rotating order; "
-                 "eight reused waves per timed invocation; Phobos uses "
+                 "with rotating order; one Executor, one Phobos TaskPool, and "
+                 "one output buffer per workload are reused across measured "
+                 "samples; eight waves per timed invocation; Phobos uses "
                  "TaskPool(3) plus its calling thread; executor ingress capacity "
                  "is 64; all scheduler grain/batch sizes are swept"),
     "machine": platform.uname()._asdict(),
