@@ -235,6 +235,14 @@ cost distribution and p95 target, not these screens alone. The [pinned XPS
 and ARM64 raw captures](https://github.com/alex-1974/concurrency-d-research/tree/32c9eacd702183f936ccbcfffdff53032d83df1d/research/m3-batch-tuning)
 record the exact hosts, commands and measurements.
 
+The batch-tuning harness now includes a complementary skew screen: a fixed
+number of items receive extra recurrence work, placed either contiguously or
+at evenly spaced indexes. Both layouts do the same total recurrence work;
+only how that work groups into callables changes. This tests whether large
+grains concentrate expensive items into straggling callables. These synthetic
+layouts are diagnostic, not scheduling guarantees. Capture both layouts on
+the target machine before turning their results into task-size guidance.
+
 When the caller needs the whole group to finish before continuing and does not
 need independent task handles, `submitBatchAndWait` avoids one handle object
 per task:
