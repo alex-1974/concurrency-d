@@ -95,6 +95,11 @@ while a single-item call keeps its record inline. An alternating local LDC
 comparison showed 8–18% lower four-producer medians at batch grains 16–256;
 one-producer gains were smaller, and measured allocation bytes varied. This
 optimization changes no public scheduling API. Repeatable native ARM64
-performance evidence is still needed for this path. Keep v0.4.0's release
+measurements now exist: two four-session hosted Neoverse-N2/LDC captures with
+byte-identical binaries showed 7–13% lower pooled paired medians across the
+tested producer counts and batch grains. The paired p95 ratios include
+outliers and do not establish better tail latency. Treat this as confirmation
+on one hosted ARM64 runner, not a cross-device guarantee; benchmark
+representative task costs before broadening the claim. Keep v0.4.0's release
 target unset until the performance work and exact release-candidate gates
 pass. Do not change task-record/parking policies without a measured need.

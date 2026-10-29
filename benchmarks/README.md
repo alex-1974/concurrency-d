@@ -181,6 +181,31 @@ sums the values. For asynchronous `submit` and `submitBatch`, it covers
 admission and handle creation, excluding handle waits and producer-thread
 startup. For `submitBatchAndWait`, it spans the full call, including task
 completion; producer-thread startup remains excluded.
+
+The synchronous batch-storage A/B has a separate native ARM64 workflow. It
+builds the same focused benchmark against the parent of the contiguous-storage
+change and the checked-out candidate, then alternates their process order over
+four independent sessions. It measures 16,384 one-store items with one and
+four producers, four executor workers, and batch grains 16, 64 and 256. The
+four-producer case uses ingress/retention limits 256/512, so each producer's
+batch fits while concurrent groups can exercise real backpressure. It records
+raw per-process CSV, compiler and host metadata, paired sample ratios, checksums,
+and p50/p95 summaries. The workflow runs on relevant pull requests and can be
+started manually. It has no timing threshold: interpret the ARM64 capture
+alongside the local XPS measurements and keep all raw rows with any conclusion.
+Two native ARM64 captures used LDC 1.41 on the same hosted Neoverse-N2 runner,
+with four alternating process sessions each and 120 paired samples total per
+producer/grain combination. Both runs built byte-identical baseline and
+candidate executables. Pooled candidate-to-baseline paired median ratios
+ranged from 0.867 to 0.928 (about 7–13% lower candidate medians); the candidate
+won 75–110 of 120 individual pairs per combination. Gains varied by grain and
+producer count. Paired p95 ratios were noisy and reached 1.71, so these runs do
+not establish a tail-latency improvement. See the [first raw ARM64 run and
+artifact](https://github.com/alex-1974/concurrency-d/actions/runs/40852675994)
+and [independent repeat and artifact](https://github.com/alex-1974/concurrency-d/actions/runs/40853021006)
+for exact rows, per-session results, compiler, and host metadata. This is one
+hosted ARM64 machine and one short-task workload; repeat with representative
+task durations before generalizing.
 In a five-sample, two-warmup one-producer capture with 16,384 items, repeated
 single-task submission allocated a median 176.5 bytes/item before and 160.5
 after the change. Batch-of-one allocated 241.5 vs 225.5 bytes/item, including
