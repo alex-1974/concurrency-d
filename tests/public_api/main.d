@@ -317,6 +317,10 @@ private void batchSubmissionAndWait()
     auto values = executor.submitBatchAndWait(jobs[]);
     enforce(values.length == 4 && values[0] == 2 && values[3] == 8,
         "submitBatchAndWait must return input-ordered typed results");
+    BatchNumber[1] singleJob = [BatchNumber(7)];
+    auto singleValue = executor.submitBatchAndWait(singleJob[]);
+    enforce(singleValue.length == 1 && singleValue[0] == 14,
+        "single-task batch wait must return its typed result");
 
     BatchValue[4] voidJobs;
     auto outputs = new ulong[4];

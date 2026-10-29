@@ -106,6 +106,13 @@ void main(string[] args)
             CostPattern.scatteredHotspots),
         Workload("heavy_prefix", 1024, 128, 896, CostPattern.heavyPrefix),
         Workload("heavy_suffix", 1024, 128, 896, CostPattern.heavySuffix),
+        Workload("large_short_uniform", 16384, 16, 0, CostPattern.uniform),
+        Workload("large_scattered_hotspots", 16384, 16, 896,
+            CostPattern.scatteredHotspots),
+        Workload("large_heavy_prefix", 16384, 16, 896,
+            CostPattern.heavyPrefix),
+        Workload("large_heavy_suffix", 16384, 16, 896,
+            CostPattern.heavySuffix),
     ];
     immutable workerCounts = [1UL, 2UL, 4UL];
     immutable grains = [1UL, 4UL, 16UL, 64UL, 256UL, 512UL];

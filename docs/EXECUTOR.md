@@ -224,12 +224,20 @@ executor.submitBatchAndWait(voidJobs[]);           // void tasks
 The non-void overload returns results in input order. It waits for every task
 before returning or rethrowing the first observed task failure. It has the same
 atomic capacity rule as `submitBatch`; an oversized batch throws and a
-temporarily full executor waits. Since completion is synchronous, use
+temporarily full executor waits. For a multi-item call, task records occupy one
+owned array retained through each task's dispatch-return marker; a one-item
+call keeps its record inline. This avoids one GC object per task while keeping
+record addresses stable for executor-owned roots. Since completion is
+synchronous, use
 `submitBatch` when results must be observed independently or work should
 overlap with later caller activity.
 
 `parallelForAdaptive` is an opt-in alternative for workloads with uneven or
-uncertain item costs. For `minGrainSize == 1`, the scheduler divides the domain
+uncertain item costs. For very short callbacks, compare it with fixed
+`parallelFor` at grain 1: fixed grain 1 performs a shared atomic claim per
+index, while adaptive grain 1 claims cyclic blocks through worker-local
+cursors. See the adaptive-range measurements in the benchmark guide; the best
+choice depends on callback cost and distribution. For `minGrainSize == 1`, the scheduler divides the domain
 into cyclic blocks and gives each participant its own atomic claim cursor.
 Participants can claim remaining blocks from another lane after exhausting
 their own. This spreads clustered expensive items across the participant

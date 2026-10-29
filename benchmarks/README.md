@@ -164,8 +164,18 @@ accepted task: a result cell, an owned task node and a typed handle. The result
 cell is now the base of the owned node, preserving the same typed handle and
 task lifetime while removing one object allocation per task. The task record
 and handle remain individual allocations for asynchronous APIs. The
-`submitBatchAndWait` path instead shares one completion cell across the batch
-and creates no per-task handles. The benchmark's `producer_allocated_bytes`
+`submitBatchAndWait` path instead shares one completion cell across the batch,
+creates no per-task handles, and stores multi-item task records in one
+executor-rooted GC array. A one-item batch keeps its record inline in the owner
+object to avoid a second allocation. Each retained-task root keeps that owner
+alive through the dispatch-return marker, preserving record address stability.
+In an alternating four-process LDC 1.42 A/B on the XPS (16,384 one-store tasks,
+four workers, 60 observations per arm), batch-wait medians improved about
+18%, 8% and 10% at grains 16, 64 and 256 with four producers; one-producer
+results were about 6% faster at grain 16, 3% at grain 64 and effectively tied
+at grain 256. Producer allocation bytes varied by arm, so these timings do not
+support a general allocation-byte reduction claim. They are host-specific
+diagnostics, not portable promises. The benchmark's `producer_allocated_bytes`
 column reads D's current-thread GC allocation counter in each producer and
 sums the values. For asynchronous `submit` and `submitBatch`, it covers
 admission and handle creation, excluding handle waits and producer-thread
@@ -191,11 +201,16 @@ The focused adaptive-range diagnostic compares only fixed and adaptive
 `parallelFor` over short (16 iterations), medium (256), long (4096), scattered
 hotspots, and expensive items clustered at the beginning or end. The hotspot
 profiles keep the same cost distribution and move the expensive one-eighth of
-items to test sensitivity to their position. It holds the 1,024-item domain
-and eight reused-executor waves constant, and sweeps 1, 2 and 4 workers and six
+items to test sensitivity to their position. It covers 1,024- and 16,384-item
+domains, eight reused-executor waves, and 1, 2 and 4 workers across six
 minimum/fixed grain sizes. Each pair checks the same checksum. This isolates
 how well a small adaptive minimum handles unknown and clustered costs; it does
-not establish a universal best grain.
+not establish a universal best grain. In one XPS/LDC 1.42 capture, the 16,384
+short-uniform, four-worker, grain-1 adaptive run took 818 μs versus 4.76 ms
+for fixed grain 1 across eight waves. Fixed grain 1 claims every index through
+one shared atomic cursor, while adaptive grain 1 distributes cyclic blocks
+across worker-local claim cursors. This result motivates choosing adaptive
+scheduling for that measured workload; it is not a general speedup guarantee.
 
 ```sh
 dub build --root=benchmarks/adaptive-ranges --build=release --compiler=ldc2

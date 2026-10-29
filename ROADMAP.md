@@ -81,9 +81,20 @@ vary by host and distribution. See the [direct comparison and limits](docs/V0.4-
 [PR #57](https://github.com/alex-1974/concurrency-d/pull/57), and
 [240-sample ARM64 run](https://github.com/alex-1974/concurrency-d/actions/runs/40566914191).
 
-The next optimization is to profile the short-task path and separate executor
-startup/scope cost, range-claim synchronization and callback time. Change only
-a measured bottleneck, then repeat both architecture matrices. Keep v0.4.0's
-release target unset until the performance work and exact release-candidate
-gates pass. Do not add public scheduling APIs or change task-record/parking
-policies without a measured need.
+Short-task profiling separated callback cost from range scheduling. At 16,384
+short uniform items and four workers, adaptive grain 1 was substantially
+faster than fixed grain 1 in the local XPS capture; isolated samples showed
+the adaptive claim path was a small part of runtime. A lower split-block
+density experiment did not produce a consistent cross-workload improvement,
+so the existing scheduler was retained. The expanded two-size adaptive matrix
+and host-specific results are recorded in [the benchmark guide](benchmarks/README.md).
+
+The current implementation target is synchronous batch record storage:
+multi-item `submitBatchAndWait` calls use one executor-rooted record array,
+while a single-item call keeps its record inline. An alternating local LDC
+comparison showed 8–18% lower four-producer medians at batch grains 16–256;
+one-producer gains were smaller, and measured allocation bytes varied. This
+optimization changes no public scheduling API. Repeatable native ARM64
+performance evidence is still needed for this path. Keep v0.4.0's release
+target unset until the performance work and exact release-candidate gates
+pass. Do not change task-record/parking policies without a measured need.

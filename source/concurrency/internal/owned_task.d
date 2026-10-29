@@ -160,8 +160,8 @@ private final class OwnedNode(F, R) : ResultCell!R
     }
 }
 
-/** One task record within a submitBatchAndWait operation. */
-private final class OwnedBatchNode(F, R)
+/** Stable contiguous task records shared by one synchronous batch. */
+private final class OwnedBatchStorage(F, R)
 {
     private struct Record
     {
@@ -173,29 +173,54 @@ private final class OwnedBatchNode(F, R)
 
     static assert(Record.prefix.offsetof == 0);
 
-    private Record _record;
+    private Record _single;
+    private Record[] _records;
+    private size_t _count;
 
-    this(F callable, BatchResultCell!R batch, size_t index,
-        WorkSize workSize)
+    this(scope F[] callables, BatchResultCell!R batch, WorkSize workSize)
     {
-        _record.callable = callable;
-        _record.batch = batch;
-        _record.index = index;
-        _record.prefix.header.execute = &execute;
-        _record.prefix.header.batchHint = workSize == WorkSize.large
+        _count = callables.length;
+        if (_count == 1)
+        {
+            initialize(_single, callables[0], batch, 0, workSize);
+        }
+        else
+        {
+            _records = new Record[_count];
+            foreach (index, ref callable; callables)
+                initialize(_records[index], callable, batch, index, workSize);
+        }
+    }
+
+    TaskRef reference(size_t index)
+    {
+        auto record = recordAt(index);
+        return TaskRef(cast(shared(TaskHeader)*)
+            &record.prefix.header);
+    }
+
+    shared(uint)* returnedFlag(size_t index)
+    {
+        return &recordAt(index).prefix.returned;
+    }
+
+    private void initialize(ref Record record, F callable,
+        BatchResultCell!R batch, size_t index, WorkSize workSize)
+    {
+        record.callable = callable;
+        record.batch = batch;
+        record.index = index;
+        record.prefix.header.execute = &execute;
+        record.prefix.header.batchHint = workSize == WorkSize.large
             ? TaskBatchHint.oneAtATime : TaskBatchHint.normal;
-        _record.prefix.afterExecution = &publishReturned;
-        atomicStore!(MemoryOrder.raw)(_record.prefix.returned, 0u);
+        record.prefix.afterExecution = &publishReturned;
+        atomicStore!(MemoryOrder.raw)(record.prefix.returned, 0u);
     }
 
-    TaskRef reference()
+    private Record* recordAt(size_t index)
     {
-        return TaskRef(cast(shared(TaskHeader)*) &_record.prefix.header);
-    }
-
-    shared(uint)* returnedFlag()
-    {
-        return &_record.prefix.returned;
+        assert(index < _count);
+        return _count == 1 ? &_single : &_records[index];
     }
 
     private static void execute(shared(TaskHeader)* header)
@@ -499,14 +524,13 @@ package(concurrency) final class OwnedTaskExecutor
         }
 
         auto batch = new BatchResultCell!R(_resultNotifier, callables.length);
+        auto nodes = new OwnedBatchStorage!(F, R)(callables, batch, workSize);
         auto refs = new TaskRef[callables.length];
         auto roots = new RetainedTask[callables.length];
-        foreach (index, ref callable; callables)
+        foreach (index; 0 .. callables.length)
         {
-            auto node = new OwnedBatchNode!(F, R)(callable, batch,
-                index, workSize);
-            refs[index] = node.reference();
-            roots[index] = RetainedTask(node, node.returnedFlag());
+            refs[index] = nodes.reference(index);
+            roots[index] = RetainedTask(nodes, nodes.returnedFlag(index));
         }
 
         while (true)
