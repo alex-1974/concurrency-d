@@ -232,16 +232,18 @@ zero-work case; with 256/512 capacities, p95 was lower for zero and medium
 work, and similar for heavier work. This is still one hosted Neoverse-N2
 machine and homogeneous items. Select using the application's own per-task
 cost distribution and p95 target, not these screens alone. The [pinned XPS
-and ARM64 raw captures](https://github.com/alex-1974/concurrency-d-research/tree/32c9eacd702183f936ccbcfffdff53032d83df1d/research/m3-batch-tuning)
+and ARM64 raw captures](https://github.com/alex-1974/concurrency-d-research/tree/07b40bc0f54b22a19c4e0b809261397f8e6511a4/research/m3-batch-tuning)
 record the exact hosts, commands and measurements.
 
-The batch-tuning harness now includes a complementary skew screen: a fixed
-number of items receive extra recurrence work, placed either contiguously or
-at evenly spaced indexes. Both layouts do the same total recurrence work;
-only how that work groups into callables changes. This tests whether large
-grains concentrate expensive items into straggling callables. These synthetic
-layouts are diagnostic, not scheduling guarantees. Capture both layouts on
-the target machine before turning their results into task-size guidance.
+The batch-tuning harness also compares two uneven-cost layouts: 128 of 2,048
+items receive 64 extra recurrence iterations, either contiguously or evenly
+spaced. On the XPS, grain 256 retained the lowest median in both layouts; the
+layout change did not consistently move median or p95, and several p95s varied
+widely between sessions. This synthetic result does not support changing the
+default or asserting a general tail-latency benefit. See the [uneven-task raw
+capture](https://github.com/alex-1974/concurrency-d-research/tree/07b40bc0f54b22a19c4e0b809261397f8e6511a4/research/m3-batch-tuning/xps-uneven-2026-10-29)
+for full observations and metadata. Measure representative consumer workloads
+before selecting a grain.
 
 When the caller needs the whole group to finish before continuing and does not
 need independent task handles, `submitBatchAndWait` avoids one handle object
