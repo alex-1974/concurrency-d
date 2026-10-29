@@ -193,6 +193,17 @@ raw per-process CSV, compiler and host metadata, paired sample ratios, checksums
 and p50/p95 summaries. The workflow runs on relevant pull requests and can be
 started manually. It has no timing threshold: interpret the ARM64 capture
 alongside the local XPS measurements and keep all raw rows with any conclusion.
+The first native ARM64 capture used LDC 1.41 on a hosted Neoverse-N2 runner
+with four alternating sessions and 60 paired samples per producer/grain
+combination. Candidate-to-baseline paired median ratios ranged from 0.877 to
+0.958 (about 4–12% lower candidate medians); the candidate won 33–55 of 60
+individual pairs in each combination. The largest median gain was four
+producers at grain 16. Paired p95 ratios were noisy and reached 1.87 in one
+combination, so the capture does not establish a tail-latency improvement.
+See the [raw ARM64 run and artifact](https://github.com/alex-1974/concurrency-d/actions/runs/40852675994)
+for the exact rows, per-session results, compiler, and host metadata. This is
+one hosted ARM64 machine and one short-task workload; repeat with representative
+task durations before generalizing.
 In a five-sample, two-warmup one-producer capture with 16,384 items, repeated
 single-task submission allocated a median 176.5 bytes/item before and 160.5
 after the change. Batch-of-one allocated 241.5 vs 225.5 bytes/item, including
