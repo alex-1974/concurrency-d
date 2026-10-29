@@ -1,0 +1,10 @@
+{
+  "name": "concurrency-batch-wait-benchmark",
+  "targetType": "executable",
+  "sourcePaths": [],
+  "mainSourceFile": "main.d",
+  "targetName": "concurrency-batch-wait-benchmark",
+  "dependencies": {
+    "concurrency-d": { "path": "../.." }
+  }
+}

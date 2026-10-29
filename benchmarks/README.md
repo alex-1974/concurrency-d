@@ -181,6 +181,18 @@ sums the values. For asynchronous `submit` and `submitBatch`, it covers
 admission and handle creation, excluding handle waits and producer-thread
 startup. For `submitBatchAndWait`, it spans the full call, including task
 completion; producer-thread startup remains excluded.
+
+The synchronous batch-storage A/B has a separate native ARM64 workflow. It
+builds the same focused benchmark against the parent of the contiguous-storage
+change and the checked-out candidate, then alternates their process order over
+four independent sessions. It measures 16,384 one-store items with one and
+four producers, four executor workers, and batch grains 16, 64 and 256. The
+four-producer case uses ingress/retention limits 256/512, so each producer's
+batch fits while concurrent groups can exercise real backpressure. It records
+raw per-process CSV, compiler and host metadata, paired sample ratios, checksums,
+and p50/p95 summaries. The workflow runs on relevant pull requests and can be
+started manually. It has no timing threshold: interpret the ARM64 capture
+alongside the local XPS measurements and keep all raw rows with any conclusion.
 In a five-sample, two-warmup one-producer capture with 16,384 items, repeated
 single-task submission allocated a median 176.5 bytes/item before and 160.5
 after the change. Batch-of-one allocated 241.5 vs 225.5 bytes/item, including

@@ -1,0 +1,74 @@
+name: Synchronous batch storage native ARM64 A/B
+
+on:
+  pull_request:
+    branches: [develop, main]
+    paths:
+      - "source/concurrency/internal/owned_task.d"
+      - "benchmarks/batch-wait/**"
+      - "tools/validation/capture_batch_wait_arm64.py"
+      - ".github/workflows/batch-wait-arm64.yml"
+  workflow_dispatch:
+    inputs:
+      sessions:
+        description: Independent paired process sessions
+        required: true
+        default: "4"
+        type: string
+      samples:
+        description: Measured samples per session, producer count and variant
+        required: true
+        default: "15"
+        type: string
+      warmups:
+        description: Warmup samples per process
+        required: true
+        default: "5"
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  capture:
+    name: Native ARM64 / LDC paired batch-wait capture
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 90
+    env:
+      DC: ldc2
+      BASELINE_REF: c984da8
+      SESSIONS: ${{ inputs.sessions || '4' }}
+      SAMPLES: ${{ inputs.samples || '15' }}
+      WARMUPS: ${{ inputs.warmups || '5' }}
+      GITHUB_EVENT_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+    steps:
+      - name: Checkout complete history
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Install LDC
+        uses: dlang-community/setup-dlang@v2
+        with:
+          compiler: ldc-1.41.0
+
+      - name: Verify native ARM64 and toolchain
+        run: |
+          test "$(uname -m)" = "aarch64"
+          uname -a
+          lscpu
+          "$DC" --version
+          dub --version
+          git rev-parse "$BASELINE_REF^{commit}"
+
+      - name: Capture and summarize paired runs
+        run: python3 tools/validation/capture_batch_wait_arm64.py
+
+      - name: Upload raw capture and metadata
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: batch-wait-arm64-${{ github.sha }}
+          path: /tmp/batch-wait-arm64/
+          if-no-files-found: warn
+          retention-days: 90
