@@ -122,6 +122,42 @@ batches of 16 logical tasks reduced median total time from 3.23 ms to 0.97 ms;
 batches of 64 reduced it from 0.87 ms to 0.35 ms. Thread startup is included
 for both the single-submit and batch arms in this multi-producer comparison.
 
+`batch-tuning` sweeps synchronous batches of 1, 4, 16, 64 and 256 homogeneous
+callables. Each callable processes its assigned logical items with a repeatable
+integer recurrence (0, 8 or 64 iterations per item by default), allowing the
+per-task work and batch size to vary independently. It tests one and four
+producers with roomy capacities, plus four producers at ingress/retention
+256/512. Batches that cannot fit atomically are omitted and listed by the
+capture metadata. Every sample validates an identical checksum. Four-producer
+timings include producer thread creation and join, so they describe a complete
+caller operation, not only executor admission.
+
+Build and run one configuration directly:
+
+```sh
+dub run --root=benchmarks/batch-tuning --compiler=ldc2 --build=release -- \
+  15 5 2048 4 4 256 512 64
+```
+
+For repeatable local captures with raw rows, machine/toolchain metadata,
+per-session p50/p95 and cross-session ranges:
+
+```sh
+SESSIONS=5 SAMPLES=15 WARMUPS=5 ITEMS=2048 ITERATIONS=0,8,64 \
+  python3 tools/validation/capture_batch_tuning.py /tmp/batch-tuning-xps
+```
+
+The capture is a tuning screen for uniform tasks. It does not model variance
+between tasks or establish a portable best grain. Use representative task
+costs and latency goals; for uneven tasks, smaller batches may reduce the wait
+behind a slow callable. See `docs/EXECUTOR.md` for the measured guidance and
+the capture's limits. Changes to this harness also run the same sweep on a
+native ARM64 runner; raw observations and metadata are retained as a workflow
+artifact for 90 days. The initial five-session ARM64 screen showed the same
+median trend for uniform tasks; its 64-versus-256 p95 result varied by work
+amount and capacity. See the [pinned XPS and ARM64 result sets](https://github.com/alex-1974/concurrency-d-research/tree/32c9eacd702183f936ccbcfffdff53032d83df1d/research/m3-batch-tuning)
+and the [native capture run](https://github.com/alex-1974/concurrency-d/actions/runs/40869310847).
+
 An isolation sweep at 16,384 items compared default capacities (ingress 256,
 retention 512) with each limit raised to 16,384. For one task per item, median
 submission remained about 19–22 ms in every configuration. Raising either

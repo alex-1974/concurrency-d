@@ -1,0 +1,75 @@
+name: Synchronous batch tuning native ARM64
+
+on:
+  pull_request:
+    branches: [develop, main]
+    paths:
+      - "benchmarks/batch-tuning/**"
+      - "tools/validation/capture_batch_tuning.py"
+      - ".github/workflows/batch-tuning-arm64.yml"
+  workflow_dispatch:
+    inputs:
+      sessions:
+        description: Independent process sessions
+        required: true
+        default: "5"
+        type: string
+      samples:
+        description: Measured samples per process configuration
+        required: true
+        default: "15"
+        type: string
+      warmups:
+        description: Warmup samples per process configuration
+        required: true
+        default: "5"
+        type: string
+      items:
+        description: Logical items per synchronous batch
+        required: true
+        default: "2048"
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  capture:
+    name: Native ARM64 / LDC batch tuning screen
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 90
+    env:
+      DC: ldc2
+      SESSIONS: ${{ inputs.sessions || '5' }}
+      SAMPLES: ${{ inputs.samples || '15' }}
+      WARMUPS: ${{ inputs.warmups || '5' }}
+      ITEMS: ${{ inputs.items || '2048' }}
+      ITERATIONS: "0,8,64"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Install LDC
+        uses: dlang-community/setup-dlang@v2
+        with:
+          compiler: ldc-1.41.0
+
+      - name: Verify native ARM64 and toolchain
+        run: |
+          test "$(uname -m)" = "aarch64"
+          uname -a
+          lscpu
+          "$DC" --version
+          dub --version
+
+      - name: Capture independent sessions
+        run: python3 tools/validation/capture_batch_tuning.py /tmp/batch-tuning-arm64
+
+      - name: Upload raw capture and metadata
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: batch-tuning-arm64-${{ github.sha }}
+          path: /tmp/batch-tuning-arm64/
+          if-no-files-found: warn
+          retention-days: 90

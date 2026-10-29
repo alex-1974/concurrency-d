@@ -212,6 +212,29 @@ shrinks as each callable does more work, so benchmark with representative task
 durations. Use `parallelFor` for indexed work, which avoids per-item task
 records altogether.
 
+A local LDC 1.42 screen on an XPS 15 (2,048 uniform items, four workers, 1/4/16/64/256
+items per callable, three per-item work amounts, five independent sessions)
+found that larger batches often lowered the completion median. With four
+producers and roomy capacities, grain 256 measured 201–226 μs median session
+p50 across the work amounts, versus 216–244 μs at grain 64. With ingress and
+retention limited to 256/512, grain 256 measured 257–354 μs, versus 277–386 μs
+at grain 64. These are whole-call timings including producer-thread startup;
+they are specific to this uniform workload. Session p95 varied substantially
+and was not consistently lower for the larger grain; the most variable
+64-iteration cases had session p50s up to 1.9 ms and p95s up to 4.3 ms. Thus,
+16–64 remains a practical starting range when latency or cost variation
+matters, while 64–256 is worth testing for uniform throughput-oriented work.
+The matching five-session native ARM64/LDC 1.41 screen showed a similar trend:
+with four producers and roomy capacities, grain 256 measured 201–219 μs
+median session p50 across the work amounts, versus 216–228 μs at grain 64.
+Its p95 was lower for the medium and heavier cases, slightly higher for the
+zero-work case; with 256/512 capacities, p95 was lower for zero and medium
+work, and similar for heavier work. This is still one hosted Neoverse-N2
+machine and homogeneous items. Select using the application's own per-task
+cost distribution and p95 target, not these screens alone. The [pinned XPS
+and ARM64 raw captures](https://github.com/alex-1974/concurrency-d-research/tree/32c9eacd702183f936ccbcfffdff53032d83df1d/research/m3-batch-tuning)
+record the exact hosts, commands and measurements.
+
 When the caller needs the whole group to finish before continuing and does not
 need independent task handles, `submitBatchAndWait` avoids one handle object
 per task:
