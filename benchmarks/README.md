@@ -126,9 +126,11 @@ for both the single-submit and batch arms in this multi-producer comparison.
 callables. Each callable processes its assigned logical items with a repeatable
 integer recurrence (0, 8 or 64 base iterations per item by default), allowing
 the per-task work and batch size to vary independently. The capture also
-compares clustered and scattered layouts of a fixed set of expensive items;
-both layouts have the same number of hot items and recurrence work, but place
-that work into different batches. It tests one and four
+compares clustered and scattered layouts of a fixed set of expensive items,
+plus a single-item outlier that receives the same total extra recurrence work.
+The clustered and scattered layouts distribute that work across the same
+number of items but place them into different batches. This isolates whether
+one long callable changes the grain-size tradeoff. It tests one and four
 producers with roomy capacities, plus four producers at ingress/retention
 256/512. Batches that cannot fit atomically are omitted and listed by the
 capture metadata. Every sample validates an identical checksum. Four-producer
@@ -152,8 +154,8 @@ SESSIONS=5 SAMPLES=15 WARMUPS=5 ITEMS=2048 ITERATIONS=0,8,64 \
 
 This capture adds a controlled uneven-task screen, but its synthetic recurrence
 is still only a proxy for application work and does not establish a portable
-best grain. Compare both layouts and use representative task costs and latency
-goals; smaller batches can reduce the wait behind a slow callable, while larger
+best grain. Compare all three layouts and use representative task costs and
+latency goals; smaller batches can reduce the wait behind a slow callable, while larger
 batches can reduce scheduling overhead. See `docs/EXECUTOR.md` for measured
 guidance and the capture's limits. Changes to this harness also run the same sweep on a
 native ARM64 runner; raw observations and metadata are retained as a workflow

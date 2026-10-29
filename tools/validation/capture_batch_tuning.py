@@ -23,7 +23,7 @@ WARMUPS = int(os.environ.get("WARMUPS", "2"))
 ITERATIONS = tuple(map(int, os.environ.get("ITERATIONS", "0,8,64").split(",")))
 HOT_ITEMS = int(os.environ.get("HOT_ITEMS", str(max(1, ITEMS // 16))))
 EXTRA_ITERATIONS = int(os.environ.get("EXTRA_ITERATIONS", "64"))
-LAYOUTS = ("clustered", "scattered")
+LAYOUTS = ("clustered", "scattered", "single")
 
 
 def run(command, cwd=ROOT):
@@ -48,6 +48,8 @@ def main():
         raise SystemExit("invalid capture dimensions")
     if HOT_ITEMS < 1 or ITEMS % HOT_ITEMS:
         raise SystemExit("HOT_ITEMS must be positive and divide ITEMS")
+    if EXTRA_ITERATIONS * HOT_ITEMS > 100_000:
+        raise SystemExit("single-outlier work must not exceed 100,000 iterations")
     OUT.mkdir(parents=True)
 
     build_log = run(["dub", "build", "--root=benchmarks/batch-tuning",
@@ -68,7 +70,9 @@ def main():
                    f"measured plus {WARMUPS} warmups; {ITEMS} items; "
                    f"{WORKERS} executor workers; base recurrence counts "
                    f"{ITERATIONS}; {HOT_ITEMS} hot items receive "
-                   f"{EXTRA_ITERATIONS} extra recurrences in {LAYOUTS}; "
+                   f"{EXTRA_ITERATIONS} extra recurrences in clustered/"
+                   f"scattered layouts; single concentrates the same total "
+                   f"extra work into one item; layouts={LAYOUTS}; "
                    f"producers/capacity modes {modes}; grains "
                    "1,4,16,64,256; checksum verified every sample; producer "
                    "thread startup/join included for four-producer cases"),
@@ -88,9 +92,13 @@ def main():
         total = 0
         stride = ITEMS // HOT_ITEMS
         for index in range(ITEMS):
-            hot = (index < HOT_ITEMS if layout == "clustered" else
-                   index % stride == 0 and index // stride < HOT_ITEMS)
-            count = iterations + (EXTRA_ITERATIONS if hot else 0)
+            if layout == "single":
+                extra = HOT_ITEMS * EXTRA_ITERATIONS if index == 0 else 0
+            else:
+                hot = (index < HOT_ITEMS if layout == "clustered" else
+                       index % stride == 0 and index // stride < HOT_ITEMS)
+                extra = EXTRA_ITERATIONS if hot else 0
+            count = iterations + extra
             value = index + 1
             for iteration in range(count):
                 value = (value * 6364136223846793005 + iteration +
@@ -145,8 +153,11 @@ def main():
                                 int(row["workers"]) != WORKERS or
                                 int(row["iterations"]) != iterations or
                                 int(row["hot_items"]) != HOT_ITEMS or
-                                int(row["extra_iterations"]) !=
-                                EXTRA_ITERATIONS or row["layout"] != layout or
+                                int(row["effective_extra_iterations"]) !=
+                                (HOT_ITEMS * EXTRA_ITERATIONS
+                                 if layout == "single" else
+                                 EXTRA_ITERATIONS) or
+                                row["layout"] != layout or
                                 int(row["producers"]) != producer or
                                 int(row["ingress"]) != ingress or
                                 int(row["retained"]) != retained or

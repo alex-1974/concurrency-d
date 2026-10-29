@@ -235,15 +235,16 @@ cost distribution and p95 target, not these screens alone. The [pinned XPS
 and ARM64 raw captures](https://github.com/alex-1974/concurrency-d-research/tree/07b40bc0f54b22a19c4e0b809261397f8e6511a4/research/m3-batch-tuning)
 record the exact hosts, commands and measurements.
 
-The batch-tuning harness also compares two uneven-cost layouts: 128 of 2,048
-items receive 64 extra recurrence iterations, either contiguously or evenly
-spaced. On the XPS, grain 256 retained the lowest median in both layouts; the
-layout change did not consistently move median or p95, and several p95s varied
-widely between sessions. This synthetic result does not support changing the
-default or asserting a general tail-latency benefit. See the [uneven-task raw
-capture](https://github.com/alex-1974/concurrency-d-research/tree/07b40bc0f54b22a19c4e0b809261397f8e6511a4/research/m3-batch-tuning/xps-uneven-2026-10-29)
-for full observations and metadata. Measure representative consumer workloads
-before selecting a grain.
+The batch-tuning harness compares three uneven-cost layouts. In addition to
+128 of 2,048 items receiving 64 extra recurrence iterations either
+contiguously or evenly spaced, it can concentrate the same total extra work
+into one outlier item. The XPS clustered-versus-scattered screen retained
+grain 256's median lead, but did not show a consistent layout effect or a
+general p95 benefit. The single-outlier screen is intended to test whether
+more severe task-cost variance changes that result; its measurements are
+pending. Measure representative consumer workloads before selecting a grain.
+The [uneven-task raw capture](https://github.com/alex-1974/concurrency-d-research/tree/07b40bc0f54b22a19c4e0b809261397f8e6511a4/research/m3-batch-tuning/xps-uneven-2026-10-29)
+contains the previous XPS observations and metadata.
 
 When the caller needs the whole group to finish before continuing and does not
 need independent task handles, `submitBatchAndWait` avoids one handle object
