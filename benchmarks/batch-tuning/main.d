@@ -14,22 +14,17 @@ private struct WorkRange
     size_t first;
     size_t last;
     size_t iterations;
-    size_t hotItems;
     size_t extraIterations;
-    bool scattered;
 
     this(ulong[] values, bool[] hotFlags, size_t first, size_t last,
-        size_t iterations, size_t hotItems, size_t extraIterations,
-        bool scattered) nothrow
+        size_t iterations, size_t extraIterations) nothrow
     {
         this.values = values;
         this.hotFlags = hotFlags;
         this.first = first;
         this.last = last;
         this.iterations = iterations;
-        this.hotItems = hotItems;
         this.extraIterations = extraIterations;
-        this.scattered = scattered;
     }
 
     void opCall() nothrow
@@ -103,13 +98,15 @@ void main(string[] args)
     const hotItems = to!size_t(args[9]);
     const extraIterations = to!size_t(args[10]);
     const scattered = args[11] == "scattered";
+    const single = args[11] == "single";
     enforce(samples > 0 && samples <= 10000 && warmups <= 10000 &&
         items > 0 && items <= 1_000_000 && workers > 0 && workers <= 256 &&
         producers > 0 && producers <= 256 && producers <= items &&
         ingress > 0 && retained > 0 && iterations <= 100_000 &&
         hotItems > 0 && hotItems <= items && items % hotItems == 0 &&
         extraIterations <= 100_000 &&
-        (args[11] == "clustered" || args[11] == "scattered"),
+        extraIterations <= 100_000 / (single ? hotItems : 1) &&
+        (args[11] == "clustered" || args[11] == "scattered" || single),
         "invalid benchmark dimensions");
 
     immutable grains = [1UL, 4UL, 16UL, 64UL, 256UL];
@@ -118,10 +115,14 @@ void main(string[] args)
     auto values = new ulong[items];
     auto hotFlags = new bool[items];
     const stride = items / hotItems;
-    foreach (hot; 0 .. hotItems)
-        hotFlags[scattered ? hot * stride : hot] = true;
+    if (single)
+        hotFlags[0] = true;
+    else
+        foreach (hot; 0 .. hotItems)
+            hotFlags[scattered ? hot * stride : hot] = true;
+    const effectiveExtra = extraIterations * (single ? hotItems : 1);
     const expected = expectedChecksum(items, iterations, hotFlags,
-        extraIterations);
+        effectiveExtra);
     WorkRange[][] jobSets;
     size_t[] acceptedGrains;
     foreach (grain; grains)
@@ -138,7 +139,7 @@ void main(string[] args)
             const last = first + (items - first < grain
                 ? items - first : grain);
             jobs[task] = WorkRange(values, hotFlags, first, last, iterations,
-                hotItems, extraIterations, scattered);
+                effectiveExtra);
         }
         jobSets ~= jobs;
         acceptedGrains ~= grain;
@@ -146,8 +147,8 @@ void main(string[] args)
     enforce(jobSets.length > 0, "no grain fits the configured capacities");
 
     writeln("phase,sample,order,grain,iterations,workers,producers,items," ~
-        "ingress,retained,tasks,hot_items,extra_iterations,layout,total_ns," ~
-        "checksum");
+        "ingress,retained,tasks,hot_items,effective_extra_iterations," ~
+        "layout,total_ns,checksum");
     foreach (sample; 0 .. warmups + samples)
     {
         foreach (order; 0 .. acceptedGrains.length)
@@ -178,7 +179,7 @@ void main(string[] args)
                 ",", order, ",", acceptedGrains[grainIndex], ",", iterations,
                 ",", workers, ",", producers, ",", items, ",", ingress,
                 ",", retained, ",", jobs.length, ",", hotItems, ",",
-                extraIterations, ",", args[11], ",", totalNs, ",", actual);
+                effectiveExtra, ",", args[11], ",", totalNs, ",", actual);
         }
     }
 }
