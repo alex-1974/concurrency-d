@@ -89,17 +89,28 @@ density experiment did not produce a consistent cross-workload improvement,
 so the existing scheduler was retained. The expanded two-size adaptive matrix
 and host-specific results are recorded in [the benchmark guide](benchmarks/README.md).
 
-The current implementation target is synchronous batch record storage:
-multi-item `submitBatchAndWait` calls use one executor-rooted record array,
-while a single-item call keeps its record inline. An alternating local LDC
-comparison showed 8–18% lower four-producer medians at batch grains 16–256;
+The latest completed implementation target was synchronous batch record
+storage: multi-item `submitBatchAndWait` calls use one executor-rooted record
+array, while a single-item call keeps its record inline. An alternating local
+LDC comparison showed 8–18% lower four-producer medians at batch grains 16–256;
 one-producer gains were smaller, and measured allocation bytes varied. This
-optimization changes no public scheduling API. Repeatable native ARM64
-measurements now exist: two four-session hosted Neoverse-N2/LDC captures with
-byte-identical binaries showed 7–13% lower pooled paired medians across the
-tested producer counts and batch grains. The paired p95 ratios include
-outliers and do not establish better tail latency. Treat this as confirmation
-on one hosted ARM64 runner, not a cross-device guarantee; benchmark
-representative task costs before broadening the claim. Keep v0.4.0's release
-target unset until the performance work and exact release-candidate gates
-pass. Do not change task-record/parking policies without a measured need.
+optimization changes no public scheduling API. Two four-session hosted
+Neoverse-N2/LDC captures with byte-identical binaries showed 7–13% lower
+pooled paired medians across the tested producer counts and batch grains. The
+paired p95 ratios include outliers and do not establish better tail latency.
+Treat this as confirmation on one hosted ARM64 runner, not a cross-device
+guarantee.
+
+A five-session local XPS tuning screen then swept 2,048 items, three uniform
+per-item work amounts, five batch grains, one/four producers and both roomy
+and 256/512 capacities. A matching five-session native ARM64 screen ran on
+Neoverse-N2/LDC 1.41. On both hosts, coarser grains generally lowered median
+completion time for uniform work. The ARM64 p95s were usually lower at grain
+256 than 64; the XPS p95 and session-to-session ranges were highly variable,
+especially for heavier four-producer cases. Neither screen models task-cost
+variance. See the [benchmark guide](benchmarks/README.md), [executor tuning
+guidance](docs/EXECUTOR.md), and [pinned XPS and ARM64 captures](https://github.com/alex-1974/concurrency-d-research/tree/32c9eacd702183f936ccbcfffdff53032d83df1d/research/m3-batch-tuning).
+Keep v0.4.0's release target unset until uneven task-cost distributions,
+representative consumer workloads, and the exact release-candidate gates are
+qualified. Do not change task-record or parking policies without a measured
+need.
