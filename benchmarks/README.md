@@ -124,8 +124,11 @@ for both the single-submit and batch arms in this multi-producer comparison.
 
 `batch-tuning` sweeps synchronous batches of 1, 4, 16, 64 and 256 homogeneous
 callables. Each callable processes its assigned logical items with a repeatable
-integer recurrence (0, 8 or 64 iterations per item by default), allowing the
-per-task work and batch size to vary independently. It tests one and four
+integer recurrence (0, 8 or 64 base iterations per item by default), allowing
+the per-task work and batch size to vary independently. The capture also
+compares clustered and scattered layouts of a fixed set of expensive items;
+both layouts have the same number of hot items and recurrence work, but place
+that work into different batches. It tests one and four
 producers with roomy capacities, plus four producers at ingress/retention
 256/512. Batches that cannot fit atomically are omitted and listed by the
 capture metadata. Every sample validates an identical checksum. Four-producer
@@ -136,7 +139,7 @@ Build and run one configuration directly:
 
 ```sh
 dub run --root=benchmarks/batch-tuning --compiler=ldc2 --build=release -- \
-  15 5 2048 4 4 256 512 64
+  15 5 2048 4 4 256 512 64 128 64 scattered
 ```
 
 For repeatable local captures with raw rows, machine/toolchain metadata,
@@ -147,11 +150,12 @@ SESSIONS=5 SAMPLES=15 WARMUPS=5 ITEMS=2048 ITERATIONS=0,8,64 \
   python3 tools/validation/capture_batch_tuning.py /tmp/batch-tuning-xps
 ```
 
-The capture is a tuning screen for uniform tasks. It does not model variance
-between tasks or establish a portable best grain. Use representative task
-costs and latency goals; for uneven tasks, smaller batches may reduce the wait
-behind a slow callable. See `docs/EXECUTOR.md` for the measured guidance and
-the capture's limits. Changes to this harness also run the same sweep on a
+This capture adds a controlled uneven-task screen, but its synthetic recurrence
+is still only a proxy for application work and does not establish a portable
+best grain. Compare both layouts and use representative task costs and latency
+goals; smaller batches can reduce the wait behind a slow callable, while larger
+batches can reduce scheduling overhead. See `docs/EXECUTOR.md` for measured
+guidance and the capture's limits. Changes to this harness also run the same sweep on a
 native ARM64 runner; raw observations and metadata are retained as a workflow
 artifact for 90 days. The initial five-session ARM64 screen showed the same
 median trend for uniform tasks; its 64-versus-256 p95 result varied by work
